@@ -1,0 +1,12 @@
+{
+  "name": "crm-webapp",
+  "version": "0.1.0",
+  "description": "Simple CRM web app scaffold (pages + CSV upload)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
