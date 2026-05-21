@@ -26,14 +26,34 @@
           <i class="fas fa-bars"></i>
         </button>
         <div class="search-container">
+    // Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      // Sidebar elements
+      const menuToggle = document.getElementById('menuToggle');
+      const closeSidebar = document.getElementById('closeSidebar');
+      const sidebar = document.querySelector('.sidebar');
+      const sidebarOverlay = document.getElementById('sidebarOverlay');
+      const sidebar = document.querySelector('.sidebar');
+      
+      // Tab elements
+      const tabOverview = document.getElementById('tab-overview');
+      const tabStrategy = document.getElementById('tab-strategy');
+      const overviewContent = document.getElementById('overview-content');
+      const strategyContent = document.getElementById('strategy-content');
+      // Sidebar logic
+      const toggleSidebar = (show) => {
+        if (!sidebar || !sidebarOverlay) return;
+        if (show) {
+          sidebar.classList.add('active');
+          sidebarOverlay.classList.add('active');
+        } else {
+          sidebar.classList.remove('active');
+          sidebarOverlay.classList.remove('active');
         }
       };
       if (menuToggle) menuToggle.addEventListener('click', () => toggleSidebar(!sidebar.classList.contains('active')));
       if (closeSidebar) closeSidebar.addEventListener('click', () => toggleSidebar(false));
       if (sidebarOverlay) sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
-      if (menuToggle) menuToggle.addEventListener('click', (e) => e.preventDefault());
-      if (closeSidebar) closeSidebar.addEventListener('click', (e) => e.preventDefault());
-      if (sidebarOverlay) sidebarOverlay.addEventListener('click', (e) => e.preventDefault());
       // Tab switching logic
       if (tabOverview && tabStrategy) {
         tabOverview.addEventListener('click', () => {
@@ -498,4 +518,5 @@
     }
   </script>
 </body>
+</html>
 </html>
