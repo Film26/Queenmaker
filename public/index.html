@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QueenMaker CRM — Admin Login</title>
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="page-login">
+  
+  <div class="login-wrapper">
+    <!-- Left Section: Branding -->
+    <div class="login-left">
+      <div class="logo-container">
+        <img src="/assets/369223.png" class="big-logo" alt="QueenMaker Logo">
+        <h1>QueenMaker</h1>
+        <p>Your CRM Dashboard</p>
+      </div>
+    </div>
+
+    <!-- Right Section: Login Form -->
+    <div class="login-right">
+      <div class="login-card">
+        <h2>ADMIN LOGIN</h2>
+        
+        <form class="login-form">
+          <div class="input-group">
+            <i class="fas fa-user"></i>
+            <input type="text" id="username" placeholder="Username" required>
+          </div>
+
+          <div class="input-group">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="password" placeholder="Password" required>
+            <i class="fas fa-eye-slash toggle-pass" id="togglePassword"></i>
+          </div>
+
+          <a href="#" class="forgot-link">Forgot password?</a>
+
+          <button type="submit" id="loginBtn" class="btn-login">LOGIN</button>
+          
+          <div id="feedback" style="margin-top: 15px; font-size: 0.9rem; min-height: 20px;"></div>
+        </form>
+
+        <div class="login-card-footer">
+          Don't have an account? <a href="#">Contact Support</a>
+        </div>
+      </div>
+
+      <div class="login-footer">
+        © 2026 QueenMaker Team
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const demoUsername = 'admin';
+    const demoPassword = 'password'; // Updated to match usual pattern or previous session
+    const loginBtn = document.getElementById('loginBtn');
+    const feedback = document.getElementById('feedback');
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+
+    // Password visibility toggle
+    togglePassword.addEventListener('click', () => {
+      const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+      passwordInput.setAttribute('type', type);
+      togglePassword.classList.toggle('fa-eye');
+      togglePassword.classList.toggle('fa-eye-slash');
+    });
+
+    // Login Logic
+    document.querySelector('.login-form').addEventListener('submit', function(e){
+      e.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      if(username === demoUsername && password === demoPassword){
+        loginBtn.textContent = 'SIGNING IN...';
+        loginBtn.style.opacity = '0.8';
+        feedback.textContent = 'Login สำเร็จ! กำลังเข้าสู่ระบบ...';
+        feedback.style.color = '#198754';
+        
+        setTimeout(() => {
+          window.location.href = 'dashboard.html';
+        }, 800);
+      } else {
+        feedback.textContent = 'Username หรือ Password ไม่ถูกต้อง';
+        feedback.style.color = '#dc3545';
+        
+        // Shake animation effect
+        const card = document.querySelector('.login-card');
+        card.style.animation = 'none';
+        void card.offsetWidth;
+        card.style.animation = 'shake 0.4s ease-in-out';
+      }
+    });
+
+    // Add shake animation to CSS dynamically or via styles.css
+  </script>
+
+  <style>
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-10px); }
+      50% { transform: translateX(10px); }
+      75% { transform: translateX(-10px); }
+    }
+  </style>
+</body>
+</html>
