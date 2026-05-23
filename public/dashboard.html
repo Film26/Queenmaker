@@ -68,218 +68,133 @@
     </aside>
 
     <!-- Main Content -->
-    <main class="main-content">
-      <header class="top-bar">
-        <button id="menuToggle" class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active');">
-          <i class="fas fa-bars"></i>
-        </button>
-        <div class="search-container">
-          <i class="fas fa-search"></i>
-          <input type="text" placeholder="Search">
+    <main class="main-content" style="background-color: #fbf9f4; padding: 20px 40px; font-family: 'Inter', sans-serif;">
+      <header class="top-bar" style="background: transparent; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; border-bottom: none; position: static;">
+        <div style="display: flex; align-items: center; gap: 20px;">
+          <button id="menuToggle" class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active');" style="background: none; border: none; font-size: 24px; cursor: pointer;">
+            <i class="fas fa-bars"></i>
+          </button>
+          <div class="search-container" style="background: #fff; padding: 8px 20px; border-radius: 20px; display: flex; align-items: center; width: 300px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+            <i class="fas fa-search" style="color: #999;"></i>
+            <input type="text" placeholder="Search" style="border: none; outline: none; margin-left: 10px; width: 100%;">
+          </div>
         </div>
         
-        <div class="user-actions">
-          <button id="importBtn" class="btn btn-import">
-            <i class="fas fa-file-import"></i>
-            Import Data
+        <div class="user-actions" style="display: flex; gap: 15px; align-items: center;">
+          <button id="importBtn" class="btn" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
+            <i class="fas fa-file-import"></i> Import Data
           </button>
           <input type="file" id="fileInput" accept=".csv" style="display: none;">
-          <button id="loadSampleBtn" class="btn btn-primary">Load Sample</button>
-          <a href="/" class="btn" style="background: #f1f3f5; color: #333;">Logout</a>
+          <button id="loadSampleBtn" class="btn" style="background: #f4803b; color: white; border: none; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 10px rgba(244, 128, 59, 0.2);">Load Sample</button>
+          <a href="/" class="btn" style="background: #f1f3f5; color: #333; text-decoration: none; border-radius: 20px; padding: 8px 20px; font-weight: 600;">Logout</a>
         </div>
       </header>
 
-        <div class="dashboard-header-flex">
-          <h2 class="dashboard-title">DASHBOARD: CUSTOMER ANALYTICS</h2>
-          <div class="nav-tabs">
-            <button class="nav-tab active" id="tab-overview">Overview</button>
-            <button class="nav-tab" id="tab-strategy">Strategy Dashboard</button>
+      <div style="margin-top: 20px;">
+        <!-- Title -->
+        <div style="background-color: #fce268; display: inline-block; padding: 10px 40px; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-weight: 700; color: #333; font-size: 20px; letter-spacing: 1px;">CRM DASHBOARD</h2>
+        </div>
+
+        <!-- Tabs & Filters -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px;">
+          <!-- Tabs -->
+          <div style="display: flex; gap: 5px;">
+            <button style="background-color: #fce268; border: none; padding: 10px 20px; font-weight: 600; cursor: pointer; color: #333;">Overview</button>
+            <button style="background-color: #e2e4e6; border: none; padding: 10px 20px; font-weight: 500; cursor: pointer; color: #555;">Executive1</button>
+            <button style="background-color: #e2e4e6; border: none; padding: 10px 20px; font-weight: 500; cursor: pointer; color: #555;">Executive2</button>
+            <button style="background-color: #e2e4e6; border: none; padding: 10px 20px; font-weight: 500; cursor: pointer; color: #555;">Retention</button>
+            <button style="background-color: #e2e4e6; border: none; padding: 10px 20px; font-weight: 500; cursor: pointer; color: #555;">Cohort Heatmap</button>
+          </div>
+          
+          <!-- Filters -->
+          <div style="text-align: right;">
+            <div style="color: #e74c3c; font-size: 13px; font-weight: 500; margin-bottom: 8px;">Filert ให้ใช้ Filter รวม ครับ ไม่ต้องแยกกราฟ</div>
+            <div style="display: flex; gap: 5px;">
+              <button style="background-color: #f1c390; border: none; padding: 8px 20px; font-weight: 500; cursor: pointer; color: #333;">Year</button>
+              <button style="background-color: #f1c390; border: none; padding: 8px 20px; font-weight: 500; cursor: pointer; color: #333;">Month</button>
+              <button style="background-color: #f1c390; border: none; padding: 8px 20px; font-weight: 500; cursor: pointer; color: #333;">Channel</button>
+              <button style="background-color: #f1c390; border: none; padding: 8px 20px; font-weight: 500; cursor: pointer; color: #333;">SubChannel</button>
+              <button style="background-color: #f1c390; border: none; padding: 8px 20px; font-weight: 500; cursor: pointer; color: #333;">Product</button>
+              <button style="background-color: #f1c390; border: none; padding: 8px 20px; font-weight: 500; cursor: pointer; color: #333;">Admin</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI Grid -->
+        <div style="display: grid; grid-template-columns: repeat(12, 1fr); gap: 15px; margin-bottom: 20px;">
+          <!-- Row 1 -->
+          <div style="grid-column: span 4; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">ยอดขาย</div>
+            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดง เป็น บาท<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
+          </div>
+          <div style="grid-column: span 4; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">Total Customer</div>
+            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดงจำนวน คน<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
+          </div>
+          <div style="grid-column: span 4; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">Active Customer</div>
+            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดงจำนวนคน คิดเป็น %<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
+          </div>
+
+          <!-- Row 2 -->
+          <div style="grid-column: span 3; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">YTD Buyer</div>
+            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดงจำนวน คน</div>
+          </div>
+          <div style="grid-column: span 3; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">YTD New Customers</div>
+            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดงจำนวน คน</div>
+          </div>
+          <div style="grid-column: span 3; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">New Customer (Last Month)</div>
+            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดงจำนวน คน<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
+          </div>
+          <div style="grid-column: span 3; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">Retained Customer (Last Month)</div>
+            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดงจำนวน คน<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
+          </div>
+
+          <!-- Row 3 -->
+          <div style="grid-column: span 4; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">AOV (ยอดต่อบิลเฉลี่ย)</div>
+            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดง เป็น บาท<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
+          </div>
+          <div style="grid-column: span 4; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">Spending per Head (ยอดเฉลี่ยต่อคน)</div>
+            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดง เป็น บาท<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
+          </div>
+          <div style="grid-column: span 4; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">Repeat Purchase</div>
+            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดง ตัวเลข (SPH หาร AOV)<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
+          </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin-bottom: 10px;">
+          <div style="background-color: #e2e4e6; padding: 20px; display: flex; align-items: center; justify-content: center; text-align: center; min-height: 180px; font-weight: 600; font-size: 14px;">
+            กราฟแท่งยอดขาย
+          </div>
+          <div style="background-color: #fff; border: 1px solid #ddd; padding: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 180px; position: relative;">
+            <div style="font-size: 12px; color: #e74c3c; font-weight: 600; margin-bottom: 10px;">Retain buyer VS New Customer<br><span style="font-size: 10px;">กราฟแท่ง ลูกค้าเก่า<br>กับลูกค้าใหม่ ต่อเดือน</span></div>
+            <img src="/assets/หน้าเว็บ2.jpg" style="max-width: 90%; height: auto; opacity: 0.6; max-height: 80px;" alt="chart placeholder">
+          </div>
+          <div style="background-color: #e2e4e6; padding: 20px; display: flex; align-items: center; justify-content: center; text-align: center; min-height: 180px; font-weight: 600; font-size: 14px;">
+            กราฟแท่งลูกค้าใหม่
+          </div>
+          <div style="background-color: #e2e4e6; padding: 20px; display: flex; align-items: center; justify-content: center; text-align: center; min-height: 180px; font-weight: 600; font-size: 14px;">
+            กราฟแท่งลูกค้าเก่า
+          </div>
+          <div style="background-color: #e2e4e6; padding: 20px; display: flex; align-items: center; justify-content: center; text-align: center; min-height: 180px; font-weight: 600; font-size: 14px;">
+            กราฟวงกลม แสดง<br>สัดส่วน แต่ละ Channel
+          </div>
+          <div style="background-color: #e2e4e6; padding: 20px; display: flex; align-items: center; justify-content: center; text-align: center; min-height: 180px; font-weight: 600; font-size: 14px;">
+            กราฟแท่งแนวนอน :<br>ยอดขายของ Admin<br>แต่ละคน
           </div>
         </div>
         
-        <div id="overview-content" class="tab-pane active">
-          <div class="dashboard-grid">
-          <!-- Card 1: Total Customers -->
-          <div class="card">
-            <div class="card-header">
-              <span class="card-label">Total Customers</span>
-              <div class="filter-dropdown-container">
-                <i class="fas fa-filter-circle-dollar filter-icon"></i>
-                <div class="filter-menu">
-                  <div class="filter-item active">All Monthly</div>
-                  <div class="filter-item">All Years</div>
-                </div>
-              </div>
-            </div>
-            <div class="card-value" id="totalCustomers">62,032</div>
-            <div class="card-subtext positive">
-              <i class="fas fa-caret-up"></i>
-              TOTAL customers
-            </div>
-            <div class="sparkline-container">
-              <canvas id="sparkline1"></canvas>
-            </div>
-          </div>
-
-          <!-- Card 2: New Customers -->
-          <div class="card">
-            <div class="card-header">
-              <span class="card-label">New Customers</span>
-              <div class="filter-dropdown-container">
-                <i class="fas fa-filter-circle-dollar filter-icon"></i>
-                <div class="filter-menu">
-                  <div class="filter-item active">All Monthly</div>
-                  <div class="filter-item">All Years</div>
-                </div>
-              </div>
-            </div>
-            <div class="card-value" id="newCustomers">754</div>
-            <div class="card-subtext positive">
-              <i class="fas fa-caret-up"></i>
-              New customers
-            </div>
-            <div class="sparkline-container">
-              <canvas id="sparkline2"></canvas>
-            </div>
-          </div>
-
-          <!-- Card 3: Growth Trends -->
-          <div class="card growth-card">
-            <div class="card-header">
-              <span class="card-label">Customer Growth Trends (Monthly)</span>
-              <div class="filter-dropdown-container">
-                <i class="fas fa-filter-circle-dollar filter-icon"></i>
-                <div class="filter-menu">
-                  <div class="filter-item active">All Monthly</div>
-                  <div class="filter-item">All Years</div>
-                </div>
-              </div>
-            </div>
-            <div style="height: 140px; margin-top: 10px;">
-              <canvas id="growthChart"></canvas>
-            </div>
-          </div>
-
-          <!-- Card 4: Active Customers -->
-          <div class="card">
-            <div class="card-header">
-              <span class="card-label">Active Customers</span>
-              <div class="filter-dropdown-container">
-                <i class="fas fa-filter-circle-dollar filter-icon"></i>
-                <div class="filter-menu">
-                  <div class="filter-item active">All Monthly</div>
-                  <div class="filter-item">All Years</div>
-                </div>
-              </div>
-            </div>
-            <div class="card-value" id="activeCustomers">12.4%</div>
-            <div class="card-subtext">Active users</div>
-            <div class="sparkline-container" style="display: flex; align-items: center; justify-content: center; font-size: 40px; color: #eee;">
-              <i class="fas fa-user-check"></i>
-            </div>
-          </div>
-
-          <!-- Card 5: Buyer Analytics -->
-          <div class="card segmentation-card">
-            <div class="card-header">
-              <span class="card-label">Buyer Analytics: Unique & Frequency</span>
-              <div class="filter-dropdown-container">
-                <i class="fas fa-filter-circle-dollar filter-icon"></i>
-                <div class="filter-menu">
-                  <div class="filter-item active">All Monthly</div>
-                  <div class="filter-item">All Years</div>
-                </div>
-              </div>
-            </div>
-            <div style="height: 150px; margin-top: 10px;">
-              <canvas id="buyerAnalyticsChart"></canvas>
-            </div>
-            <div class="legend" style="flex-direction: row; justify-content: center; gap: 30px; margin-top: 15px;">
-              <div class="legend-item"><span class="dot" style="background: #d95f1d;"></span> Unique Buyers (คนซื้อจริง)</div>
-              <div class="legend-item"><span class="dot" style="background: #555;"></span> Frequency (ความถี่ซื้อ)</div>
-            </div>
-          </div>
-
-          <!-- Card 6: Retention Analytics -->
-          <div class="card">
-            <div class="card-header">
-              <span class="card-label">Retention: Spending & Retained Buyers</span>
-              <div class="filter-dropdown-container">
-                <i class="fas fa-filter-circle-dollar filter-icon"></i>
-                <div class="filter-menu">
-                  <div class="filter-item active">All Monthly</div>
-                  <div class="filter-item">All Years</div>
-                </div>
-              </div>
-            </div>
-            <div style="height: 130px; margin-top: 10px;">
-              <canvas id="retentionChart"></canvas>
-            </div>
-            <div class="legend" style="flex-direction: column; gap: 8px; margin-top: 10px;">
-              <div class="legend-item"><span class="dot" style="background: #d95f1d;"></span> Spending per Head (เฉลี่ยต่อคน)</div>
-              <div class="legend-item"><span class="dot" style="background: #555;"></span> Retained Buyers (คนเก่าซื้อซ้ำ)</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div id="strategy-content" class="tab-pane">
-        <!-- Strategy Summary Badges -->
-        <div class="strategy-summary-grid">
-          <div class="strategy-badge-card vanguard">
-            <div class="badge-icon">🔵</div>
-            <div class="badge-info">
-              <h4>Vanguard (ทัพหน้า)</h4>
-              <p>หาคนใหม่เก่งมาก (>70%)</p>
-            </div>
-          </div>
-          <div class="strategy-badge-card migration">
-            <div class="badge-icon">🟢</div>
-            <div class="badge-info">
-              <h4>Migration Hub</h4>
-              <p>จุดรับแขกเก่า (>70%)</p>
-            </div>
-          </div>
-          <div class="strategy-badge-card retention">
-            <div class="badge-icon">🟠</div>
-            <div class="badge-info">
-              <h4>Retention Hub</h4>
-              <p>ถังเก็บลูกค้า (>30%)</p>
-            </div>
-          </div>
-          <div class="strategy-badge-card cashcow">
-            <div class="badge-icon">🔴</div>
-            <div class="badge-info">
-              <h4>Cash Cow</h4>
-              <p>เสือนอนกิน (<30%)</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="card strategy-table-card" style="background: #fff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-top: 20px;">
-          <div class="card-header" style="padding: 20px; border-bottom: 1px solid #eee;">
-            <h3 style="font-size: 1.1rem; font-weight: 700;">ความหมายเชิงกลยุทธ์ (Strategic Meaning)</h3>
-            <span id="strategy-period-label" style="font-size: 0.85rem; color: #d95f1d; font-weight: 600;">เดือนที่เลือก</span>
-          </div>
-          <div class="table-responsive">
-            <table class="strategy-table">
-              <thead>
-                <tr>
-                  <th>Sub-Channel</th>
-                  <th>Revenue</th>
-                  <th>Buyers</th>
-                  <th>New Customers</th>
-                  <th>New-to-Sub</th>
-                  <th>% Migration</th>
-                  <th>% New Share</th>
-                  <th>Category</th>
-                </tr>
-              </thead>
-              <tbody id="strategy-table-body">
-                <!-- Dynamic Content -->
-              </tbody>
-            </table>
-          </div>
+        <div style="text-align: right; color: #e74c3c; font-size: 13px; font-weight: 500; margin-top: 10px; padding-right: 10px;">
+          เบื้องต้นมีเท่านี้ก่อน แต่จะมีเพิ่มอีกครับในหน้า Overview นี้
         </div>
       </div>
     </main>
