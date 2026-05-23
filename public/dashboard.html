@@ -6,6 +6,33 @@
   <title>QueenMaker CRM — Dashboard</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .dashboard-wrapper { background-color: #fbf9f4; padding: 20px 40px; font-family: 'Inter', sans-serif; min-height: 100vh;}
+    .kpi-grid-new { display: grid; grid-template-columns: repeat(12, 1fr); gap: 15px; margin-bottom: 20px; }
+    .kpi-card { background-color: #e2e4e6; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; min-height: 110px;}
+    .kpi-title { font-weight: 600; font-size: 14px; margin-bottom: 5px; color: #333; }
+    .kpi-val { font-size: 26px; font-weight: bold; margin-bottom: 2px; color: #111; }
+    .kpi-desc { font-size: 11px; color: #666; line-height: 1.4; }
+    .kpi-change { font-size: 12px; font-weight: bold; margin-top: 5px; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px;}
+    .kpi-change.up { color: #198754; background: rgba(25,135,84,0.1); }
+    .kpi-change.down { color: #dc3545; background: rgba(220,53,69,0.1); }
+    .kpi-change.neutral { color: #6c757d; background: rgba(108,117,125,0.1); }
+    
+    .charts-grid-new { display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin-bottom: 20px; }
+    .chart-box { background-color: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 300px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);}
+    .chart-box.grey { background-color: #e2e4e6; border: none; }
+    .chart-title { font-size: 13px; font-weight: 600; text-align: center; margin-bottom: 10px; color: #333; }
+    .chart-container { width: 100%; flex-grow: 1; position: relative; }
+    
+    .filter-btn-new { background-color: #f1c390; border: none; padding: 8px 15px; font-weight: 500; cursor: pointer; color: #333; border-radius: 4px; font-size: 13px; margin-left: 5px;}
+    .filter-btn-new:hover { background-color: #eab46e; }
+    .filter-dropdown { position: relative; display: inline-block; }
+    .filter-content { display: none; position: absolute; background-color: #fff; min-width: 120px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); z-index: 10; border-radius: 8px; padding: 5px 0; right: 0; max-height: 300px; overflow-y: auto;}
+    .filter-content.show { display: block; }
+    .filter-content div { padding: 8px 15px; cursor: pointer; font-size: 13px; }
+    .filter-content div:hover { background-color: #f1f1f1; }
+    .filter-content div.selected { background-color: #fdf1e6; font-weight: bold; color: #d95f1d;}
+  </style>
 </head>
 <body>
   <div id="sidebarOverlay" class="sidebar-overlay" onclick="document.querySelector('.sidebar').classList.remove('active'); document.getElementById('sidebarOverlay').classList.remove('active');"></div>
@@ -22,712 +49,588 @@
       </div>
       
       <ul class="nav-menu">
-        <li class="nav-item">
-          <a href="#" class="nav-link active">
-            <i class="fas fa-th-large"></i>
-            CRM DASHBOARD
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="#" class="nav-link">
-            <i class="fas fa-users"></i>
-            INSIGHT HUB
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="#" class="nav-link">
-            <i class="fas fa-chart-pie"></i>
-            MUSIGHT HUB
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="#" class="nav-link">
-            <i class="fas fa-crown"></i>
-            TOP SPENDER
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="#" class="nav-link">
-            <i class="fas fa-brain"></i>
-            AI ANALYTICS
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="#" class="nav-link">
-            <i class="fas fa-file-alt"></i>
-            REPORTS
-          </a>
-        </li>
-        <li class="nav-item">
-          <a href="#" class="nav-link">
-            <i class="fas fa-cog"></i>
-            SETTINGS
-          </a>
-        </li>
+        <li class="nav-item"><a href="#" class="nav-link active"><i class="fas fa-th-large"></i>CRM DASHBOARD</a></li>
+        <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
+        <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-pie"></i>MUSIGHT HUB</a></li>
+        <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-crown"></i>TOP SPENDER</a></li>
+        <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
+        <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-file-alt"></i>REPORTS</a></li>
+        <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-cog"></i>SETTINGS</a></li>
       </ul>
     </aside>
 
     <!-- Main Content -->
-    <main class="main-content" style="background-color: #fbf9f4; padding: 20px 40px; font-family: 'Inter', sans-serif;">
-      <header class="top-bar" style="background: transparent; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; border-bottom: none; position: static;">
-        <div style="display: flex; align-items: center; gap: 20px;">
-          <button id="menuToggle" class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active');" style="background: none; border: none; font-size: 24px; cursor: pointer;">
-            <i class="fas fa-bars"></i>
-          </button>
-          <div class="search-container" style="background: #fff; padding: 8px 20px; border-radius: 20px; display: flex; align-items: center; width: 300px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-            <i class="fas fa-search" style="color: #999;"></i>
-            <input type="text" placeholder="Search" style="border: none; outline: none; margin-left: 10px; width: 100%;">
-          </div>
-        </div>
-        
-        <div class="user-actions" style="display: flex; gap: 15px; align-items: center;">
-          <button id="importBtn" class="btn" style="background: #fff; border: 1px solid #e0e0e0; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
-            <i class="fas fa-file-import"></i> Import Data
-          </button>
-          <input type="file" id="fileInput" accept=".csv" style="display: none;">
-          <button id="loadSampleBtn" class="btn" style="background: #f4803b; color: white; border: none; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 10px rgba(244, 128, 59, 0.2);">Load Sample</button>
-          <a href="/" class="btn" style="background: #f1f3f5; color: #333; text-decoration: none; border-radius: 20px; padding: 8px 20px; font-weight: 600;">Logout</a>
-        </div>
-      </header>
-
-      <div style="margin-top: 20px;">
-        <!-- Title -->
-        <div style="background-color: #fce268; display: inline-block; padding: 10px 40px; margin-bottom: 20px;">
-          <h2 style="margin: 0; font-weight: 700; color: #333; font-size: 20px; letter-spacing: 1px;">CRM DASHBOARD</h2>
-        </div>
-
-        <!-- Tabs & Filters -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 30px;">
-          <!-- Tabs -->
-          <div style="display: flex; gap: 5px;">
-            <button style="background-color: #fce268; border: none; padding: 10px 20px; font-weight: 600; cursor: pointer; color: #333;">Overview</button>
-            <button style="background-color: #e2e4e6; border: none; padding: 10px 20px; font-weight: 500; cursor: pointer; color: #555;">Executive1</button>
-            <button style="background-color: #e2e4e6; border: none; padding: 10px 20px; font-weight: 500; cursor: pointer; color: #555;">Executive2</button>
-            <button style="background-color: #e2e4e6; border: none; padding: 10px 20px; font-weight: 500; cursor: pointer; color: #555;">Retention</button>
-            <button style="background-color: #e2e4e6; border: none; padding: 10px 20px; font-weight: 500; cursor: pointer; color: #555;">Cohort Heatmap</button>
-          </div>
-          
-          <!-- Filters -->
-          <div style="text-align: right;">
-            <div style="color: #e74c3c; font-size: 13px; font-weight: 500; margin-bottom: 8px;">Filert ให้ใช้ Filter รวม ครับ ไม่ต้องแยกกราฟ</div>
-            <div style="display: flex; gap: 5px;">
-              <button style="background-color: #f1c390; border: none; padding: 8px 20px; font-weight: 500; cursor: pointer; color: #333;">Year</button>
-              <button style="background-color: #f1c390; border: none; padding: 8px 20px; font-weight: 500; cursor: pointer; color: #333;">Month</button>
-              <button style="background-color: #f1c390; border: none; padding: 8px 20px; font-weight: 500; cursor: pointer; color: #333;">Channel</button>
-              <button style="background-color: #f1c390; border: none; padding: 8px 20px; font-weight: 500; cursor: pointer; color: #333;">SubChannel</button>
-              <button style="background-color: #f1c390; border: none; padding: 8px 20px; font-weight: 500; cursor: pointer; color: #333;">Product</button>
-              <button style="background-color: #f1c390; border: none; padding: 8px 20px; font-weight: 500; cursor: pointer; color: #333;">Admin</button>
+    <main class="main-content" style="padding:0;">
+      <div class="dashboard-wrapper">
+        <header class="top-bar" style="background: transparent; padding: 0 0 15px 0; display: flex; justify-content: space-between; align-items: center; border-bottom: none; position: static;">
+          <div style="display: flex; align-items: center; gap: 20px;">
+            <button id="menuToggle" class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active');" style="background: none; border: none; font-size: 24px; cursor: pointer;">
+              <i class="fas fa-bars"></i>
+            </button>
+            <div class="search-container" style="background: #fff; padding: 8px 20px; border-radius: 20px; display: flex; align-items: center; width: 300px; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
+              <i class="fas fa-search" style="color: #999;"></i>
+              <input type="text" placeholder="Search" style="border: none; outline: none; margin-left: 10px; width: 100%;">
             </div>
           </div>
-        </div>
+          
+          <div class="user-actions" style="display: flex; gap: 10px; align-items: center;">
+            <button id="importBtn" class="btn" style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 8px 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+              <i class="fas fa-file-import"></i> Import Data
+            </button>
+            <input type="file" id="fileInput" accept=".csv" style="display: none;">
+            <button id="loadSampleBtn" class="btn" style="background: #f4803b; color: white; border: none; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer;">Load Sample</button>
+            <a href="/" class="btn" style="background: #eee; color: #333; text-decoration: none; border-radius: 20px; padding: 8px 20px; font-weight: 600;">Logout</a>
+          </div>
+        </header>
 
-        <!-- KPI Grid -->
-        <div style="display: grid; grid-template-columns: repeat(12, 1fr); gap: 15px; margin-bottom: 20px;">
-          <!-- Row 1 -->
-          <div style="grid-column: span 4; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">ยอดขาย</div>
-            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดง เป็น บาท<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
-          </div>
-          <div style="grid-column: span 4; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">Total Customer</div>
-            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดงจำนวน คน<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
-          </div>
-          <div style="grid-column: span 4; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">Active Customer</div>
-            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดงจำนวนคน คิดเป็น %<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
-          </div>
-
-          <!-- Row 2 -->
-          <div style="grid-column: span 3; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">YTD Buyer</div>
-            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดงจำนวน คน</div>
-          </div>
-          <div style="grid-column: span 3; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">YTD New Customers</div>
-            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดงจำนวน คน</div>
-          </div>
-          <div style="grid-column: span 3; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">New Customer (Last Month)</div>
-            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดงจำนวน คน<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
-          </div>
-          <div style="grid-column: span 3; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">Retained Customer (Last Month)</div>
-            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดงจำนวน คน<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
+        <div>
+          <!-- Title -->
+          <div style="background-color: #fce268; display: inline-block; padding: 10px 40px; margin-bottom: 20px;">
+            <h2 style="margin: 0; font-weight: 700; color: #333; font-size: 20px; letter-spacing: 1px;">CRM DASHBOARD</h2>
           </div>
 
-          <!-- Row 3 -->
-          <div style="grid-column: span 4; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">AOV (ยอดต่อบิลเฉลี่ย)</div>
-            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดง เป็น บาท<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
+          <!-- Tabs & Filters -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
+            <div style="display: flex; gap: 5px;">
+              <button style="background-color: #fce268; border: none; padding: 10px 20px; font-weight: 600; cursor: pointer; color: #333;">Overview</button>
+              <button style="background-color: #e2e4e6; border: none; padding: 10px 20px; font-weight: 500; cursor: pointer; color: #555;">Executive1</button>
+              <button style="background-color: #e2e4e6; border: none; padding: 10px 20px; font-weight: 500; cursor: pointer; color: #555;">Executive2</button>
+              <button style="background-color: #e2e4e6; border: none; padding: 10px 20px; font-weight: 500; cursor: pointer; color: #555;">Retention</button>
+              <button style="background-color: #e2e4e6; border: none; padding: 10px 20px; font-weight: 500; cursor: pointer; color: #555;">Cohort Heatmap</button>
+            </div>
+            
+            <div style="text-align: right;">
+              <div style="color: #e74c3c; font-size: 13px; font-weight: 500; margin-bottom: 8px;">Filter ให้ใช้ Filter รวม ครับ ไม่ต้องแยกกราฟ</div>
+              <div style="display: flex; align-items: center;">
+                <span id="currentFilterLabel" style="font-weight:bold; margin-right: 10px; color:#d95f1d; font-size: 14px;"></span>
+                
+                <div class="filter-dropdown">
+                  <button class="filter-btn-new" onclick="toggleFilter('monthFilterMenu')">Month <i class="fas fa-caret-down"></i></button>
+                  <div id="monthFilterMenu" class="filter-content"></div>
+                </div>
+                <!-- Mock buttons for other filters as requested -->
+                <button class="filter-btn-new">Year</button>
+                <button class="filter-btn-new">Channel</button>
+                <button class="filter-btn-new">SubChannel</button>
+                <button class="filter-btn-new">Product</button>
+                <button class="filter-btn-new">Admin</button>
+              </div>
+            </div>
           </div>
-          <div style="grid-column: span 4; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">Spending per Head (ยอดเฉลี่ยต่อคน)</div>
-            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดง เป็น บาท<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
-          </div>
-          <div style="grid-column: span 4; background-color: #e2e4e6; padding: 20px; min-height: 110px;">
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 5px;">Repeat Purchase</div>
-            <div style="font-size: 13px; color: #333; line-height: 1.5;">แสดง ตัวเลข (SPH หาร AOV)<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
-          </div>
-        </div>
 
-        <!-- Charts Grid -->
-        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin-bottom: 10px;">
-          <div style="background-color: #e2e4e6; padding: 20px; display: flex; align-items: center; justify-content: center; text-align: center; min-height: 180px; font-weight: 600; font-size: 14px;">
-            กราฟแท่งยอดขาย
+          <!-- KPI Grid -->
+          <div class="kpi-grid-new">
+            <!-- Row 1 -->
+            <div class="kpi-card" style="grid-column: span 4;">
+              <div class="kpi-title">ยอดขาย</div>
+              <div>
+                <div class="kpi-val" id="kpi-sales">฿0</div>
+                <div class="kpi-change" id="kpi-sales-change">-</div>
+                <div class="kpi-desc">แสดง เป็น บาท<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
+              </div>
+            </div>
+            <div class="kpi-card" style="grid-column: span 4;">
+              <div class="kpi-title">Total Customer</div>
+              <div>
+                <div class="kpi-val" id="kpi-total-cust">0</div>
+                <div class="kpi-change" id="kpi-total-cust-change">-</div>
+                <div class="kpi-desc">แสดงจำนวน คน<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
+              </div>
+            </div>
+            <div class="kpi-card" style="grid-column: span 4;">
+              <div class="kpi-title">Active Customer</div>
+              <div>
+                <div class="kpi-val" id="kpi-active-cust">0%</div>
+                <div class="kpi-change" id="kpi-active-cust-change">-</div>
+                <div class="kpi-desc">แสดงจำนวนคน คิดเป็น %<br>แสดง % เทียบเดือนก่อนหน้า<br>ไม่ต้องแสดงเส้นแนวโน้ม</div>
+              </div>
+            </div>
+
+            <!-- Row 2 -->
+            <div class="kpi-card" style="grid-column: span 3;">
+              <div class="kpi-title">YTD Buyer</div>
+              <div>
+                <div class="kpi-val" id="kpi-ytd-buyer">0</div>
+                <div class="kpi-desc">แสดงจำนวน คน<br>(Year to Date)</div>
+              </div>
+            </div>
+            <div class="kpi-card" style="grid-column: span 3;">
+              <div class="kpi-title">YTD New Customers</div>
+              <div>
+                <div class="kpi-val" id="kpi-ytd-new">0</div>
+                <div class="kpi-desc">แสดงจำนวน คน<br>(Year to Date)</div>
+              </div>
+            </div>
+            <div class="kpi-card" style="grid-column: span 3;">
+              <div class="kpi-title">New Customer (Last Month)</div>
+              <div>
+                <div class="kpi-val" id="kpi-new-cust">0</div>
+                <div class="kpi-change" id="kpi-new-cust-change">-</div>
+                <div class="kpi-desc">แสดงจำนวน คน<br>แสดง % เทียบเดือนก่อนหน้า</div>
+              </div>
+            </div>
+            <div class="kpi-card" style="grid-column: span 3;">
+              <div class="kpi-title">Retained Customer (Last Month)</div>
+              <div>
+                <div class="kpi-val" id="kpi-ret-cust">0</div>
+                <div class="kpi-change" id="kpi-ret-cust-change">-</div>
+                <div class="kpi-desc">แสดงจำนวน คน<br>แสดง % เทียบเดือนก่อนหน้า</div>
+              </div>
+            </div>
+
+            <!-- Row 3 -->
+            <div class="kpi-card" style="grid-column: span 4;">
+              <div class="kpi-title">AOV (ยอดต่อบิลเฉลี่ย)</div>
+              <div>
+                <div class="kpi-val" id="kpi-aov">฿0</div>
+                <div class="kpi-change" id="kpi-aov-change">-</div>
+                <div class="kpi-desc">แสดง เป็น บาท<br>แสดง % เทียบเดือนก่อนหน้า</div>
+              </div>
+            </div>
+            <div class="kpi-card" style="grid-column: span 4;">
+              <div class="kpi-title">Spending per Head (ยอดเฉลี่ยต่อคน)</div>
+              <div>
+                <div class="kpi-val" id="kpi-sph">฿0</div>
+                <div class="kpi-change" id="kpi-sph-change">-</div>
+                <div class="kpi-desc">แสดง เป็น บาท<br>แสดง % เทียบเดือนก่อนหน้า</div>
+              </div>
+            </div>
+            <div class="kpi-card" style="grid-column: span 4;">
+              <div class="kpi-title">Repeat Purchase</div>
+              <div>
+                <div class="kpi-val" id="kpi-repeat">0.0x</div>
+                <div class="kpi-change" id="kpi-repeat-change">-</div>
+                <div class="kpi-desc">แสดง ตัวเลข (SPH หาร AOV)<br>แสดง % เทียบเดือนก่อนหน้า</div>
+              </div>
+            </div>
           </div>
-          <div style="background-color: #fff; border: 1px solid #ddd; padding: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 180px; position: relative;">
-            <div style="font-size: 12px; color: #e74c3c; font-weight: 600; margin-bottom: 10px;">Retain buyer VS New Customer<br><span style="font-size: 10px;">กราฟแท่ง ลูกค้าเก่า<br>กับลูกค้าใหม่ ต่อเดือน</span></div>
-            <img src="/assets/หน้าเว็บ2.jpg" style="max-width: 90%; height: auto; opacity: 0.6; max-height: 80px;" alt="chart placeholder">
+
+          <!-- Charts Grid -->
+          <div class="charts-grid-new">
+            <div class="chart-box grey">
+              <div class="chart-title">กราฟแท่งยอดขาย</div>
+              <div class="chart-container"><canvas id="chart-sales"></canvas></div>
+            </div>
+            <div class="chart-box grey">
+              <div class="chart-title" style="color:#e74c3c;">กราฟแท่ง ลูกค้าเก่า<br>กับลูกค้าใหม่ ต่อเดือน</div>
+              <div class="chart-container"><canvas id="chart-ret-new-stacked"></canvas></div>
+            </div>
+            <div class="chart-box grey">
+              <div class="chart-title">กราฟแท่งลูกค้าใหม่</div>
+              <div class="chart-container"><canvas id="chart-new"></canvas></div>
+            </div>
+            <div class="chart-box grey">
+              <div class="chart-title">กราฟแท่งลูกค้าเก่า</div>
+              <div class="chart-container"><canvas id="chart-ret"></canvas></div>
+            </div>
+            <div class="chart-box grey">
+              <div class="chart-title">กราฟวงกลม แสดง<br>สัดส่วน แต่ละ Channel</div>
+              <div class="chart-container"><canvas id="chart-channel"></canvas></div>
+            </div>
+            <div class="chart-box grey">
+              <div class="chart-title">กราฟแท่งแนวนอน :<br>ยอดขายของ Admin<br>แต่ละคน</div>
+              <div class="chart-container"><canvas id="chart-admin"></canvas></div>
+            </div>
           </div>
-          <div style="background-color: #e2e4e6; padding: 20px; display: flex; align-items: center; justify-content: center; text-align: center; min-height: 180px; font-weight: 600; font-size: 14px;">
-            กราฟแท่งลูกค้าใหม่
+          
+          <div style="text-align: right; color: #e74c3c; font-size: 13px; font-weight: 500; margin-top: 10px;">
+            เบื้องต้นมีเท่านี้ก่อน แต่จะมีเพิ่มอีกครับในหน้า Overview นี้
           </div>
-          <div style="background-color: #e2e4e6; padding: 20px; display: flex; align-items: center; justify-content: center; text-align: center; min-height: 180px; font-weight: 600; font-size: 14px;">
-            กราฟแท่งลูกค้าเก่า
-          </div>
-          <div style="background-color: #e2e4e6; padding: 20px; display: flex; align-items: center; justify-content: center; text-align: center; min-height: 180px; font-weight: 600; font-size: 14px;">
-            กราฟวงกลม แสดง<br>สัดส่วน แต่ละ Channel
-          </div>
-          <div style="background-color: #e2e4e6; padding: 20px; display: flex; align-items: center; justify-content: center; text-align: center; min-height: 180px; font-weight: 600; font-size: 14px;">
-            กราฟแท่งแนวนอน :<br>ยอดขายของ Admin<br>แต่ละคน
-          </div>
-        </div>
-        
-        <div style="text-align: right; color: #e74c3c; font-size: 13px; font-weight: 500; margin-top: 10px; padding-right: 10px;">
-          เบื้องต้นมีเท่านี้ก่อน แต่จะมีเพิ่มอีกครับในหน้า Overview นี้
         </div>
       </div>
     </main>
   </div>
 
-  <div id="loadingOverlay" class="loading-overlay">
-    <div class="spinner"></div>
+  <div id="loadingOverlay" class="loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center;">
+    <div class="spinner" style="width:40px; height:40px; border:4px solid #f3f3f3; border-top:4px solid #d95f1d; border-radius:50%; animation:spin 1s linear infinite;"></div>
   </div>
+  <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script>
-    // Constants
     const sampleUrl = '/assets/RAW%202025%20-%20RAW.csv';
+    let rawData = [];
+    let monthlyData = {}; // key: YYYY-MM
+    let globalFirstPurchase = {}; // id -> YYYY-MM
+    let availableMonths = [];
+    let selectedMonthStr = "";
     
-    // Chart instances
     let charts = {};
-    let lastLoadedData = null;
-    let currentFilterType = 'All Monthly';
 
-    // Initialization
     window.addEventListener('DOMContentLoaded', () => {
-      // Sidebar elements
-      const sidebar = document.querySelector('.sidebar');
-      const sidebarOverlay = document.getElementById('sidebarOverlay');
-      
-      // Tab elements
-      const tabOverview = document.getElementById('tab-overview');
-      const tabStrategy = document.getElementById('tab-strategy');
-      const overviewContent = document.getElementById('overview-content');
-      const strategyContent = document.getElementById('strategy-content');
-
-      // Tab switching logic
-      if (tabOverview && tabStrategy) {
-        tabOverview.addEventListener('click', () => {
-          tabOverview.classList.add('active');
-          tabStrategy.classList.remove('active');
-          overviewContent.classList.add('active');
-          strategyContent.classList.remove('active');
-        });
-
-        tabStrategy.addEventListener('click', () => {
-          tabStrategy.classList.add('active');
-          tabOverview.classList.remove('active');
-          strategyContent.classList.add('active');
-          overviewContent.classList.remove('active');
-        });
-      }
-
-      // Filter Dropdown Logic
-      const filterIcons = document.querySelectorAll('.filter-icon');
-      filterIcons.forEach(icon => {
-        icon.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const menu = icon.nextElementSibling;
-          if (menu) {
-            document.querySelectorAll('.filter-menu').forEach(m => {
-              if (m !== menu) m.classList.remove('active');
-            });
-            menu.classList.toggle('active');
-          }
-        });
-      });
-
-      document.querySelectorAll('.filter-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const selectedText = item.textContent.trim();
-          currentFilterType = selectedText;
-          document.querySelectorAll('.filter-item').forEach(i => {
-            if (i.textContent.trim() === selectedText) i.classList.add('active');
-            else i.classList.remove('active');
-          });
-          document.querySelectorAll('.filter-menu').forEach(m => m.classList.remove('active'));
-          if (lastLoadedData) updateDashboard(lastLoadedData);
-        });
-      });
-
-      // Data buttons
-      const importBtn = document.getElementById('importBtn');
-      const fileInput = document.getElementById('fileInput');
-      const loadSampleBtn = document.getElementById('loadSampleBtn');
-
-      if (importBtn && fileInput) {
-        importBtn.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', (e) => {
-          const file = e.target.files[0];
-          if (file) {
-            showLoading(true);
-            Papa.parse(file, {
-              header: true,
-              complete: (results) => {
-                updateDashboard(results.data);
-                showLoading(false);
-              },
-              error: (err) => {
-                console.error(err);
-                showLoading(false);
-                alert('Error parsing CSV');
-              }
-            });
-          }
-        });
-      }
-
-      if (loadSampleBtn) {
-        loadSampleBtn.addEventListener('click', () => {
+      document.getElementById('importBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+      document.getElementById('fileInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
           showLoading(true);
-          fetch(sampleUrl)
-            .then(res => res.text())
-            .then(text => {
-              Papa.parse(text, {
-                header: true,
-                complete: (results) => {
-                  updateDashboard(results.data);
-                  showLoading(false);
-                }
-              });
-            })
-            .catch(err => {
-              console.error(err);
-              showLoading(false);
-              alert('Failed to load sample data');
+          Papa.parse(file, {
+            header: true,
+            complete: (results) => { processData(results.data); showLoading(false); },
+            error: (err) => { console.error(err); showLoading(false); alert('Error parsing CSV'); }
+          });
+        }
+      });
+
+      document.getElementById('loadSampleBtn').addEventListener('click', () => {
+        showLoading(true);
+        fetch(sampleUrl)
+          .then(res => res.text())
+          .then(text => {
+            Papa.parse(text, {
+              header: true,
+              complete: (results) => { processData(results.data); showLoading(false); }
             });
-        });
+          })
+          .catch(err => { showLoading(false); alert('Failed to load sample data'); });
+      });
+
+      // Close dropdowns
+      window.onclick = function(event) {
+        if (!event.target.matches('.filter-btn-new') && !event.target.matches('.fa-caret-down')) {
+          var dropdowns = document.getElementsByClassName("filter-content");
+          for (var i = 0; i < dropdowns.length; i++) {
+            var openDropdown = dropdowns[i];
+            if (openDropdown.classList.contains('show')) {
+              openDropdown.classList.remove('show');
+            }
+          }
+        }
       }
 
       initCharts();
-
-      // Close menus when clicking outside
-      document.addEventListener('click', () => {
-        document.querySelectorAll('.filter-menu').forEach(m => m.classList.remove('active'));
-      });
     });
+
+    function toggleFilter(id) {
+      document.getElementById(id).classList.toggle("show");
+    }
+
+    function showLoading(show) {
+      document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+    }
+
+    function formatCurrency(num) {
+      return '฿' + num.toLocaleString('th-TH', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+    }
+
+    function formatPercent(num) {
+      if (!isFinite(num)) return '-';
+      const sign = num > 0 ? '+' : '';
+      return sign + (num * 100).toFixed(1) + '%';
+    }
+
+    function updateChangeUI(elId, current, previous) {
+      const el = document.getElementById(elId);
+      if (!previous || previous === 0) {
+        el.textContent = '-';
+        el.className = 'kpi-change neutral';
+        return;
+      }
+      const change = (current - previous) / previous;
+      el.textContent = formatPercent(change);
+      
+      let icon = '';
+      if (change > 0) {
+        el.className = 'kpi-change up';
+        icon = '<i class="fas fa-arrow-up"></i> ';
+      } else if (change < 0) {
+        el.className = 'kpi-change down';
+        icon = '<i class="fas fa-arrow-down"></i> ';
+      } else {
+        el.className = 'kpi-change neutral';
+      }
+      el.innerHTML = icon + el.textContent;
+    }
 
     function parseDate(dateStr) {
       if (!dateStr) return null;
       const parts = dateStr.split(' ')[0].split('/');
       if (parts.length < 3) return null;
-      return {
-        day: parseInt(parts[0]),
-        month: parseInt(parts[1]) - 1,
-        year: parseInt(parts[2]),
-        val: parseInt(parts[2]) * 10000 + parseInt(parts[1]) * 100 + parseInt(parts[0])
-      };
+      // DD/MM/YYYY
+      let y = parseInt(parts[2]);
+      let m = parseInt(parts[1]);
+      let d = parseInt(parts[0]);
+      if (y < 2000) y += 2000; // handle YY
+      return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
     }
 
-    function showLoading(show) {
-      const loadingOverlay = document.getElementById('loadingOverlay');
-      if (loadingOverlay) {
-        loadingOverlay.style.display = show ? 'flex' : 'none';
+    function processData(data) {
+      if (!data || data.length === 0) return;
+      rawData = data;
+      monthlyData = {};
+      globalFirstPurchase = {};
+
+      // First pass: find first purchase date for all customers
+      data.forEach(row => {
+        const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
+        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
+        if (!id || !dateStr) return;
+        const d = parseDate(dateStr);
+        if (!d) return;
+
+        const val = d.y * 10000 + d.m * 100 + d.d;
+        if (!globalFirstPurchase[id] || val < globalFirstPurchase[id].val) {
+          globalFirstPurchase[id] = { val: val, monthStr: d.str, year: d.y };
+        }
+      });
+
+      // Second pass: Aggregate by month
+      data.forEach(row => {
+        const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
+        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
+        const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'];
+        const channel = (row['ช่องทาง'] || 'Unknown').toString().trim();
+        const subChannel = (row['ชื่อคลัง (คลังสินค้า)'] || 'Unknown').toString().trim();
+        const admin = (row['ชื่อแอดมิน'] || row['Admin'] || 'Unknown').toString().trim();
+
+        if (!id || !dateStr) return;
+        const d = parseDate(dateStr);
+        if (!d) return;
+        const revenue = parseFloat(revenueStr?.toString().replace(/,/g, '') || 0);
+        const mStr = d.str;
+
+        if (!monthlyData[mStr]) {
+          monthlyData[mStr] = {
+            sales: 0,
+            orders: 0,
+            buyers: new Set(),
+            channels: {},
+            admins: {},
+            year: d.y
+          };
+        }
+
+        let m = monthlyData[mStr];
+        m.sales += revenue;
+        m.orders++;
+        m.buyers.add(id);
+
+        if (!m.channels[channel]) m.channels[channel] = 0;
+        m.channels[channel] += revenue;
+
+        if (!m.admins[admin]) m.admins[admin] = 0;
+        m.admins[admin] += revenue;
+      });
+
+      availableMonths = Object.keys(monthlyData).sort();
+      if (availableMonths.length === 0) return;
+
+      // Populate filter dropdown
+      const menu = document.getElementById('monthFilterMenu');
+      menu.innerHTML = '';
+      availableMonths.slice().reverse().forEach(m => {
+        const div = document.createElement('div');
+        div.textContent = m;
+        div.onclick = () => selectMonth(m);
+        menu.appendChild(div);
+      });
+
+      // Select latest month by default
+      selectMonth(availableMonths[availableMonths.length - 1]);
+    }
+
+    function selectMonth(mStr) {
+      selectedMonthStr = mStr;
+      document.getElementById('currentFilterLabel').textContent = mStr;
+      
+      const items = document.getElementById('monthFilterMenu').children;
+      for (let i=0; i<items.length; i++) {
+        items[i].classList.remove('selected');
+        if (items[i].textContent === mStr) items[i].classList.add('selected');
       }
+
+      renderDashboard();
+    }
+
+    function renderDashboard() {
+      if (!selectedMonthStr) return;
+
+      const idx = availableMonths.indexOf(selectedMonthStr);
+      const curr = monthlyData[selectedMonthStr];
+      const prev = idx > 0 ? monthlyData[availableMonths[idx - 1]] : null;
+      
+      const currYear = curr.year;
+
+      // Calculate New vs Retained for Current Month
+      let newCount = 0;
+      let retCount = 0;
+      curr.buyers.forEach(id => {
+        if (globalFirstPurchase[id].monthStr === selectedMonthStr) {
+          newCount++;
+        } else {
+          retCount++;
+        }
+      });
+
+      // Calculate for Previous Month (for % change)
+      let prevNew = 0, prevRet = 0, prevSales = 0, prevBuyers = 0, prevAov = 0, prevSph = 0, prevRepeat = 0;
+      if (prev) {
+        prevSales = prev.sales;
+        prevBuyers = prev.buyers.size;
+        prev.buyers.forEach(id => {
+          if (globalFirstPurchase[id].monthStr === availableMonths[idx - 1]) prevNew++;
+          else prevRet++;
+        });
+        prevAov = prev.orders > 0 ? prevSales / prev.orders : 0;
+        prevSph = prevBuyers > 0 ? prevSales / prevBuyers : 0;
+        prevRepeat = prevAov > 0 ? prevSph / prevAov : 0;
+      }
+
+      // Calculate YTD
+      let ytdBuyers = new Set();
+      let ytdNew = 0;
+      availableMonths.forEach(m => {
+        if (monthlyData[m].year === currYear && m <= selectedMonthStr) {
+          monthlyData[m].buyers.forEach(id => ytdBuyers.add(id));
+          monthlyData[m].buyers.forEach(id => {
+            if (globalFirstPurchase[id].monthStr === m) ytdNew++;
+          });
+        }
+      });
+
+      // Calculate Total unique buyers ever (up to selected month)
+      let totalEver = new Set();
+      availableMonths.forEach(m => {
+        if (m <= selectedMonthStr) {
+          monthlyData[m].buyers.forEach(id => totalEver.add(id));
+        }
+      });
+
+      // Metrics
+      const totalCust = curr.buyers.size;
+      const activePct = totalEver.size > 0 ? (totalCust / totalEver.size) : 0;
+      const prevActivePct = prev ? (prevBuyers / (totalEver.size - totalCust)) : 0; // rough approx for previous active pct
+
+      const aov = curr.orders > 0 ? curr.sales / curr.orders : 0;
+      const sph = totalCust > 0 ? curr.sales / totalCust : 0;
+      const repeat = aov > 0 ? sph / aov : 0;
+
+      // Update KPI DOM
+      document.getElementById('kpi-sales').textContent = formatCurrency(curr.sales);
+      updateChangeUI('kpi-sales-change', curr.sales, prevSales);
+
+      document.getElementById('kpi-total-cust').textContent = totalCust.toLocaleString();
+      updateChangeUI('kpi-total-cust-change', totalCust, prevBuyers);
+
+      document.getElementById('kpi-active-cust').textContent = (activePct * 100).toFixed(1) + '%';
+      updateChangeUI('kpi-active-cust-change', activePct, prevActivePct);
+
+      document.getElementById('kpi-ytd-buyer').textContent = ytdBuyers.size.toLocaleString();
+      document.getElementById('kpi-ytd-new').textContent = ytdNew.toLocaleString();
+
+      document.getElementById('kpi-new-cust').textContent = newCount.toLocaleString();
+      updateChangeUI('kpi-new-cust-change', newCount, prevNew);
+
+      document.getElementById('kpi-ret-cust').textContent = retCount.toLocaleString();
+      updateChangeUI('kpi-ret-cust-change', retCount, prevRet);
+
+      document.getElementById('kpi-aov').textContent = formatCurrency(aov);
+      updateChangeUI('kpi-aov-change', aov, prevAov);
+
+      document.getElementById('kpi-sph').textContent = formatCurrency(sph);
+      updateChangeUI('kpi-sph-change', sph, prevSph);
+
+      document.getElementById('kpi-repeat').textContent = repeat.toFixed(2) + 'x';
+      updateChangeUI('kpi-repeat-change', repeat, prevRepeat);
+
+      // Update Charts
+      updateChartsData();
     }
 
     function initCharts() {
-      // Sparkline 1
-      charts.spark1 = new Chart(document.getElementById('sparkline1'), {
-        type: 'line',
-        data: {
-          labels: [1,2,3,4,5,6,7,8,9,10],
-          datasets: [{
-            data: [20, 25, 22, 30, 28, 35, 32, 40, 38, 45],
-            borderColor: '#d95f1d',
-            borderWidth: 2,
-            pointRadius: 0,
-            fill: true,
-            backgroundColor: 'rgba(217, 95, 29, 0.1)',
-            tension: 0.4
-          }]
-        },
-        options: {
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: { x: { display: false }, y: { display: false } }
-        }
+      Chart.defaults.font.family = 'Inter';
+      Chart.defaults.color = '#555';
+      
+      const commonOpts = { maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } } };
+
+      charts.sales = new Chart(document.getElementById('chart-sales'), {
+        type: 'bar',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: '#fce268', borderRadius: 4 }] },
+        options: commonOpts
       });
 
-      // Sparkline 2
-      charts.spark2 = new Chart(document.getElementById('sparkline2'), {
-        type: 'line',
-        data: {
-          labels: [1,2,3,4,5,6,7,8,9,10],
-          datasets: [{
-            data: [10, 15, 12, 25, 20, 30, 28, 45, 40, 55],
-            borderColor: '#d95f1d',
-            borderWidth: 2,
-            pointRadius: 0,
-            fill: true,
-            backgroundColor: 'rgba(217, 95, 29, 0.1)',
-            tension: 0.4
-          }]
-        },
-        options: {
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: { x: { display: false }, y: { display: false } }
-        }
+      charts.retNew = new Chart(document.getElementById('chart-ret-new-stacked'), {
+        type: 'bar',
+        data: { labels: [], datasets: [
+          { label: 'Retained', data: [], backgroundColor: '#555' },
+          { label: 'New', data: [], backgroundColor: '#fce268' }
+        ]},
+        options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true } } }
       });
 
-      // Growth Chart
-      charts.growth = new Chart(document.getElementById('growthChart'), {
-        type: 'line',
-        data: {
-          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
-          datasets: [
-            {
-              label: 'Current Year',
-              data: [10, 25, 15, 35, 20, 45, 30],
-              borderColor: '#d95f1d',
-              backgroundColor: 'rgba(217, 95, 29, 0.2)',
-              fill: true,
-              tension: 0.4
-            },
-            {
-              label: 'Previous Year',
-              data: [5, 15, 10, 25, 15, 35, 20],
-              borderColor: '#333',
-              borderDash: [5, 5],
-              fill: false,
-              tension: 0.4
-            }
-          ]
-        },
-        options: {
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { grid: { display: false }, ticks: { font: { size: 10 } } },
-            x: { grid: { display: false }, ticks: { font: { size: 10 } } }
-          }
-        }
+      charts.newCust = new Chart(document.getElementById('chart-new'), {
+        type: 'bar',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: '#198754', borderRadius: 4 }] },
+        options: commonOpts
       });
 
-      // Buyer Analytics Chart
-      charts.buyerAnalytics = new Chart(document.getElementById('buyerAnalyticsChart'), {
-        type: 'line',
-        data: {
-          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-          datasets: [
-            {
-              label: 'Unique Buyers',
-              data: [100, 150, 120, 180, 200, 250],
-              borderColor: '#d95f1d',
-              backgroundColor: 'rgba(217, 95, 29, 0.1)',
-              fill: true,
-              tension: 0.4,
-              yAxisID: 'y'
-            },
-            {
-              label: 'Frequency',
-              data: [1.2, 1.5, 1.3, 1.6, 1.8, 2.0],
-              borderColor: '#555',
-              borderDash: [5, 5],
-              fill: false,
-              tension: 0.4,
-              yAxisID: 'y1'
-            }
-          ]
-        },
-        options: {
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: {
-              type: 'linear',
-              display: true,
-              position: 'left',
-              title: { display: true, text: 'Unique Buyers', font: { size: 10 } },
-              grid: { display: false }
-            },
-            y1: {
-              type: 'linear',
-              display: true,
-              position: 'right',
-              title: { display: true, text: 'Frequency', font: { size: 10 } },
-              grid: { drawOnChartArea: false }
-            },
-            x: { grid: { display: false } }
-          }
-        }
+      charts.retCust = new Chart(document.getElementById('chart-ret'), {
+        type: 'bar',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: '#0d6efd', borderRadius: 4 }] },
+        options: commonOpts
       });
 
-      // Retention Chart
-      charts.retention = new Chart(document.getElementById('retentionChart'), {
-        type: 'line',
-        data: {
-          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-          datasets: [
-            {
-              label: 'Spending',
-              data: [1500, 1800, 1600, 2100, 1900, 2400],
-              borderColor: '#d95f1d',
-              backgroundColor: 'rgba(217, 95, 29, 0.1)',
-              fill: true,
-              tension: 0.4,
-              yAxisID: 'y'
-            },
-            {
-              label: 'Retained',
-              data: [40, 60, 55, 80, 75, 110],
-              borderColor: '#555',
-              borderDash: [5, 5],
-              fill: false,
-              tension: 0.4,
-              yAxisID: 'y1'
-            }
-          ]
-        },
-        options: {
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: {
-              type: 'linear',
-              display: true,
-              position: 'left',
-              title: { display: true, text: 'Spending (Avg)', font: { size: 9 } },
-              grid: { display: false }
-            },
-            y1: {
-              type: 'linear',
-              display: true,
-              position: 'right',
-              title: { display: true, text: 'Retained', font: { size: 9 } },
-              grid: { drawOnChartArea: false }
-            },
-            x: { grid: { display: false }, ticks: { font: { size: 9 } } }
-          }
-        }
+      charts.channel = new Chart(document.getElementById('chart-channel'), {
+        type: 'doughnut',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: ['#d95f1d', '#fce268', '#555', '#ccc', '#888'] }] },
+        options: { ...commonOpts, plugins: { legend: { display: true, position: 'right' } } }
+      });
+
+      charts.admin = new Chart(document.getElementById('chart-admin'), {
+        type: 'bar',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: '#6c757d', borderRadius: 4 }] },
+        options: { ...commonOpts, indexAxis: 'y' }
       });
     }
 
-    function updateDashboard(data) {
-      if (!data || data.length === 0) return;
-      lastLoadedData = data;
-
-      const isYearly = currentFilterType === 'All Years';
+    function updateChartsData() {
+      // Trend Data (Last 6 months or available)
+      const trendMonths = availableMonths.filter(m => m <= selectedMonthStr).slice(-6);
       
-      // Data structures for aggregation
-      const periods = {}; // key -> { orders: 0, revenue: 0, customers: Set }
-      const customerFirstDate = {}; // id -> { val, date }
-      const customerSubFirstDate = {}; // id_sub -> { val, date }
-      const subChannels = {}; // subName -> { revenue: 0, buyers: Set, newCustomers: 0, newToSub: 0 }
-
-      // First pass: Track overall and sub-channel first purchase dates
-      data.forEach(row => {
-        const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
-        const sub = (row['ช่องทาง'] || row['ชื่อคลัง (คลังสินค้า)'] || 'Unknown').toString().trim().toUpperCase();
-        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
-        const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'];
-        
-        if (sub === 'MAIN') return;
-        if (!id || !dateStr) return;
-
-        const date = parseDate(dateStr);
-        if (!date) return;
-
-        const revenue = parseFloat(revenueStr?.toString().replace(/,/g, '') || 0);
-        
-        // Track overall first purchase
-        if (!customerFirstDate[id] || date.val < customerFirstDate[id].val) {
-          customerFirstDate[id] = { val: date.val, date: date };
-        }
-
-        // Track first purchase in this sub-channel
-        const subKey = `${id}_${sub}`;
-        if (!customerSubFirstDate[subKey] || date.val < customerSubFirstDate[subKey].val) {
-          customerSubFirstDate[subKey] = { val: date.val, date: date };
-        }
-
-        const pKey = isYearly ? date.year : date.month;
-        if (!periods[pKey]) {
-          periods[pKey] = { orders: 0, revenue: 0, customers: new Set() };
-        }
-        periods[pKey].orders++;
-        periods[pKey].revenue += revenue;
-        periods[pKey].customers.add(id);
-      });
-
-      // Second pass: Calculate metrics for selected period
-      const monthsInOrder = Object.keys(periods).sort((a, b) => b - a);
-      if (monthsInOrder.length === 0) return;
-      const selectedMonthKey = isYearly ? monthsInOrder[0] : monthsInOrder[0]; // Take latest
+      const salesData = trendMonths.map(m => monthlyData[m].sales);
       
-      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      document.getElementById('strategy-period-label').textContent = isYearly ? `Year ${selectedMonthKey}` : monthNames[selectedMonthKey];
-
-      data.forEach(row => {
-        const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
-        const sub = (row['ช่องทาง'] || row['ชื่อคลัง (คลังสินค้า)'] || 'Unknown').toString().trim().toUpperCase();
-        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
-        const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'];
-        
-        if (sub === 'MAIN') return;
-        if (!id || !dateStr) return;
-        const date = parseDate(dateStr);
-        if (!date) return;
-        
-        const pKey = isYearly ? date.year : date.month;
-        if (pKey.toString() !== selectedMonthKey.toString()) return;
-
-
-        const revenue = parseFloat(revenueStr?.toString().replace(/,/g, '') || 0);
-
-        if (!subChannels[sub]) {
-          subChannels[sub] = { revenue: 0, buyers: new Set(), newCustomers: 0, newToSub: 0 };
-        }
-
-        subChannels[sub].revenue += revenue;
-        subChannels[sub].buyers.add(id);
-
-        if (customerFirstDate[id].val === date.val) {
-          subChannels[sub].newCustomers++;
-        }
-        
-        const subKey = `${id}_${sub}`;
-        if (customerSubFirstDate[subKey].val === date.val) {
-          subChannels[sub].newToSub++;
-        }
-      });
-
-      // Population of Strategy Table
-      const tableBody = document.getElementById('strategy-table-body');
-      if (tableBody) {
-        tableBody.innerHTML = '';
-        Object.keys(subChannels).sort((a,b) => subChannels[b].revenue - subChannels[a].revenue).forEach(sub => {
-          const s = subChannels[sub];
-          const buyers = s.buyers.size;
-          if (buyers === 0) return;
-          const migPct = ((s.newToSub / buyers) * 100).toFixed(0);
-          const newPct = ((s.newCustomers / buyers) * 100).toFixed(0);
-          
-          let strategy = '';
-          let strategyClass = '';
-          if (newPct > 70) {
-            strategy = '🔵 Vanguard (ทัพหน้า)';
-            strategyClass = 'strat-vanguard';
-          } else if (migPct > 70) {
-            strategy = '🟢 Migration Hub';
-            strategyClass = 'strat-migration';
-          } else if (migPct > 30 || newPct > 10) {
-            strategy = '🟠 Retention Hub';
-            strategyClass = 'strat-retention';
-          } else {
-            strategy = '🔴 Cash Cow (เสือนอนกิน)';
-            strategyClass = 'strat-cashcow';
-          }
-
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td><strong>${sub}</strong></td>
-            <td>${s.revenue.toLocaleString()}</td>
-            <td>${buyers}</td>
-            <td>${s.newCustomers}</td>
-            <td>${s.newToSub}</td>
-            <td>${migPct}%</td>
-            <td>${newPct}%</td>
-            <td><span class="strategy-chip ${strategyClass}">${strategy}</span></td>
-          `;
-          tableBody.appendChild(tr);
+      const newCustArr = [];
+      const retCustArr = [];
+      
+      trendMonths.forEach(m => {
+        let n = 0, r = 0;
+        monthlyData[m].buyers.forEach(id => {
+          if (globalFirstPurchase[id].monthStr === m) n++;
+          else r++;
         });
-      }
-
-      // Group New Customers by their first purchase period for the Overview chart
-      const periodNewCust = {};
-      Object.values(customerFirstDate).forEach(d => {
-        const pKey = isYearly ? d.date.year : d.date.month;
-        periodNewCust[pKey] = (periodNewCust[pKey] || 0) + 1;
+        newCustArr.push(n);
+        retCustArr.push(r);
       });
 
-      // Prepare Labels and Data for Overview
-      let labels = [];
-      if (!isYearly) {
-        labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      } else {
-        labels = Object.keys(periods).sort((a, b) => a - b);
-      }
+      charts.sales.data.labels = trendMonths;
+      charts.sales.data.datasets[0].data = salesData;
+      charts.sales.update();
 
-      const growthData = labels.map((l, i) => {
-        const key = isYearly ? l : i;
-        return periods[key]?.customers.size || 0;
-      });
+      charts.retNew.data.labels = trendMonths;
+      charts.retNew.data.datasets[0].data = retCustArr;
+      charts.retNew.data.datasets[1].data = newCustArr;
+      charts.retNew.update();
 
-      const freqData = labels.map((l, i) => {
-        const key = isYearly ? l : i;
-        const p = periods[key];
-        return p ? (p.orders / p.customers.size).toFixed(2) : 0;
-      });
+      charts.newCust.data.labels = trendMonths;
+      charts.newCust.data.datasets[0].data = newCustArr;
+      charts.newCust.update();
 
-      const spendingData = labels.map((l, i) => {
-        const key = isYearly ? l : i;
-        const p = periods[key];
-        return p ? (p.revenue / p.customers.size).toFixed(0) : 0;
-      });
+      charts.retCust.data.labels = trendMonths;
+      charts.retCust.data.datasets[0].data = retCustArr;
+      charts.retCust.update();
 
-      const newCustData = labels.map((l, i) => {
-        const key = isYearly ? l : i;
-        return periodNewCust[key] || 0;
-      });
-
-      // Update DOM
-      const tc = document.getElementById('totalCustomers');
-      if (tc) tc.textContent = Object.keys(customerFirstDate).length.toLocaleString();
+      // Current Month Pie & Horizontal Bar
+      const curr = monthlyData[selectedMonthStr];
       
-      const currentMonth = new Date().getMonth();
-      const newThisMonth = periodNewCust[currentMonth] || 0;
-      const nc = document.getElementById('newCustomers');
-      if (nc) nc.textContent = newThisMonth.toLocaleString();
-      
-      // Update Charts
-      if (charts.growth) updateChart(charts.growth, labels, growthData);
-      if (charts.buyerAnalytics) updateChart(charts.buyerAnalytics, labels, growthData, freqData);
-      if (charts.retention) updateChart(charts.retention, labels, spendingData, newCustData);
-      
-      // Update Sparklines randomly for aesthetic
-      if (charts.spark1) updateSparkline(charts.spark1);
-      if (charts.spark2) updateSparkline(charts.spark2);
-    }
+      const channels = Object.keys(curr.channels).sort((a,b) => curr.channels[b] - curr.channels[a]).slice(0,5);
+      charts.channel.data.labels = channels;
+      charts.channel.data.datasets[0].data = channels.map(c => curr.channels[c]);
+      charts.channel.update();
 
-    function updateChart(chart, labels, data1, data2 = null) {
-      if (!chart) return;
-      chart.data.labels = labels;
-      chart.data.datasets[0].data = data1;
-      if (data2 && chart.data.datasets[1]) {
-        chart.data.datasets[1].data = data2;
-      }
-      chart.update();
-    }
-
-    function updateSparkline(chart) {
-      if (!chart) return;
-      chart.data.datasets[0].data = chart.data.datasets[0].data.map(() => Math.floor(Math.random() * 50) + 10);
-      chart.update();
+      const admins = Object.keys(curr.admins).sort((a,b) => curr.admins[b] - curr.admins[a]).slice(0,5);
+      charts.admin.data.labels = admins;
+      charts.admin.data.datasets[0].data = admins.map(a => curr.admins[a]);
+      charts.admin.update();
     }
   </script>
 </body>
