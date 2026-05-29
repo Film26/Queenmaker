@@ -118,15 +118,17 @@ function renderExecutive1(filteredData, rawData) {
   }
 
   // Formatting helpers
-  const fmtNum = (num) => num.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  const fmtDec = (num) => (num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const fmtPct = (num) => ((num || 0) * 100).toFixed(1) + '%';
+  const fmtNum = (num) => (Number(num) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  const fmtDec = (num) => (Number(num) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtPct = (num) => ((Number(num) || 0) * 100).toFixed(1) + '%';
   const getSafely = (a, b) => b === 0 ? 0 : a / b;
 
   // Build Table HTML
+  const filterSummary = `${filters.Year === 'All' ? 'ALL' : filters.Year} - ALL - ${filters.Channel} - ${filters.SubChannel} - ${filters.Product} - ${filters.Admin}`;
+  
   let html = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-      <h3 style="margin:0; font-size:18px; color:#333;">Executive 1 Overview</h3>
+    <div style="font-size: 12px; font-weight: bold; color: #0000ee; margin-bottom: 5px;">${filterSummary.toUpperCase()}</div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
     </div>
     <table class="exec-table">
       <thead>
@@ -196,7 +198,7 @@ function renderExecutive1(filteredData, rawData) {
   html += renderRow('AOV (ยอดต่อบิลเฉลี่ย)', aovArr, true, false, false, 'bg-light-blue');
   html += renderRow('Unique Buyers (คนซื้อจริง)', ubArr, true, false, false, 'bg-light-green');
   html += renderRow('Frequency (ความถี่ซื้อ)', freqArr, false, true, false, 'bg-light-blue');
-  html += renderRow('Spending per Head (เฉลี่ยต่อคน)', sphArr, true, false, false, 'bg-light-green');
+  html += renderRow('Spending per Head (เฉลี่ยต่อคน)', sphArr, true, false, false, 'bg-light-blue');
   html += renderRow('Retained Buyers (คนเก่าซื้อซ้ำ)', retArr, true, false, false, 'bg-light-blue');
   html += renderRow('New Customers (Global)', newGArr, true, false, false, 'bg-light-green');
   html += renderRow('% New Customer Share', newGShrArr, false, false, true, 'bg-light-blue');
