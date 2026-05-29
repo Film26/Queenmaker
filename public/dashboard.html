@@ -401,7 +401,14 @@
     }
 
     function populateDropdowns() {
-      const options = { Month: new Set(), Year: new Set(), Channel: new Set(), SubChannel: new Set(), Product: new Set(), Admin: new Set() };
+      const options = { 
+        Month: new Set(), 
+        Year: new Set(), 
+        Channel: new Set(['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok']), 
+        SubChannel: new Set(['Call', 'CRM', 'Email', 'FB', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'Lazada', 'Line', 'Other', 'PC', 'Shopee', 'Telesale', 'TikTok', 'Website']), 
+        Product: new Set(), 
+        Admin: new Set() 
+      };
       
       rawData.forEach(row => {
         const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
