@@ -103,7 +103,7 @@
         
         <div class="tabs-container">
           <button id="tab-overview" class="tab-btn active" onclick="switchTab('overview')">Overview</button>
-          <button class="tab-btn">Executive1</button>
+          <button id="tab-executive1" class="tab-btn" onclick="switchTab('executive1')">Executive1</button>
           <button class="tab-btn">Executive2</button>
           <button class="tab-btn">Retention</button>
           <button id="tab-cohort" class="tab-btn" onclick="switchTab('cohort')">Cohort Heatmap</button>
@@ -247,6 +247,11 @@
           <!-- Cohort table will be injected here by cohort.js -->
         </div>
 
+        <!-- Executive1 View -->
+        <div id="view-executive1" style="display:none; padding: 20px; background: #fff; border-radius: 16px; margin-top: 20px; overflow-x: auto; min-height: 500px;">
+          <!-- Executive1 table will be injected here by executive1.js -->
+        </div>
+
       </div>
     </main>
   </div>
@@ -313,12 +318,22 @@
         document.getElementById('tab-overview').classList.add('active');
         document.getElementById('view-overview').style.display = 'block';
         document.getElementById('view-cohort').style.display = 'none';
+        document.getElementById('view-executive1').style.display = 'none';
       } else if (tabId === 'cohort') {
         document.getElementById('tab-cohort').classList.add('active');
         document.getElementById('view-overview').style.display = 'none';
         document.getElementById('view-cohort').style.display = 'block';
+        document.getElementById('view-executive1').style.display = 'none';
         if (typeof renderCohortHeatmap === 'function') {
            renderCohortHeatmap(filteredData, rawData);
+        }
+      } else if (tabId === 'executive1') {
+        document.getElementById('tab-executive1').classList.add('active');
+        document.getElementById('view-overview').style.display = 'none';
+        document.getElementById('view-cohort').style.display = 'none';
+        document.getElementById('view-executive1').style.display = 'block';
+        if (typeof renderExecutive1 === 'function') {
+           renderExecutive1(filteredData, rawData);
         }
       }
     }
@@ -433,6 +448,17 @@
       return 'Other';
     }
 
+    function getNormalizedAdmin(rawAdmin) {
+      let a = (rawAdmin || '').toString().trim().toLowerCase();
+      if (!a) return 'Other';
+      if (a.includes('may') || a.includes('เมย์')) return 'May';
+      if (a.includes('บี')) return 'บี';
+      if (a.includes('มิ้ว')) return 'มิ้ว';
+      if (a.includes('แอน')) return 'แอน';
+      if (a.includes('แอล')) return 'แอล';
+      return 'Other';
+    }
+
     function populateDropdowns() {
       const options = { 
         Month: new Set(), 
@@ -441,7 +467,7 @@
         SubChannel: new Set(['Call', 'CRM', 'Email', 'FB', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'Lazada', 'Line', 'Other', 'PC', 'Shopee', 'Telesale', 'TikTok', 'Website']), 
         Product: new Set(['Plus', 'Gold', 'Wiss', 'Kides', 'Collagen', 'Other']), 
         SubProduct: new Set(['Plus', 'Gold', 'Wiss', 'Kides original', 'Kidesส้ม', 'Kides แตงโม', 'Collagen', 'Other']), 
-        Admin: new Set() 
+        Admin: new Set(['May', 'บี', 'มิ้ว', 'แอน', 'แอล', 'Other']) 
       };
       
       rawData.forEach(row => {
@@ -459,7 +485,7 @@
         const rawProductName = row['ชื่อสินค้า'] || row['Product'] || row['รายการขาย'] || '';
         const product = getNormalizedProduct(rawProductName);
         const subProduct = getNormalizedSubProduct(rawProductName);
-        const admin = (row['ชื่อแอดมิน'] || row['Admin'] || 'Unknown').toString().trim();
+        const admin = getNormalizedAdmin(row['ชื่อแอดมิน'] || row['Admin']);
         
         options.Channel.add(channel);
         options.SubChannel.add(subChannel);
@@ -522,7 +548,7 @@
         const rawProductName = row['ชื่อสินค้า'] || row['Product'] || row['รายการขาย'] || '';
         const product = getNormalizedProduct(rawProductName);
         const subProduct = getNormalizedSubProduct(rawProductName);
-        const admin = (row['ชื่อแอดมิน'] || row['Admin'] || 'Unknown').toString().trim();
+        const admin = getNormalizedAdmin(row['ชื่อแอดมิน'] || row['Admin']);
 
         if (filters.Year !== 'All' && d.y.toString() !== filters.Year) return false;
         if (filters.Channel !== 'All' && channel !== filters.Channel) return false;
@@ -538,6 +564,12 @@
       if (document.getElementById('view-cohort').style.display === 'block') {
         if (typeof renderCohortHeatmap === 'function') {
            renderCohortHeatmap(filteredData, rawData);
+        }
+      }
+      
+      if (document.getElementById('view-executive1').style.display === 'block') {
+        if (typeof renderExecutive1 === 'function') {
+           renderExecutive1(filteredData, rawData);
         }
       }
     }
@@ -783,5 +815,6 @@
     }
   </script>
   <script src="cohort.js"></script>
+  <script src="executive1.js"></script>
 </body>
 </html>
