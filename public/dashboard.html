@@ -132,6 +132,10 @@
             <div id="menu-Product" class="filter-content"></div>
           </div>
           <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-SubProduct" onclick="toggleFilter('menu-SubProduct')">Sub Product: <span id="lbl-SubProduct">All</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-SubProduct" class="filter-content"></div>
+          </div>
+          <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Admin" onclick="toggleFilter('menu-Admin')">Admin: <span id="lbl-Admin">All</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Admin" class="filter-content"></div>
           </div>
@@ -259,7 +263,7 @@
     let rawData = [];
     let filteredData = [];
     
-    let filters = { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', Admin: 'All' };
+    let filters = { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All' };
 
     let monthlyData = {}; 
     let globalFirstPurchase = {}; 
@@ -400,13 +404,43 @@
       return 'Other';
     }
 
+    function getNormalizedProduct(rawProd) {
+      let p = (rawProd || '').toString().trim().toLowerCase();
+      if (!p) return 'Other';
+      if (p.includes('plus')) return 'Plus';
+      if (p.includes('gold')) return 'Gold';
+      if (p.includes('wiss')) return 'Wiss';
+      if (p.includes('kides') || p.includes('kide')) return 'Kides';
+      if (p.includes('collagen') || p.includes('callagen')) return 'Collagen';
+      return 'Other';
+    }
+
+    function getNormalizedSubProduct(rawProd) {
+      let p = (rawProd || '').toString().trim().toLowerCase();
+      if (!p) return 'Other';
+      
+      if (p.includes('kides') || p.includes('kide')) {
+        if (p.includes('ส้ม')) return 'Kidesส้ม';
+        if (p.includes('แตงโม')) return 'Kides แตงโม';
+        return 'Kides original';
+      }
+      
+      if (p.includes('plus')) return 'Plus';
+      if (p.includes('gold')) return 'Gold';
+      if (p.includes('wiss')) return 'Wiss';
+      if (p.includes('collagen') || p.includes('callagen')) return 'Collagen';
+      
+      return 'Other';
+    }
+
     function populateDropdowns() {
       const options = { 
         Month: new Set(), 
         Year: new Set(), 
         Channel: new Set(['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok']), 
         SubChannel: new Set(['Call', 'CRM', 'Email', 'FB', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'Lazada', 'Line', 'Other', 'PC', 'Shopee', 'Telesale', 'TikTok', 'Website']), 
-        Product: new Set(), 
+        Product: new Set(['Plus', 'Gold', 'Wiss', 'Kides', 'Collagen', 'Other']), 
+        SubProduct: new Set(['Plus', 'Gold', 'Wiss', 'Kides original', 'Kidesส้ม', 'Kides แตงโม', 'Collagen', 'Other']), 
         Admin: new Set() 
       };
       
@@ -421,16 +455,20 @@
         
         const channel = getNormalizedChannel(row['ช่องทาง']);
         const subChannel = getNormalizedSubChannel(row['ชื่อคลัง (คลังสินค้า)']);
-        const product = (row['ชื่อสินค้า'] || row['Product'] || 'Unknown').toString().trim();
+        
+        const rawProductName = row['ชื่อสินค้า'] || row['Product'] || row['รายการขาย'] || '';
+        const product = getNormalizedProduct(rawProductName);
+        const subProduct = getNormalizedSubProduct(rawProductName);
         const admin = (row['ชื่อแอดมิน'] || row['Admin'] || 'Unknown').toString().trim();
         
         options.Channel.add(channel);
         options.SubChannel.add(subChannel);
         options.Product.add(product);
+        options.SubProduct.add(subProduct);
         options.Admin.add(admin);
       });
 
-      ['Year', 'Channel', 'SubChannel', 'Product', 'Admin'].forEach(type => {
+      ['Year', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].forEach(type => {
         const menu = document.getElementById('menu-' + type);
         menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
         Array.from(options[type]).sort().forEach(val => {
@@ -460,7 +498,7 @@
     }
 
     function clearFilters() {
-      ['Month', 'Year', 'Channel', 'SubChannel', 'Product', 'Admin'].forEach(type => {
+      ['Month', 'Year', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].forEach(type => {
         filters[type] = 'All';
         document.getElementById('lbl-' + type).textContent = 'All';
         document.getElementById('btn-' + type).classList.remove('active');
@@ -480,13 +518,17 @@
 
         const channel = getNormalizedChannel(row['ช่องทาง']);
         const subChannel = getNormalizedSubChannel(row['ชื่อคลัง (คลังสินค้า)']);
-        const product = (row['ชื่อสินค้า'] || row['Product'] || 'Unknown').toString().trim();
+        
+        const rawProductName = row['ชื่อสินค้า'] || row['Product'] || row['รายการขาย'] || '';
+        const product = getNormalizedProduct(rawProductName);
+        const subProduct = getNormalizedSubProduct(rawProductName);
         const admin = (row['ชื่อแอดมิน'] || row['Admin'] || 'Unknown').toString().trim();
 
         if (filters.Year !== 'All' && d.y.toString() !== filters.Year) return false;
         if (filters.Channel !== 'All' && channel !== filters.Channel) return false;
         if (filters.SubChannel !== 'All' && subChannel !== filters.SubChannel) return false;
         if (filters.Product !== 'All' && product !== filters.Product) return false;
+        if (filters.SubProduct !== 'All' && subProduct !== filters.SubProduct) return false;
         if (filters.Admin !== 'All' && admin !== filters.Admin) return false;
 
         return true;
