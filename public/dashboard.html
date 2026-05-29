@@ -354,6 +354,52 @@
       return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
     }
 
+    function getNormalizedChannel(rawChannel) {
+      let ch = (rawChannel || '').toString().trim().toLowerCase();
+      if (!ch) return 'Other';
+      if (ch.includes('facebook') || ch === 'fb') return 'Facebook';
+      if (ch.includes('line')) return 'Line';
+      if (ch.includes('tiktok')) return 'Tiktok';
+      if (ch.includes('shopee')) return 'Shopee';
+      if (ch.includes('lazada')) return 'Lazada';
+      if (ch.includes('ig') || ch.includes('instagram')) return 'Instagram';
+      if (ch.includes('call')) return 'Call';
+      if (ch.includes('crm')) return 'CRM';
+      return 'Other';
+    }
+
+    function getNormalizedSubChannel(rawSub) {
+      let sub = (rawSub || '').toString().trim().toUpperCase();
+      if (!sub) return 'Other';
+      
+      if (sub.includes('FBH-IG')) return 'FBH-IG';
+      if (sub.includes('FBP-W')) return 'FBP-W';
+      if (sub.includes('FBSS')) return 'FBSS';
+      if (sub.includes('FBD')) return 'FBD';
+      if (sub.includes('FBG')) return 'FBG';
+      if (sub.includes('FBH')) return 'FBH';
+      if (sub.includes('FBK')) return 'FBK';
+      if (sub.includes('FBM')) return 'FBM';
+      if (sub.includes('FBP')) return 'FBP';
+      if (sub.includes('FBW')) return 'FBW';
+      if (sub.includes('FB')) return 'FB';
+      if (sub.includes('IG') || sub.includes('INSTAGRAM')) return 'IG';
+      
+      let lowerSub = sub.toLowerCase();
+      if (lowerSub.includes('tiktok')) return 'TikTok';
+      if (lowerSub.includes('shopee')) return 'Shopee';
+      if (lowerSub.includes('lazada')) return 'Lazada';
+      if (lowerSub.includes('line')) return 'Line';
+      if (lowerSub.includes('email')) return 'Email';
+      if (lowerSub.includes('website') || lowerSub.includes('web')) return 'Website';
+      if (lowerSub.includes('telesale')) return 'Telesale';
+      if (lowerSub.includes('call')) return 'Call';
+      if (lowerSub.includes('crm')) return 'CRM';
+      if (lowerSub.includes('pc')) return 'PC';
+      
+      return 'Other';
+    }
+
     function populateDropdowns() {
       const options = { Month: new Set(), Year: new Set(), Channel: new Set(), SubChannel: new Set(), Product: new Set(), Admin: new Set() };
       
@@ -366,8 +412,8 @@
         options.Month.add(d.str);
         options.Year.add(d.y.toString());
         
-        const channel = (row['ช่องทาง'] || 'Unknown').toString().trim();
-        const subChannel = (row['ชื่อคลัง (คลังสินค้า)'] || 'Unknown').toString().trim();
+        const channel = getNormalizedChannel(row['ช่องทาง']);
+        const subChannel = getNormalizedSubChannel(row['ชื่อคลัง (คลังสินค้า)']);
         const product = (row['ชื่อสินค้า'] || row['Product'] || 'Unknown').toString().trim();
         const admin = (row['ชื่อแอดมิน'] || row['Admin'] || 'Unknown').toString().trim();
         
@@ -425,8 +471,8 @@
         const d = parseDate(dateStr);
         if (!d) return false;
 
-        const channel = (row['ช่องทาง'] || 'Unknown').toString().trim();
-        const subChannel = (row['ชื่อคลัง (คลังสินค้า)'] || 'Unknown').toString().trim();
+        const channel = getNormalizedChannel(row['ช่องทาง']);
+        const subChannel = getNormalizedSubChannel(row['ชื่อคลัง (คลังสินค้า)']);
         const product = (row['ชื่อสินค้า'] || row['Product'] || 'Unknown').toString().trim();
         const admin = (row['ชื่อแอดมิน'] || row['Admin'] || 'Unknown').toString().trim();
 
@@ -467,12 +513,11 @@
         }
       });
 
-      // 2nd pass: Aggregate using FILTERED data
       data.forEach(row => {
         const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
         const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
         const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'];
-        const channel = (row['ช่องทาง'] || 'Unknown').toString().trim();
+        const channel = getNormalizedChannel(row['ช่องทาง']);
         const admin = (row['ชื่อแอดมิน'] || row['Admin'] || 'Unknown').toString().trim();
 
         if (!id || !dateStr) return;
