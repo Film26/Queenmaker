@@ -104,8 +104,7 @@
         <div class="tabs-container">
           <button id="tab-overview" class="tab-btn active" onclick="switchTab('overview')">Overview</button>
           <button id="tab-executive1" class="tab-btn" onclick="switchTab('executive1')">Executive1</button>
-          <button class="tab-btn">Executive2</button>
-          <button class="tab-btn">Retention</button>
+          <button id="tab-executive2" class="tab-btn" onclick="switchTab('executive2')">Executive2</button>
           <button id="tab-cohort" class="tab-btn" onclick="switchTab('cohort')">Cohort Heatmap</button>
         </div>
 
@@ -151,38 +150,45 @@
             <div class="kpi-header"><div class="kpi-title">ยอดขาย</div></div>
             <div class="kpi-val" id="val-sales">฿0</div>
             <div><span class="kpi-change-new neutral" id="change-sales">-</span></div>
+            <div class="kpi-desc">แสดง เป็น บาท<br>แสดง % เทียบเดือนก่อนหน้า</div>
           </div>
           
           <div class="kpi-card col-span-4">
             <div class="kpi-header"><div class="kpi-title">Total Customer</div></div>
             <div class="kpi-val" id="val-total-cust">0</div>
             <div><span class="kpi-change-new neutral" id="change-total-cust">-</span></div>
+            <div class="kpi-desc">แสดงจำนวน คน<br>แสดง % เทียบเดือนก่อนหน้า</div>
           </div>
           
           <div class="kpi-card col-span-4">
             <div class="kpi-header"><div class="kpi-title">Active Customer</div></div>
             <div class="kpi-val" id="val-active-cust">0%</div>
             <div><span class="kpi-change-new neutral" id="change-active-cust">-</span></div>
+            <div class="kpi-desc">แสดงจำนวนคน คิดเป็น %<br>แสดง % เทียบเดือนก่อนหน้า</div>
           </div>
 
           <!-- Row 2 -->
           <div class="kpi-card col-span-3">
             <div class="kpi-header"><div class="kpi-title">YTD Buyer</div></div>
             <div class="kpi-val" id="val-ytd-buyer">0</div>
+            <div class="kpi-desc">แสดงจำนวน คน<br>(Year to Date)</div>
           </div>
           <div class="kpi-card col-span-3">
             <div class="kpi-header"><div class="kpi-title">YTD New Customers</div></div>
             <div class="kpi-val" id="val-ytd-new">0</div>
+            <div class="kpi-desc">แสดงจำนวน คน<br>(Year to Date)</div>
           </div>
           <div class="kpi-card col-span-3">
             <div class="kpi-header"><div class="kpi-title">New Customer (Last Month)</div></div>
             <div class="kpi-val" id="val-new-cust">0</div>
             <div><span class="kpi-change-new neutral" id="change-new-cust">-</span></div>
+            <div class="kpi-desc">แสดงจำนวน คน<br>แสดง % เทียบเดือนก่อนหน้า</div>
           </div>
           <div class="kpi-card col-span-3">
             <div class="kpi-header"><div class="kpi-title">Retained Customer (Last Month)</div></div>
             <div class="kpi-val" id="val-ret-cust">0</div>
             <div><span class="kpi-change-new neutral" id="change-ret-cust">-</span></div>
+            <div class="kpi-desc">แสดงจำนวน คน<br>แสดง % เทียบเดือนก่อนหน้า</div>
           </div>
 
           <!-- Row 3 -->
@@ -190,16 +196,19 @@
             <div class="kpi-header"><div class="kpi-title">AOV (ยอดต่อบิลเฉลี่ย)</div></div>
             <div class="kpi-val" id="val-aov">฿0</div>
             <div><span class="kpi-change-new neutral" id="change-aov">-</span></div>
+            <div class="kpi-desc">แสดง เป็น บาท<br>แสดง % เทียบเดือนก่อนหน้า</div>
           </div>
           <div class="kpi-card col-span-4">
             <div class="kpi-header"><div class="kpi-title">Spending per Head (ยอดเฉลี่ยต่อคน)</div></div>
             <div class="kpi-val" id="val-sph">฿0</div>
             <div><span class="kpi-change-new neutral" id="change-sph">-</span></div>
+            <div class="kpi-desc">แสดง เป็น บาท<br>แสดง % เทียบเดือนก่อนหน้า</div>
           </div>
           <div class="kpi-card col-span-4">
             <div class="kpi-header"><div class="kpi-title">Repeat Purchase</div></div>
             <div class="kpi-val" id="val-repeat">0.0x</div>
             <div><span class="kpi-change-new neutral" id="change-repeat">-</span></div>
+            <div class="kpi-desc">แสดง ตัวเลข (SPH หาร AOV)<br>แสดง % เทียบเดือนก่อนหน้า</div>
           </div>
         </div>
 
@@ -238,10 +247,11 @@
         </div>
 
         <!-- Executive1 View -->
-        <div id="view-executive1" style="display:none; padding: 20px; background: #fff; border-radius: 16px; margin-top: 20px; overflow-x: auto; min-height: 500px;">
-          <!-- Executive1 table will be injected here by executive1.js -->
-        </div>
-
+        <div id="view-executive1" class="view-content" style="display:none; padding: 20px;"></div>
+      
+        <!-- Executive2 View -->
+        <div id="view-executive2" class="view-content" style="display:none; padding: 20px; background-color: #f8f9fa;"></div>
+      
       </div>
     </main>
   </div>
@@ -303,27 +313,30 @@
 
     function switchTab(tabId) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.view-content').forEach(view => view.style.display = 'none');
+      document.getElementById('view-overview').style.display = 'none';
+      document.getElementById('view-cohort').style.display = 'none';
       
       if (tabId === 'overview') {
         document.getElementById('tab-overview').classList.add('active');
         document.getElementById('view-overview').style.display = 'block';
-        document.getElementById('view-cohort').style.display = 'none';
-        document.getElementById('view-executive1').style.display = 'none';
       } else if (tabId === 'cohort') {
         document.getElementById('tab-cohort').classList.add('active');
-        document.getElementById('view-overview').style.display = 'none';
         document.getElementById('view-cohort').style.display = 'block';
-        document.getElementById('view-executive1').style.display = 'none';
         if (typeof renderCohortHeatmap === 'function') {
            renderCohortHeatmap(filteredData, rawData);
         }
       } else if (tabId === 'executive1') {
         document.getElementById('tab-executive1').classList.add('active');
-        document.getElementById('view-overview').style.display = 'none';
-        document.getElementById('view-cohort').style.display = 'none';
         document.getElementById('view-executive1').style.display = 'block';
         if (typeof renderExecutive1 === 'function') {
            renderExecutive1(filteredData, rawData);
+        }
+      } else if (tabId === 'executive2') {
+        document.getElementById('tab-executive2').classList.add('active');
+        document.getElementById('view-executive2').style.display = 'block';
+        if (typeof renderExecutive2 === 'function') {
+           renderExecutive2(filteredData, rawData);
         }
       }
     }
@@ -560,6 +573,12 @@
       if (document.getElementById('view-executive1').style.display === 'block') {
         if (typeof renderExecutive1 === 'function') {
            renderExecutive1(filteredData, rawData);
+        }
+      }
+      
+      if (document.getElementById('view-executive2').style.display === 'block') {
+        if (typeof renderExecutive2 === 'function') {
+           renderExecutive2(filteredData, rawData);
         }
       }
     }
@@ -806,5 +825,6 @@
   </script>
   <script src="cohort.js"></script>
   <script src="executive1.js"></script>
+  <script src="executive2.js"></script>
 </body>
 </html>
