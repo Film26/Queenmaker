@@ -20,7 +20,6 @@
     .filter-content div.selected { background-color: #fdf1e6; font-weight: bold; color: #d95f1d;}
     
     .clear-filters-btn { background: none; border: none; color: #d95f1d; font-size: 13px; cursor: pointer; text-decoration: underline; margin-left: 10px; display: none;}
-
     /* Layout for 10 KPIs and 6 Charts - Beautiful Design */
     .dashboard-content { padding: 30px 40px; background-color: #fbf9f4; min-height: 100vh;}
     
@@ -39,12 +38,10 @@
     .kpi-change-new.up { color: #198754; background: rgba(25,135,84,0.1); }
     .kpi-change-new.down { color: #dc3545; background: rgba(220,53,69,0.1); }
     .kpi-change-new.neutral { color: #6c757d; background: rgba(108,117,125,0.1); }
-
     .charts-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px;}
     .chart-box { background: #fff; border-radius: 16px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); display: flex; flex-direction: column; height: 320px;}
     .chart-title { font-size: 14px; font-weight: 700; color: #333; margin-bottom: 15px; text-align: center; }
     .chart-container { flex-grow: 1; position: relative; width: 100%; }
-
     /* Tabs Styling */
     .tabs-container { margin-bottom: 20px; display: flex; gap: 10px; }
     .tab-btn { background-color: #fff; border: 1px solid #ddd; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; color: #555; }
@@ -75,7 +72,6 @@
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-cog"></i>SETTINGS</a></li>
       </ul>
     </aside>
-
     <!-- Main Content -->
     <main class="main-content" style="padding:0;">
       <header class="top-bar" style="background: transparent; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center;">
@@ -98,17 +94,14 @@
           <a href="#" class="btn" style="background: #eee; color: #333; text-decoration: none; border-radius: 20px; padding: 8px 20px; font-weight: 600;">Logout</a>
         </div>
       </header>
-
       <div class="dashboard-content">
         
         <div class="tabs-container">
           <button id="tab-overview" class="tab-btn active" onclick="switchTab('overview')">Overview</button>
           <button id="tab-executive1" class="tab-btn" onclick="switchTab('executive1')">Executive1</button>
           <button id="tab-executive2" class="tab-btn" onclick="switchTab('executive2')">Executive2</button>
-          <button class="tab-btn">Retention</button>
           <button id="tab-cohort" class="tab-btn" onclick="switchTab('cohort')">Cohort Heatmap</button>
         </div>
-
         <!-- Global Filters Bar -->
         <div class="filters-bar">
           <div class="filter-dropdown">
@@ -141,7 +134,6 @@
           </div>
           <button id="clearFiltersBtn" class="clear-filters-btn" onclick="clearFilters()">Clear Filters</button>
         </div>
-
         <!-- Main Overview View -->
         <div id="view-overview">
           <!-- KPI Grid 10 Items -->
@@ -167,7 +159,6 @@
             <div><span class="kpi-change-new neutral" id="change-active-cust">-</span></div>
             <div class="kpi-desc">แสดงจำนวนคน คิดเป็น %<br>แสดง % เทียบเดือนก่อนหน้า</div>
           </div>
-
           <!-- Row 2 -->
           <div class="kpi-card col-span-3">
             <div class="kpi-header"><div class="kpi-title">YTD Buyer</div></div>
@@ -191,7 +182,6 @@
             <div><span class="kpi-change-new neutral" id="change-ret-cust">-</span></div>
             <div class="kpi-desc">แสดงจำนวน คน<br>แสดง % เทียบเดือนก่อนหน้า</div>
           </div>
-
           <!-- Row 3 -->
           <div class="kpi-card col-span-4">
             <div class="kpi-header"><div class="kpi-title">AOV (ยอดต่อบิลเฉลี่ย)</div></div>
@@ -212,7 +202,6 @@
             <div class="kpi-desc">แสดง ตัวเลข (SPH หาร AOV)<br>แสดง % เทียบเดือนก่อนหน้า</div>
           </div>
         </div>
-
         <!-- 6 Charts Layout -->
         <div class="charts-grid-3">
           <div class="chart-box">
@@ -241,27 +230,29 @@
           </div>
           </div>
         </div>
-
         <!-- Cohort Heatmap View -->
         <div id="view-cohort" style="display:none; padding: 20px; background: #fff; border-radius: 16px; margin-top: 20px; overflow-x: auto; min-height: 500px;">
           <!-- Cohort table will be injected here by cohort.js -->
         </div>
-
         <!-- Executive1 View -->
         <div id="view-executive1" class="view-content" style="display:none; padding: 20px;"></div>
       
         <!-- Executive2 View -->
         <div id="view-executive2" class="view-content" style="display:none; padding: 20px; background-color: #f8f9fa;"></div>
       
+        <!-- Retention View Placeholder -->
+        <div id="view-retention" class="view-content" style="display:none; padding: 50px; text-align: center; color: #999;">
+           <h2>Retention View</h2>
+           <p>หน้าแสดงผลนี้กำลังรอการออกแบบและใส่ข้อมูลครับ</p>
+        </div>
+      
       </div>
     </main>
   </div>
-
-  <div id="loadingOverlay" class="loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center;">
+ <div id="loadingOverlay" class="loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center;">
     <div class="spinner" style="width:40px; height:40px; border:4px solid #f3f3f3; border-top:4px solid #d95f1d; border-radius:50%; animation:spin 1s linear infinite;"></div>
   </div>
   <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
-
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script>
@@ -270,12 +261,10 @@
     let filteredData = [];
     
     let filters = { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All' };
-
     let monthlyData = {}; 
     let globalFirstPurchase = {}; 
     let availableMonths = [];
     let charts = {};
-
     window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('importBtn').addEventListener('click', () => document.getElementById('fileInput').click());
       document.getElementById('fileInput').addEventListener('change', (e) => {
@@ -289,7 +278,6 @@
           });
         }
       });
-
       document.getElementById('loadSampleBtn').addEventListener('click', () => {
         showLoading(true);
         fetch(sampleUrl)
@@ -299,7 +287,6 @@
           })
           .catch(err => { showLoading(false); alert('Failed to load sample data'); });
       });
-
       window.onclick = function(event) {
         if (!event.target.closest('.filter-dropdown')) {
           var dropdowns = document.getElementsByClassName("filter-content");
@@ -308,10 +295,8 @@
           }
         }
       }
-
       initCharts();
     });
-
     function switchTab(tabId) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.view-content').forEach(view => view.style.display = 'none');
@@ -339,10 +324,12 @@
         if (typeof renderExecutive2 === 'function') {
            renderExecutive2(filteredData, rawData);
         }
+      } else if (tabId === 'retention') {
+        document.getElementById('tab-retention').classList.add('active');
+        document.getElementById('view-retention').style.display = 'block';
       }
     }
-
-    function toggleFilter(id) { document.getElementById(id).classList.toggle("show"); }
+        function toggleFilter(id) { document.getElementById(id).classList.toggle("show"); }
     function showLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none'; }
     function formatCurrency(num) { return '฿' + num.toLocaleString('th-TH', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
     function formatPercent(num) { 
@@ -350,7 +337,6 @@
       const sign = num > 0 ? '+' : '';
       return sign + (num * 100).toFixed(1) + '%';
     }
-
     function updateChangeUI(elId, current, previous) {
       const el = document.getElementById(elId);
       if (!previous || previous === 0) {
@@ -365,7 +351,6 @@
       else { el.className = 'kpi-change-new neutral'; }
       el.innerHTML = icon + el.textContent;
     }
-
     function parseDate(dateStr) {
       if (!dateStr) return null;
       const parts = dateStr.split(' ')[0].split('/');
@@ -376,7 +361,6 @@
       if (y < 2000) y += 2000;
       return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
     }
-
     function getNormalizedChannel(rawChannel) {
       let ch = (rawChannel || '').toString().trim().toLowerCase();
       if (!ch) return 'Other';
@@ -390,7 +374,6 @@
       if (ch.includes('crm')) return 'CRM';
       return 'Other';
     }
-
     function getNormalizedSubChannel(rawSub) {
       let sub = (rawSub || '').toString().trim().toUpperCase();
       if (!sub) return 'Other';
@@ -422,7 +405,6 @@
       
       return 'Other';
     }
-
     function getNormalizedProduct(rawProd) {
       let p = (rawProd || '').toString().trim().toLowerCase();
       if (!p) return 'Other';
@@ -433,7 +415,6 @@
       if (p.includes('collagen') || p.includes('callagen')) return 'Collagen';
       return 'Other';
     }
-
     function getNormalizedSubProduct(rawProd) {
       let p = (rawProd || '').toString().trim().toLowerCase();
       if (!p) return 'Other';
@@ -451,7 +432,6 @@
       
       return 'Other';
     }
-
     function getNormalizedAdmin(rawAdmin) {
       let a = (rawAdmin || '').toString().trim().toLowerCase();
       if (!a) return 'Other';
@@ -462,7 +442,6 @@
       if (a.includes('แอล')) return 'แอล';
       return 'Other';
     }
-
     function populateDropdowns() {
       const options = { 
         Month: new Set(), 
@@ -497,7 +476,6 @@
         options.SubProduct.add(subProduct);
         options.Admin.add(admin);
       });
-
       ['Year', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].forEach(type => {
         const menu = document.getElementById('menu-' + type);
         menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
@@ -505,14 +483,12 @@
           menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
         });
       });
-
       const monthMenu = document.getElementById('menu-Month');
       monthMenu.innerHTML = `<div onclick="setFilter('Month', 'All')">All</div>`;
       Array.from(options.Month).sort().reverse().forEach(val => {
         monthMenu.innerHTML += `<div onclick="setFilter('Month', '${val}')">${val}</div>`;
       });
     }
-
     function setFilter(type, val) {
       filters[type] = val;
       document.getElementById('lbl-' + type).textContent = val;
@@ -526,7 +502,6 @@
       }
       applyFilters();
     }
-
     function clearFilters() {
       ['Month', 'Year', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].forEach(type => {
         filters[type] = 'All';
@@ -536,16 +511,13 @@
       document.getElementById('clearFiltersBtn').style.display = 'none';
       applyFilters();
     }
-
     function applyFilters() {
       if (rawData.length > 0 && document.getElementById('menu-Year').children.length === 0) populateDropdowns();
-
       filteredData = rawData.filter(row => {
         const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
         if (!dateStr) return false;
         const d = parseDate(dateStr);
         if (!d) return false;
-
         const channel = getNormalizedChannel(row['ช่องทาง']);
         const subChannel = getNormalizedSubChannel(row['ชื่อคลัง (คลังสินค้า)']);
         
@@ -553,14 +525,12 @@
         const product = getNormalizedProduct(rawProductName);
         const subProduct = getNormalizedSubProduct(rawProductName);
         const admin = getNormalizedAdmin(row['ชื่อแอดมิน'] || row['Admin']);
-
         if (filters.Year !== 'All' && d.y.toString() !== filters.Year) return false;
         if (filters.Channel !== 'All' && channel !== filters.Channel) return false;
         if (filters.SubChannel !== 'All' && subChannel !== filters.SubChannel) return false;
         if (filters.Product !== 'All' && product !== filters.Product) return false;
         if (filters.SubProduct !== 'All' && subProduct !== filters.SubProduct) return false;
         if (filters.Admin !== 'All' && admin !== filters.Admin) return false;
-
         return true;
       });
       processData(filteredData);
@@ -583,13 +553,10 @@
         }
       }
     }
-
     function processData(data) {
       monthlyData = {};
       globalFirstPurchase = {};
-
       if (data.length === 0) { renderEmpty(); return; }
-
       // 1st pass: true global first purchase date from RAW data (ignoring filters to accurately tag "New" vs "Retained")
       rawData.forEach(row => {
         const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
@@ -597,46 +564,37 @@
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
-
         const val = d.y * 10000 + d.m * 100 + d.d;
         if (!globalFirstPurchase[id] || val < globalFirstPurchase[id].val) {
           globalFirstPurchase[id] = { val: val, monthStr: d.str, year: d.y };
         }
       });
-
       data.forEach(row => {
         const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
         const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
         const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'];
         const channel = getNormalizedChannel(row['ช่องทาง']);
         const admin = (row['ชื่อแอดมิน'] || row['Admin'] || 'Unknown').toString().trim();
-
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
         const revenue = parseFloat(revenueStr?.toString().replace(/,/g, '') || 0);
         const mStr = d.str;
-
         if (!monthlyData[mStr]) {
           monthlyData[mStr] = { sales: 0, orders: 0, buyers: new Set(), channels: {}, admins: {}, year: d.y };
         }
-
         let m = monthlyData[mStr];
         m.sales += revenue;
         m.orders++;
         m.buyers.add(id);
-
         if (!m.channels[channel]) m.channels[channel] = 0;
         m.channels[channel] += revenue;
-
         if (!m.admins[admin]) m.admins[admin] = 0;
         m.admins[admin] += revenue;
       });
-
       availableMonths = Object.keys(monthlyData).sort();
       renderDashboard();
     }
-
     function renderEmpty() {
       const ids = ['sales','total-cust','active-cust','ytd-buyer','ytd-new','new-cust','ret-cust','aov','sph','repeat'];
       ids.forEach(id => {
@@ -645,27 +603,22 @@
       });
       Object.values(charts).forEach(c => { c.data.labels = []; c.update(); });
     }
-
     function renderDashboard() {
       if (availableMonths.length === 0) { renderEmpty(); return; }
-
       let focalMonths = availableMonths;
       if (filters.Month !== 'All') focalMonths = availableMonths.filter(m => m <= filters.Month);
       if (focalMonths.length === 0) { renderEmpty(); return; }
-
       const selectedMonthStr = focalMonths[focalMonths.length - 1];
       const idx = availableMonths.indexOf(selectedMonthStr);
       const curr = monthlyData[selectedMonthStr];
       const prev = idx > 0 ? monthlyData[availableMonths[idx - 1]] : null;
       
       const currYear = curr.year;
-
       let newCount = 0, retCount = 0;
       curr.buyers.forEach(id => {
         if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === selectedMonthStr) newCount++;
         else retCount++;
       });
-
       let prevNew = 0, prevRet = 0, prevSales = 0, prevBuyers = 0, prevAov = 0, prevSph = 0, prevRepeat = 0;
       if (prev) {
         prevSales = prev.sales;
@@ -678,7 +631,6 @@
         prevSph = prevBuyers > 0 ? prevSales / prevBuyers : 0;
         prevRepeat = prevAov > 0 ? prevSph / prevAov : 0;
       }
-
       let ytdBuyers = new Set(), ytdNew = 0;
       availableMonths.forEach(m => {
         if (monthlyData[m].year === currYear && m <= selectedMonthStr) {
@@ -688,7 +640,6 @@
           });
         }
       });
-
       let totalEver = new Set();
       rawData.forEach(row => {
         const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
@@ -697,43 +648,31 @@
         const d = parseDate(dateStr);
         if (d && d.str <= selectedMonthStr) totalEver.add(id);
       });
-
       const totalCust = curr.buyers.size;
       const activePct = totalEver.size > 0 ? (totalCust / totalEver.size) : 0;
       const prevActivePct = prev ? (prevBuyers / (totalEver.size - totalCust)) : 0;
-
       const aov = curr.orders > 0 ? curr.sales / curr.orders : 0;
       const sph = totalCust > 0 ? curr.sales / totalCust : 0;
       const repeat = aov > 0 ? sph / aov : 0;
-
       // Update UI Values
       document.getElementById('val-sales').textContent = formatCurrency(curr.sales);
       updateChangeUI('change-sales', curr.sales, prevSales);
-
       document.getElementById('val-total-cust').textContent = totalCust.toLocaleString();
       updateChangeUI('change-total-cust', totalCust, prevBuyers);
-
       document.getElementById('val-active-cust').textContent = (activePct * 100).toFixed(1) + '%';
       updateChangeUI('change-active-cust', activePct, prevActivePct);
-
       document.getElementById('val-ytd-buyer').textContent = ytdBuyers.size.toLocaleString();
       document.getElementById('val-ytd-new').textContent = ytdNew.toLocaleString();
-
       document.getElementById('val-new-cust').textContent = newCount.toLocaleString();
       updateChangeUI('change-new-cust', newCount, prevNew);
-
       document.getElementById('val-ret-cust').textContent = retCount.toLocaleString();
       updateChangeUI('change-ret-cust', retCount, prevRet);
-
       document.getElementById('val-aov').textContent = formatCurrency(aov);
       updateChangeUI('change-aov', aov, prevAov);
-
       document.getElementById('val-sph').textContent = formatCurrency(sph);
       updateChangeUI('change-sph', sph, prevSph);
-
       document.getElementById('val-repeat').textContent = repeat.toFixed(2) + 'x';
       updateChangeUI('change-repeat', repeat, prevRepeat);
-
       // Update Charts
       const trendMonths = focalMonths.slice(-6);
       
@@ -750,46 +689,37 @@
         newCustArr.push(n);
         retCustArr.push(r);
       });
-
       charts.sales.data.labels = trendMonths;
       charts.sales.data.datasets[0].data = salesData;
       charts.sales.update();
-
       charts.retNew.data.labels = trendMonths;
       charts.retNew.data.datasets[0].data = retCustArr;
       charts.retNew.data.datasets[1].data = newCustArr;
       charts.retNew.update();
-
       charts.newCust.data.labels = trendMonths;
       charts.newCust.data.datasets[0].data = newCustArr;
       charts.newCust.update();
-
       charts.retCust.data.labels = trendMonths;
       charts.retCust.data.datasets[0].data = retCustArr;
       charts.retCust.update();
-
       const channels = Object.keys(curr.channels).sort((a,b) => curr.channels[b] - curr.channels[a]).slice(0,5);
       charts.channel.data.labels = channels;
       charts.channel.data.datasets[0].data = channels.map(c => curr.channels[c]);
       charts.channel.update();
-
       const admins = Object.keys(curr.admins).sort((a,b) => curr.admins[b] - curr.admins[a]).slice(0,5);
       charts.admin.data.labels = admins;
       charts.admin.data.datasets[0].data = admins.map(a => curr.admins[a]);
       charts.admin.update();
     }
-
     function initCharts() {
       Chart.defaults.font.family = 'Inter';
       Chart.defaults.color = '#777';
       const commonOpts = { maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } } };
-
       charts.sales = new Chart(document.getElementById('chart-sales'), {
         type: 'bar',
         data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] },
         options: commonOpts
       });
-
       charts.retNew = new Chart(document.getElementById('chart-ret-new-stacked'), {
         type: 'bar',
         data: { labels: [], datasets: [
@@ -798,25 +728,21 @@
         ]},
         options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } } }, scales: { x: { stacked: true }, y: { stacked: true } } }
       });
-
       charts.newCust = new Chart(document.getElementById('chart-new'), {
         type: 'bar',
         data: { labels: [], datasets: [{ data: [], backgroundColor: '#e86c31', borderRadius: 6 }] },
         options: commonOpts
       });
-
       charts.retCust = new Chart(document.getElementById('chart-ret'), {
         type: 'bar',
         data: { labels: [], datasets: [{ data: [], backgroundColor: '#555', borderRadius: 6 }] },
         options: commonOpts
       });
-
       charts.channel = new Chart(document.getElementById('chart-channel'), {
         type: 'doughnut',
         data: { labels: [], datasets: [{ data: [], backgroundColor: ['#d95f1d', '#fce268', '#555', '#ccc', '#888'] }] },
         options: { ...commonOpts, plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } } }
       });
-
       charts.admin = new Chart(document.getElementById('chart-admin'), {
         type: 'bar',
         data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] },
