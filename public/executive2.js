@@ -77,14 +77,30 @@ function renderExecutive2(filteredData, rawData) {
     return { y, m, d, val: y * 10000 + m * 100 + d };
   };
 
+  function getExec2Group(row) {
+    let sub = (row['ชื่อคลัง (คลังสินค้า)'] || row['SubChannel'] || '').toString().trim().toLowerCase();
+    if (!sub) return 'Other';
+    
+    if (sub.includes('fbh-ig') || sub.includes('ig') || sub.includes('instagram')) return 'Instagram';
+    if (sub.includes('fb') || sub.includes('facebook')) return 'Facebook';
+    if (sub.includes('tiktok')) return 'Tiktok';
+    if (sub.includes('shopee')) return 'Shopee';
+    if (sub.includes('lazada')) return 'Lazada';
+    if (sub.includes('line')) return 'Line';
+    if (sub.includes('call') || sub.includes('telesale') || sub.includes('phone')) return 'Call';
+    if (sub.includes('crm')) return 'CRM';
+    
+    return 'Other';
+  }
+
   // Determine SubChannel first purchase dates globally (using ALL raw data)
   const scFirstPurchase = {};
   if (rawData && rawData.length > 0) {
     rawData.forEach(row => {
       const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
-      const sc = (row['SubChannel'] || 'Unknown').trim();
+      const sc = getExec2Group(row);
       const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
-      if (!id || !sc || !dateStr) return;
+      if (!id || !dateStr) return;
       const d = parseD(dateStr);
       if (!d) return;
       const key = id + '_' + sc;
@@ -98,8 +114,7 @@ function renderExecutive2(filteredData, rawData) {
   const agg = {};
   
   filteredData.forEach(row => {
-    let sc = (row['SubChannel'] || 'Unknown').trim();
-    if (sc === '') sc = 'Unknown';
+    let sc = getExec2Group(row);
 
     if (!agg[sc]) {
       agg[sc] = { 
