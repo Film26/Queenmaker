@@ -1,5 +1,4 @@
 // public/cohort.js
-
 function renderCohortHeatmap(filteredData, rawData) {
   const container = document.getElementById('view-cohort');
   
@@ -7,7 +6,6 @@ function renderCohortHeatmap(filteredData, rawData) {
     container.innerHTML = '<p style="text-align:center; padding: 50px; color: #888;">No data available for cohort heatmap.</p>';
     return;
   }
-
   // 1. Find Cohort Month for each user using ALL rawData (True first purchase date)
   const userCohorts = {};
   rawData.forEach(row => {
@@ -28,16 +26,13 @@ function renderCohortHeatmap(filteredData, rawData) {
       userCohorts[id] = { val: val, monthStr: monthStr, year: y, month: m };
     }
   });
-
   // 2. Aggregate Active Users by Cohort Month and Lifetime Month based on filteredData
   const cohortData = {};
   let maxLifetime = 0;
-
   filteredData.forEach(row => {
     const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
     const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
     if (!id || !dateStr || !userCohorts[id]) return;
-
     const parts = dateStr.split(' ')[0].split('/');
     if (parts.length < 3) return;
     let y = parseInt(parts[2]);
@@ -61,17 +56,14 @@ function renderCohortHeatmap(filteredData, rawData) {
       }
     }
   });
-
   // Limit max columns to prevent infinite scroll horizontally
   if (maxLifetime > 48) maxLifetime = 48;
-
   const sortedCohorts = Object.keys(cohortData).sort();
   
   if (sortedCohorts.length === 0) {
     container.innerHTML = '<p style="text-align:center; padding: 50px; color: #888;">No cohort data available for selected filters.</p>';
     return;
   }
-
   // AI Summary Logic (Rule-based)
   let bestMonth1Cohort = { month: '-', pct: 0 };
   let totalMonth1Pct = 0;
@@ -89,7 +81,6 @@ function renderCohortHeatmap(filteredData, rawData) {
         }
     }
   });
-
   let aiSummaryHtml = '';
   if (month1Count > 0) {
       const avgM1 = (totalMonth1Pct / month1Count).toFixed(1);
@@ -107,7 +98,6 @@ function renderCohortHeatmap(filteredData, rawData) {
       </div>
       `;
   }
-
   // 3. Build HTML Table
   let html = aiSummaryHtml + `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -116,15 +106,14 @@ function renderCohortHeatmap(filteredData, rawData) {
     <div style="overflow-x: auto; padding-bottom: 20px;">
     <table class="cohort-table" style="width: 100%; border-collapse: collapse; text-align: center; font-size: 13px;">
       <thead>
-        <tr style="background-color: #f9f9f9;">
+      <tr style="background-color: #f9f9f9;">
           <th style="padding: 12px; border-bottom: 2px solid #ddd; text-align: left;">CohortMonth</th>
-  `;`;
+  `;
   
   for (let i = 0; i <= maxLifetime; i++) {
     html += `<th>${i}</th>`;
   }
   html += `<th>Cohort Size</th></tr></thead><tbody>`;
-
   sortedCohorts.forEach(cMonth => {
     const data = cohortData[cMonth];
     const size = data[0] ? data[0].size : 0;
@@ -162,7 +151,6 @@ function renderCohortHeatmap(filteredData, rawData) {
     
     html += `<td class="cohort-size">${size.toLocaleString()}</td></tr>`;
   });
-
   html += `</tbody></table></div>`;
   
   container.innerHTML = html;
