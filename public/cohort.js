@@ -72,17 +72,53 @@ function renderCohortHeatmap(filteredData, rawData) {
     return;
   }
 
+  // AI Summary Logic (Rule-based)
+  let bestMonth1Cohort = { month: '-', pct: 0 };
+  let totalMonth1Pct = 0;
+  let month1Count = 0;
+  
+  sortedCohorts.forEach(cMonth => {
+    const data = cohortData[cMonth];
+    const size = data[0] ? data[0].size : 0;
+    if (size > 0 && data[1]) {
+        const m1Pct = (data[1].size / size) * 100;
+        totalMonth1Pct += m1Pct;
+        month1Count++;
+        if (m1Pct > bestMonth1Cohort.pct) {
+            bestMonth1Cohort = { month: cMonth, pct: m1Pct };
+        }
+    }
+  });
+
+  let aiSummaryHtml = '';
+  if (month1Count > 0) {
+      const avgM1 = (totalMonth1Pct / month1Count).toFixed(1);
+      aiSummaryHtml = `
+      <div style="background: linear-gradient(135deg, #fef6e4, #fdf1e6); border-left: 4px solid #d95f1d; padding: 20px; border-radius: 8px; margin-bottom: 25px; display: flex; gap: 15px; align-items: flex-start;">
+        <i class="fas fa-brain" style="color: #d95f1d; font-size: 24px; margin-top: 5px;"></i>
+        <div>
+            <h4 style="margin: 0 0 10px 0; color: #d95f1d; font-size: 16px;">AI Analytics Summary (Rule-based Prototype)</h4>
+            <ul style="margin: 0; padding-left: 20px; color: #555; font-size: 14px; line-height: 1.6;">
+                <li><strong>ภาพรวม Retention:</strong> มีกลุ่มลูกค้าทั้งหมด ${sortedCohorts.length} กลุ่ม (Cohorts) โดยมีอัตราการซื้อซ้ำในเดือนที่ 1 เฉลี่ยอยู่ที่ <strong>${avgM1}%</strong></li>
+                <li><strong>กลุ่มลูกค้าที่โดดเด่นที่สุด:</strong> กลุ่มลูกค้าใหม่ที่เข้ามาในเดือน <strong>${bestMonth1Cohort.month}</strong> มีอัตราการซื้อซ้ำเดือนที่ 1 สูงที่สุดถึง <strong>${bestMonth1Cohort.pct.toFixed(1)}%</strong> แนะนำให้ตรวจสอบแคมเปญในเดือนดังกล่าวเพื่อนำมาปรับใช้ต่อ</li>
+                <li><strong>ข้อเสนอแนะจากระบบ:</strong> ควรจัดโปรโมชั่นหรือส่ง CRM Message กระตุ้นลูกค้าในช่วงเปลี่ยนผ่านเข้าสู่เดือนที่ 1 (หลังจากซื้อครั้งแรก) เนื่องจากเป็นช่วงเวลาที่มีโอกาสลูกค้าสูญหาย (Drop-off) สูงที่สุด</li>
+            </ul>
+        </div>
+      </div>
+      `;
+  }
+
   // 3. Build HTML Table
-  let html = `
+  let html = aiSummaryHtml + `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h3 style="margin: 0; color: #333; font-size: 18px;">Cohort Analysis (Retention Rate %)</h3>
     </div>
     <div style="overflow-x: auto; padding-bottom: 20px;">
-    <table class="cohort-table">
+    <table class="cohort-table" style="width: 100%; border-collapse: collapse; text-align: center; font-size: 13px;">
       <thead>
-        <tr>
-          <th>CohortMonth</th>
-  `;
+        <tr style="background-color: #f9f9f9;">
+          <th style="padding: 12px; border-bottom: 2px solid #ddd; text-align: left;">CohortMonth</th>
+  `;`;
   
   for (let i = 0; i <= maxLifetime; i++) {
     html += `<th>${i}</th>`;
