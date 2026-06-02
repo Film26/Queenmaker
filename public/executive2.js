@@ -114,9 +114,10 @@ function renderExecutive2(filteredData, rawData) {
   if (rawData && rawData.length > 0) {
     rawData.forEach(row => {
       if (window.isSaleOrder && !window.isSaleOrder(row)) return;
-      const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
+      const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
+      const id = getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
       const sc = getExec2Group(row);
-      const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
+      const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
       if (!id || !dateStr) return;
       const d = parseD(dateStr);
       if (!d) return;
@@ -144,9 +145,10 @@ function renderExecutive2(filteredData, rawData) {
       };
     }
     
-    const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
-    const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
-    const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'];
+    const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
+    const id = getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+    const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+    const revenueStr = getVal(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
     
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
