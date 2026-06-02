@@ -47,6 +47,12 @@ function renderExecutive1(filteredData, rawData) {
   // Helper to parse date from string
   const parseD = (dateStr) => {
     if (!dateStr) return null;
+    if (window.parseDate) {
+      const parsed = window.parseDate(dateStr);
+      if (parsed) {
+        return { y: parsed.y, m: parsed.m, d: parsed.d, val: parsed.y * 10000 + parsed.m * 100 + parsed.d };
+      }
+    }
     const parts = dateStr.split(' ')[0].split('/');
     if (parts.length < 3) return null;
     let y = parseInt(parts[2]);
@@ -60,8 +66,8 @@ function renderExecutive1(filteredData, rawData) {
   // First pass: Calculate first purchase date within the CURRENT filtered context (for Migration)
   const filterContextFirstPurchase = {};
   filteredData.forEach(row => {
-    const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
-    const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
+    const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'] || row['phone'];
+    const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
     if (!d) return;
@@ -71,9 +77,9 @@ function renderExecutive1(filteredData, rawData) {
   });
   // Aggregate data by month
   filteredData.forEach(row => {
-    const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
-    const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
-    const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'];
+    const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'] || row['phone'];
+    const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
+    const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'] || row['Net Sales'] || row['Revenue'] || row['ยอดโอน'];
     
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
