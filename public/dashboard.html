@@ -400,84 +400,26 @@
     function getNormalizedSubChannel(row) {
       if (!row) return 'Other';
       
-      const remark = (row['หมายเหตุ'] || '').toString().trim();
-      const warehouse = (row['ชื่อคลัง (คลังสินค้า)'] || '').toString().trim();
-      const channel = (row['ช่องทาง'] || '').toString().trim();
-      
-      const keys = [
-        'IG-FBSS', 'IG-FBW', 'IG-FBH', 'FBH-IG', 'FBP-W', 'FBSS', 'FBD', 'FBG', 'FBH', 'FBK', 'FBM', 'FBP', 'FBW', 'FBC', 'FB',
-        'IG', 'LINE', 'L1', 'L2', 'L3', 'LAZADA', 'SHOPEE', 'TIKTOK', 'WEBSITE', 'WEB', 'WWW', 'โทรศัพท์', 'CALL', 'PHONE', 'EMAIL',
-        'CRM', 'PC', 'TELESALES', 'TELESALE'
-      ];
-      
-      const stdMap = {
-        'IG-FBSS': 'IG',
-        'IG-FBW': 'IG',
-        'IG-FBH': 'FBH-IG',
-        'FBH-IG': 'FBH-IG',
-        'FBP-W': 'FBP-W',
-        'FBSS': 'FBSS',
-        'FBD': 'FBD',
-        'FBG': 'FBG',
-        'FBH': 'FBH',
-        'FBK': 'FBK',
-        'FBM': 'FBM',
-        'FBP': 'FBP',
-        'FBW': 'FBW',
-        'FBC': 'FB',
-        'FB': 'FB',
-        'IG': 'IG',
-        'LINE': 'Line',
-        'L1': 'Line',
-        'L2': 'Line',
-        'L3': 'Line',
-        'LAZADA': 'Lazada',
-        'SHOPEE': 'Shopee',
-        'TIKTOK': 'TikTok',
-        'WEBSITE': 'Website',
-        'WEB': 'Website',
-        'WWW': 'Website',
-        'โทรศัพท์': 'Call',
-        'CALL': 'Call',
-        'PHONE': 'Call',
-        'EMAIL': 'Email',
-        'CRM': 'CRM',
-        'PC': 'PC',
-        'TELESALES': 'Telesale',
-        'TELESALE': 'Telesale'
-      };
-      
-      function findKey(text) {
-        if (!text) return null;
-        for (let k of keys) {
-          const escaped = k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-          const regex = new RegExp('(?:^|[^a-zA-Z0-9_])' + escaped + '(?:$|[^a-zA-Z0-9_])', 'i');
-          if (regex.test(text)) {
-            return stdMap[k];
-          }
-        }
-        return null;
+      let sub = row['Sub Channel'] || row['SubChannel'] || row['ชื่อคลัง (คลังสินค้า)'];
+      if (!sub || sub.toString().trim() === '') {
+        sub = row['ช่องทาง'] || row['Channel'] || 'Other';
       }
       
-      let match = findKey(remark);
-      if (match) return match;
+      let cleanSub = sub.toString().trim();
+      let lower = cleanSub.toLowerCase();
       
-      match = findKey(warehouse);
-      if (match) return match;
+      if (lower === 'facebook' || lower === 'fb') return 'FB';
+      if (lower === 'line' || lower === 'line_oa') return 'Line';
+      if (lower === 'tiktok') return 'TikTok';
+      if (lower === 'shopee') return 'Shopee';
+      if (lower === 'lazada') return 'Lazada';
+      if (lower === 'instagram' || lower === 'ig') return 'IG';
+      if (lower === 'phone' || lower === 'call') return 'Call';
+      if (lower === 'crm') return 'CRM';
+      if (lower === 'email') return 'Email';
+      if (lower === 'website' || lower === 'web' || lower === 'www') return 'Website';
       
-      const ch = channel.toLowerCase();
-      if (ch.includes('facebook') || ch === 'fb') return 'FB';
-      if (ch.includes('line')) return 'Line';
-      if (ch.includes('tiktok')) return 'TikTok';
-      if (ch.includes('shopee')) return 'Shopee';
-      if (ch.includes('lazada')) return 'Lazada';
-      if (ch.includes('ig') || ch.includes('instagram')) return 'IG';
-      if (ch.includes('phone') || ch.includes('call')) return 'Call';
-      if (ch.includes('crm')) return 'CRM';
-      if (ch.includes('email')) return 'Email';
-      if (ch.includes('website') || ch.includes('web') || ch.includes('www')) return 'Website';
-      
-      return 'Other';
+      return cleanSub || 'Other';
     }
     window.getNormalizedSubChannel = getNormalizedSubChannel;
     function getNormalizedProduct(rawProd) {
@@ -841,8 +783,8 @@
       });
     }
   </script>
-  <script src="cohort.js?v=3"></script>
-  <script src="executive1.js?v=3"></script>
-  <script src="executive2.js?v=3"></script>
+  <script src="cohort.js?v=4"></script>
+  <script src="executive1.js?v=4"></script>
+  <script src="executive2.js?v=4"></script>
 </body>
 </html>
