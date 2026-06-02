@@ -97,6 +97,7 @@ function renderExecutive2(filteredData, rawData) {
   const scFirstPurchase = {};
   if (rawData && rawData.length > 0) {
     rawData.forEach(row => {
+      if (window.isSaleOrder && !window.isSaleOrder(row)) return;
       const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
       const sc = getExec2Group(row);
       const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
