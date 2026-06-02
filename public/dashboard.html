@@ -345,17 +345,30 @@
     }
     function parseDate(dateStr) {
       if (!dateStr) return null;
-      const parts = dateStr.split(' ')[0].split('/');
-      if (parts.length < 3) return null;
-      let y = parseInt(parts[2]);
-      let m = parseInt(parts[1]);
-      let d = parseInt(parts[0]);
-      if (y < 2000) y += 2000;
-      return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
+      const datePart = dateStr.toString().split(' ')[0];
+      let parts = datePart.split('/');
+      if (parts.length >= 3) {
+        let d = parseInt(parts[0]);
+        let m = parseInt(parts[1]);
+        let y = parseInt(parts[2]);
+        if (y < 2000) y += 2000;
+        return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
+      }
+      parts = datePart.split('-');
+      if (parts.length >= 3) {
+        let y = parseInt(parts[0]);
+        let m = parseInt(parts[1]);
+        let d = parseInt(parts[2]);
+        if (y < 2000) y += 2000;
+        return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
+      }
+      return null;
     }
+    window.parseDate = parseDate;
+
     function isSaleOrder(row) {
-      const remark = (row['หมายเหตุ'] || '').toString().trim();
-      const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'] || '0';
+      const remark = (row['หมายเหตุ'] || row['Remark'] || row['remark'] || '').toString().trim();
+      const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'] || row['Net Sales'] || row['net sales'] || row['Revenue'] || row['revenue'] || '0';
       const revenue = parseFloat(revenueStr.toString().replace(/,/g, ''));
       if (isNaN(revenue)) return false;
       const nonSaleKeywords = [
@@ -516,7 +529,7 @@
       };
       
       rawData.forEach(row => {
-        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
+        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
         if (!dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
@@ -524,13 +537,13 @@
         options.Month.add(d.str);
         options.Year.add(d.y.toString());
         
-        const channel = getNormalizedChannel(row['ช่องทาง']);
+        const channel = getNormalizedChannel(row['ช่องทาง'] || row['Channel']);
         const subChannel = getNormalizedSubChannel(row);
         
-        const rawProductName = row['ชื่อสินค้า'] || row['Product'] || row['รายการขาย'] || '';
+        const rawProductName = row['ชื่อสินค้า'] || row['Product'] || row['รายการขาย'] || row['Product Set'] || '';
         const product = getNormalizedProduct(rawProductName);
         const subProduct = getNormalizedSubProduct(rawProductName);
-        const admin = getNormalizedAdmin(row['ชื่อแอดมิน'] || row['Admin']);
+        const admin = getNormalizedAdmin(row['ชื่อแอดมิน'] || row['Admin'] || row['Admin Name']);
         
         options.Channel.add(channel);
         options.SubChannel.add(subChannel);
@@ -577,17 +590,17 @@
       if (rawData.length > 0 && document.getElementById('menu-Year').children.length === 0) populateDropdowns();
       filteredData = rawData.filter(row => {
         if (!isSaleOrder(row)) return false;
-        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
+        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
         if (!dateStr) return false;
         const d = parseDate(dateStr);
         if (!d) return false;
-        const channel = getNormalizedChannel(row['ช่องทาง']);
+        const channel = getNormalizedChannel(row['ช่องทาง'] || row['Channel']);
         const subChannel = getNormalizedSubChannel(row);
         
-        const rawProductName = row['ชื่อสินค้า'] || row['Product'] || row['รายการขาย'] || '';
+        const rawProductName = row['ชื่อสินค้า'] || row['Product'] || row['รายการขาย'] || row['Product Set'] || '';
         const product = getNormalizedProduct(rawProductName);
         const subProduct = getNormalizedSubProduct(rawProductName);
-        const admin = getNormalizedAdmin(row['ชื่อแอดมิน'] || row['Admin']);
+        const admin = getNormalizedAdmin(row['ชื่อแอดมิน'] || row['Admin'] || row['Admin Name']);
         if (filters.Year !== 'All' && d.y.toString() !== filters.Year) return false;
         if (filters.Channel !== 'All' && channel !== filters.Channel) return false;
         if (filters.SubChannel !== 'All' && subChannel !== filters.SubChannel) return false;
@@ -623,8 +636,8 @@
       // 1st pass: true global first purchase date from RAW data (ignoring filters to accurately tag "New" vs "Retained")
       rawData.forEach(row => {
         if (!isSaleOrder(row)) return;
-        const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
-        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
+        const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'] || row['phone'];
+        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
@@ -635,11 +648,11 @@
       });
       data.forEach(row => {
         if (!isSaleOrder(row)) return;
-        const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
-        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
-        const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'];
-        const channel = getNormalizedChannel(row['ช่องทาง']);
-        const admin = (row['ชื่อแอดมิน'] || row['Admin'] || 'Unknown').toString().trim();
+        const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'] || row['phone'];
+        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
+        const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'] || row['Net Sales'] || row['Revenue'] || row['ยอดโอน'] || '0';
+        const channel = getNormalizedChannel(row['ช่องทาง'] || row['Channel']);
+        const admin = (row['ชื่อแอดมิน'] || row['Admin'] || row['Admin Name'] || 'Unknown').toString().trim();
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
@@ -708,8 +721,8 @@
       let totalEver = new Set();
       rawData.forEach(row => {
         if (!isSaleOrder(row)) return;
-        const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
-        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
+        const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'] || row['phone'];
+        const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
         if (d && d.str <= selectedMonthStr) totalEver.add(id);
@@ -718,8 +731,8 @@
       if (prev) {
         rawData.forEach(row => {
           if (!isSaleOrder(row)) return;
-          const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
-          const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
+          const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'] || row['phone'];
+          const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
           if (!id || !dateStr) return;
           const d = parseDate(dateStr);
           if (d && d.str <= availableMonths[idx - 1]) totalEverPrev.add(id);
@@ -828,8 +841,8 @@
       });
     }
   </script>
-  <script src="cohort.js?v=2"></script>
-  <script src="executive1.js"></script>
-  <script src="executive2.js"></script>
+  <script src="cohort.js?v=3"></script>
+  <script src="executive1.js?v=3"></script>
+  <script src="executive2.js?v=3"></script>
 </body>
 </html>
