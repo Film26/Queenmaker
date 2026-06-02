@@ -6,39 +6,50 @@ function renderCohortHeatmap(filteredData, rawData) {
     container.innerHTML = '<p style="text-align:center; padding: 50px; color: #888;">No data available for cohort heatmap.</p>';
     return;
   }
+  const parseDateStr = (dateStr) => {
+    if (!dateStr) return null;
+    if (window.parseDate) {
+      return window.parseDate(dateStr);
+    }
+    const parts = dateStr.split(' ')[0].split('/');
+    if (parts.length < 3) return null;
+    let y = parseInt(parts[2]);
+    let m = parseInt(parts[1]);
+    let d = parseInt(parts[0]);
+    if (y < 2000) y += 2000;
+    return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
+  };
+
   // 1. Find Cohort Month for each user using ALL rawData (True first purchase date)
   const userCohorts = {};
   rawData.forEach(row => {
     if (window.isSaleOrder && !window.isSaleOrder(row)) return;
-    const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
-    const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
+    const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'] || row['phone'];
+    const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
     if (!id || !dateStr) return;
     
-    const parts = dateStr.split(' ')[0].split('/');
-    if (parts.length < 3) return;
-    let y = parseInt(parts[2]);
-    let m = parseInt(parts[1]);
-    if (y < 2000) y += 2000;
-    
-    const monthStr = `${y}-${m.toString().padStart(2, '0')}`;
+    const parsed = parseDateStr(dateStr);
+    if (!parsed) return;
+    const y = parsed.y;
+    const m = parsed.m;
     const val = y * 100 + m;
     
     if (!userCohorts[id] || val < userCohorts[id].val) {
-      userCohorts[id] = { val: val, monthStr: monthStr, year: y, month: m };
+      userCohorts[id] = { val: val, monthStr: parsed.str, year: y, month: m };
     }
   });
   // 2. Aggregate Active Users by Cohort Month and Lifetime Month based on filteredData
   const cohortData = {};
   let maxLifetime = 0;
   filteredData.forEach(row => {
-    const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
-    const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
+    const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'] || row['phone'];
+    const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
     if (!id || !dateStr || !userCohorts[id]) return;
-    const parts = dateStr.split(' ')[0].split('/');
-    if (parts.length < 3) return;
-    let y = parseInt(parts[2]);
-    let m = parseInt(parts[1]);
-    if (y < 2000) y += 2000;
+    
+    const parsed = parseDateStr(dateStr);
+    if (!parsed) return;
+    const y = parsed.y;
+    const m = parsed.m;
     
     const cohort = userCohorts[id];
     
