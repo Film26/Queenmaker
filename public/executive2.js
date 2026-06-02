@@ -78,35 +78,7 @@ function renderExecutive2(filteredData, rawData) {
   };
 
   function getExec2Group(row) {
-    let sub = (row['ชื่อคลัง (คลังสินค้า)'] || row['SubChannel'] || '').toString().trim().toUpperCase();
-    if (!sub) return 'Other';
-    
-    if (sub.includes('FBH-IG')) return 'FBH-IG';
-    if (sub.includes('FBP-W')) return 'FBP-W';
-    if (sub.includes('FBSS')) return 'FBSS';
-    if (sub.includes('FBD')) return 'FBD';
-    if (sub.includes('FBG')) return 'FBG';
-    if (sub.includes('FBH')) return 'FBH';
-    if (sub.includes('FBK')) return 'FBK';
-    if (sub.includes('FBM')) return 'FBM';
-    if (sub.includes('FBP')) return 'FBP';
-    if (sub.includes('FBW')) return 'FBW';
-    if (sub.includes('FB')) return 'FB';
-    if (sub.includes('IG') || sub.includes('INSTAGRAM')) return 'IG';
-    
-    let lowerSub = sub.toLowerCase();
-    if (lowerSub.includes('tiktok')) return 'TikTok';
-    if (lowerSub.includes('shopee')) return 'Shopee';
-    if (lowerSub.includes('lazada')) return 'Lazada';
-    if (lowerSub.includes('line')) return 'Line';
-    if (lowerSub.includes('email')) return 'Email';
-    if (lowerSub.includes('website') || lowerSub.includes('web')) return 'Website';
-    if (lowerSub.includes('telesale')) return 'Telesale';
-    if (lowerSub.includes('call')) return 'Call';
-    if (lowerSub.includes('crm')) return 'CRM';
-    if (lowerSub.includes('pc')) return 'PC';
-    
-    return 'Other';
+    return window.getNormalizedSubChannel ? window.getNormalizedSubChannel(row) : 'Other';
   }
 
   // Determine SubChannel first purchase dates globally (using ALL raw data)
