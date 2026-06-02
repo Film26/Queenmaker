@@ -9,6 +9,7 @@ function renderCohortHeatmap(filteredData, rawData) {
   // 1. Find Cohort Month for each user using ALL rawData (True first purchase date)
   const userCohorts = {};
   rawData.forEach(row => {
+    if (window.isSaleOrder && !window.isSaleOrder(row)) return;
     const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
     const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
     if (!id || !dateStr) return;
