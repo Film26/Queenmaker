@@ -78,17 +78,33 @@ function renderExecutive2(filteredData, rawData) {
   };
 
   function getExec2Group(row) {
-    let sub = (row['ชื่อคลัง (คลังสินค้า)'] || row['SubChannel'] || '').toString().trim().toLowerCase();
+    let sub = (row['ชื่อคลัง (คลังสินค้า)'] || row['SubChannel'] || '').toString().trim().toUpperCase();
     if (!sub) return 'Other';
     
-    if (sub.includes('fbh-ig') || sub.includes('ig') || sub.includes('instagram')) return 'Instagram';
-    if (sub.includes('fb') || sub.includes('facebook')) return 'Facebook';
-    if (sub.includes('tiktok')) return 'Tiktok';
-    if (sub.includes('shopee')) return 'Shopee';
-    if (sub.includes('lazada')) return 'Lazada';
-    if (sub.includes('line')) return 'Line';
-    if (sub.includes('call') || sub.includes('telesale') || sub.includes('phone')) return 'Call';
-    if (sub.includes('crm')) return 'CRM';
+    if (sub.includes('FBH-IG')) return 'FBH-IG';
+    if (sub.includes('FBP-W')) return 'FBP-W';
+    if (sub.includes('FBSS')) return 'FBSS';
+    if (sub.includes('FBD')) return 'FBD';
+    if (sub.includes('FBG')) return 'FBG';
+    if (sub.includes('FBH')) return 'FBH';
+    if (sub.includes('FBK')) return 'FBK';
+    if (sub.includes('FBM')) return 'FBM';
+    if (sub.includes('FBP')) return 'FBP';
+    if (sub.includes('FBW')) return 'FBW';
+    if (sub.includes('FB')) return 'FB';
+    if (sub.includes('IG') || sub.includes('INSTAGRAM')) return 'IG';
+    
+    let lowerSub = sub.toLowerCase();
+    if (lowerSub.includes('tiktok')) return 'TikTok';
+    if (lowerSub.includes('shopee')) return 'Shopee';
+    if (lowerSub.includes('lazada')) return 'Lazada';
+    if (lowerSub.includes('line')) return 'Line';
+    if (lowerSub.includes('email')) return 'Email';
+    if (lowerSub.includes('website') || lowerSub.includes('web')) return 'Website';
+    if (lowerSub.includes('telesale')) return 'Telesale';
+    if (lowerSub.includes('call')) return 'Call';
+    if (lowerSub.includes('crm')) return 'CRM';
+    if (lowerSub.includes('pc')) return 'PC';
     
     return 'Other';
   }
@@ -286,7 +302,7 @@ function renderExecutive2(filteredData, rawData) {
     results.forEach(r => {
       html += `
         <tr>
-          <td style="font-weight: 700;">${r.subChannel.toUpperCase()}</td>
+          <td style="font-weight: 700;">${r.subChannel}</td>
           <td>${fmtNum(r.revenue)}</td>
           <td>${fmtNum(r.buyers)}</td>
           <td>${fmtNum(r.newCust)}</td>
