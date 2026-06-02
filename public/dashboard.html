@@ -353,6 +353,24 @@
       if (y < 2000) y += 2000;
       return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
     }
+    function isSaleOrder(row) {
+      const remark = (row['หมายเหตุ'] || '').toString().trim();
+      const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'] || '0';
+      const revenue = parseFloat(revenueStr.toString().replace(/,/g, ''));
+      if (isNaN(revenue)) return false;
+      const nonSaleKeywords = [
+        'ของขวัญวันเกิด', 'ของขวัญปีใหม่', 'เคลม', 'ของแถม', 'แจก',
+        'sample', 'replace', 'คืนเงิน', 'rerund', 'refund'
+      ];
+      const upperRemark = remark.toUpperCase();
+      for (let kw of nonSaleKeywords) {
+        if (upperRemark.includes(kw.toUpperCase())) {
+          return false;
+        }
+      }
+      return revenue > 0;
+    }
+    window.isSaleOrder = isSaleOrder;
     function getNormalizedChannel(rawChannel) {
       let ch = (rawChannel || '').toString().trim().toLowerCase();
       if (!ch) return 'Other';
@@ -506,6 +524,7 @@
     function applyFilters() {
       if (rawData.length > 0 && document.getElementById('menu-Year').children.length === 0) populateDropdowns();
       filteredData = rawData.filter(row => {
+        if (!isSaleOrder(row)) return false;
         const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
         if (!dateStr) return false;
         const d = parseDate(dateStr);
@@ -551,6 +570,7 @@
       if (data.length === 0) { renderEmpty(); return; }
       // 1st pass: true global first purchase date from RAW data (ignoring filters to accurately tag "New" vs "Retained")
       rawData.forEach(row => {
+        if (!isSaleOrder(row)) return;
         const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
         const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
         if (!id || !dateStr) return;
@@ -562,6 +582,7 @@
         }
       });
       data.forEach(row => {
+        if (!isSaleOrder(row)) return;
         const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
         const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
         const revenueStr = row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'];
@@ -621,7 +642,7 @@
         });
         prevAov = prev.orders > 0 ? prevSales / prev.orders : 0;
         prevSph = prevBuyers > 0 ? prevSales / prevBuyers : 0;
-        prevRepeat = prevAov > 0 ? prevSph / prevAov : 0;
+        prevRepeat = prevBuyers > 0 ? prev.orders / prevBuyers : 0;
       }
       let ytdBuyers = new Set(), ytdNew = 0;
       availableMonths.forEach(m => {
@@ -634,23 +655,36 @@
       });
       let totalEver = new Set();
       rawData.forEach(row => {
+        if (!isSaleOrder(row)) return;
         const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
         const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
         if (d && d.str <= selectedMonthStr) totalEver.add(id);
       });
-      const totalCust = curr.buyers.size;
-      const activePct = totalEver.size > 0 ? (totalCust / totalEver.size) : 0;
-      const prevActivePct = prev ? (prevBuyers / (totalEver.size - totalCust)) : 0;
+      let totalEverPrev = new Set();
+      if (prev) {
+        rawData.forEach(row => {
+          if (!isSaleOrder(row)) return;
+          const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'];
+          const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'];
+          if (!id || !dateStr) return;
+          const d = parseDate(dateStr);
+          if (d && d.str <= availableMonths[idx - 1]) totalEverPrev.add(id);
+        });
+      }
+      const totalCust = totalEver.size;
+      const activeCustThisMonth = curr.buyers.size;
+      const activePct = totalEver.size > 0 ? (activeCustThisMonth / totalEver.size) : 0;
+      const prevActivePct = (prev && totalEverPrev.size > 0) ? (prevBuyers / totalEverPrev.size) : 0;
       const aov = curr.orders > 0 ? curr.sales / curr.orders : 0;
-      const sph = totalCust > 0 ? curr.sales / totalCust : 0;
-      const repeat = aov > 0 ? sph / aov : 0;
+      const sph = activeCustThisMonth > 0 ? curr.sales / activeCustThisMonth : 0;
+      const repeat = activeCustThisMonth > 0 ? curr.orders / activeCustThisMonth : 0;
       // Update UI Values
       document.getElementById('val-sales').textContent = formatCurrency(curr.sales);
       updateChangeUI('change-sales', curr.sales, prevSales);
       document.getElementById('val-total-cust').textContent = totalCust.toLocaleString();
-      updateChangeUI('change-total-cust', totalCust, prevBuyers);
+      updateChangeUI('change-total-cust', totalCust, prev ? totalEverPrev.size : 0);
       document.getElementById('val-active-cust').textContent = (activePct * 100).toFixed(1) + '%';
       updateChangeUI('change-active-cust', activePct, prevActivePct);
       document.getElementById('val-ytd-buyer').textContent = ytdBuyers.size.toLocaleString();
