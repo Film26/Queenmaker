@@ -384,37 +384,89 @@
       if (ch.includes('crm')) return 'CRM';
       return 'Other';
     }
-    function getNormalizedSubChannel(rawSub) {
-      let sub = (rawSub || '').toString().trim().toUpperCase();
-      if (!sub) return 'Other';
+    function getNormalizedSubChannel(row) {
+      if (!row) return 'Other';
       
-      if (sub.includes('FBH-IG')) return 'FBH-IG';
-      if (sub.includes('FBP-W')) return 'FBP-W';
-      if (sub.includes('FBSS')) return 'FBSS';
-      if (sub.includes('FBD')) return 'FBD';
-      if (sub.includes('FBG')) return 'FBG';
-      if (sub.includes('FBH')) return 'FBH';
-      if (sub.includes('FBK')) return 'FBK';
-      if (sub.includes('FBM')) return 'FBM';
-      if (sub.includes('FBP')) return 'FBP';
-      if (sub.includes('FBW')) return 'FBW';
-      if (sub.includes('FB')) return 'FB';
-      if (sub.includes('IG') || sub.includes('INSTAGRAM')) return 'IG';
+      const remark = (row['หมายเหตุ'] || '').toString().trim();
+      const warehouse = (row['ชื่อคลัง (คลังสินค้า)'] || '').toString().trim();
+      const channel = (row['ช่องทาง'] || '').toString().trim();
       
-      let lowerSub = sub.toLowerCase();
-      if (lowerSub.includes('tiktok')) return 'TikTok';
-      if (lowerSub.includes('shopee')) return 'Shopee';
-      if (lowerSub.includes('lazada')) return 'Lazada';
-      if (lowerSub.includes('line')) return 'Line';
-      if (lowerSub.includes('email')) return 'Email';
-      if (lowerSub.includes('website') || lowerSub.includes('web')) return 'Website';
-      if (lowerSub.includes('telesale')) return 'Telesale';
-      if (lowerSub.includes('call')) return 'Call';
-      if (lowerSub.includes('crm')) return 'CRM';
-      if (lowerSub.includes('pc')) return 'PC';
+      const keys = [
+        'IG-FBSS', 'IG-FBW', 'IG-FBH', 'FBH-IG', 'FBP-W', 'FBSS', 'FBD', 'FBG', 'FBH', 'FBK', 'FBM', 'FBP', 'FBW', 'FBC', 'FB',
+        'IG', 'LINE', 'L1', 'L2', 'L3', 'LAZADA', 'SHOPEE', 'TIKTOK', 'WEBSITE', 'WEB', 'WWW', 'โทรศัพท์', 'CALL', 'PHONE', 'EMAIL',
+        'CRM', 'PC', 'TELESALES', 'TELESALE'
+      ];
+      
+      const stdMap = {
+        'IG-FBSS': 'IG',
+        'IG-FBW': 'IG',
+        'IG-FBH': 'FBH-IG',
+        'FBH-IG': 'FBH-IG',
+        'FBP-W': 'FBP-W',
+        'FBSS': 'FBSS',
+        'FBD': 'FBD',
+        'FBG': 'FBG',
+        'FBH': 'FBH',
+        'FBK': 'FBK',
+        'FBM': 'FBM',
+        'FBP': 'FBP',
+        'FBW': 'FBW',
+        'FBC': 'FB',
+        'FB': 'FB',
+        'IG': 'IG',
+        'LINE': 'Line',
+        'L1': 'Line',
+        'L2': 'Line',
+        'L3': 'Line',
+        'LAZADA': 'Lazada',
+        'SHOPEE': 'Shopee',
+        'TIKTOK': 'TikTok',
+        'WEBSITE': 'Website',
+        'WEB': 'Website',
+        'WWW': 'Website',
+        'โทรศัพท์': 'Call',
+        'CALL': 'Call',
+        'PHONE': 'Call',
+        'EMAIL': 'Email',
+        'CRM': 'CRM',
+        'PC': 'PC',
+        'TELESALES': 'Telesale',
+        'TELESALE': 'Telesale'
+      };
+      
+      function findKey(text) {
+        if (!text) return null;
+        for (let k of keys) {
+          const escaped = k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+          const regex = new RegExp('(?:^|[^a-zA-Z0-9_])' + escaped + '(?:$|[^a-zA-Z0-9_])', 'i');
+          if (regex.test(text)) {
+            return stdMap[k];
+          }
+        }
+        return null;
+      }
+      
+      let match = findKey(remark);
+      if (match) return match;
+      
+      match = findKey(warehouse);
+      if (match) return match;
+      
+      const ch = channel.toLowerCase();
+      if (ch.includes('facebook') || ch === 'fb') return 'FB';
+      if (ch.includes('line')) return 'Line';
+      if (ch.includes('tiktok')) return 'TikTok';
+      if (ch.includes('shopee')) return 'Shopee';
+      if (ch.includes('lazada')) return 'Lazada';
+      if (ch.includes('ig') || ch.includes('instagram')) return 'IG';
+      if (ch.includes('phone') || ch.includes('call')) return 'Call';
+      if (ch.includes('crm')) return 'CRM';
+      if (ch.includes('email')) return 'Email';
+      if (ch.includes('website') || ch.includes('web') || ch.includes('www')) return 'Website';
       
       return 'Other';
     }
+    window.getNormalizedSubChannel = getNormalizedSubChannel;
     function getNormalizedProduct(rawProd) {
       let p = (rawProd || '').toString().trim().toLowerCase();
       if (!p) return 'Other';
@@ -473,7 +525,7 @@
         options.Year.add(d.y.toString());
         
         const channel = getNormalizedChannel(row['ช่องทาง']);
-        const subChannel = getNormalizedSubChannel(row['ชื่อคลัง (คลังสินค้า)']);
+        const subChannel = getNormalizedSubChannel(row);
         
         const rawProductName = row['ชื่อสินค้า'] || row['Product'] || row['รายการขาย'] || '';
         const product = getNormalizedProduct(rawProductName);
@@ -530,7 +582,7 @@
         const d = parseDate(dateStr);
         if (!d) return false;
         const channel = getNormalizedChannel(row['ช่องทาง']);
-        const subChannel = getNormalizedSubChannel(row['ชื่อคลัง (คลังสินค้า)']);
+        const subChannel = getNormalizedSubChannel(row);
         
         const rawProductName = row['ชื่อสินค้า'] || row['Product'] || row['รายการขาย'] || '';
         const product = getNormalizedProduct(rawProductName);
