@@ -257,6 +257,7 @@
     let globalFirstPurchase = {}; 
     let availableMonths = [];
     let charts = {};
+    const keyCache = {};
 
     function precomputeGlobalFirstPurchases() {
       globalFirstPurchase = {};
@@ -381,18 +382,29 @@
     }
     function getRowValue(row, possibleKeys) {
       if (!row) return '';
-      const rowKeys = Object.keys(row);
-      const cleanPossible = possibleKeys.map(k => k.toLowerCase().replace(/[^a-zA-Z0-9\u0e00-\u0e7f]/g, ''));
       
-      for (let cp of cleanPossible) {
-        for (let rk of rowKeys) {
-          const cleanRk = rk.toLowerCase().replace(/[^a-zA-Z0-9\u0e00-\u0e7f]/g, '');
-          if (cleanRk === cp || cleanRk.includes(cp)) {
-            return (row[rk] || '').toString().trim();
+      const cacheKey = possibleKeys.join('|');
+      let mappedKey = keyCache[cacheKey];
+      
+      if (mappedKey === undefined) {
+        const rowKeys = Object.keys(row);
+        const cleanPossible = possibleKeys.map(k => k.toLowerCase().replace(/[^a-zA-Z0-9\u0e00-\u0e7f]/g, ''));
+        mappedKey = '';
+        
+        for (let cp of cleanPossible) {
+          for (let rk of rowKeys) {
+            const cleanRk = rk.toLowerCase().replace(/[^a-zA-Z0-9\u0e00-\u0e7f]/g, '');
+            if (cleanRk === cp || cleanRk.includes(cp)) {
+              mappedKey = rk;
+              break;
+            }
           }
+          if (mappedKey) break;
         }
+        keyCache[cacheKey] = mappedKey;
       }
-      return '';
+      
+      return mappedKey ? (row[mappedKey] || '').toString().trim() : '';
     }
     window.getRowValue = getRowValue;
 
@@ -822,8 +834,8 @@
       });
     }
   </script>
-  <script src="cohort.js?v=7"></script>
-  <script src="executive1.js?v=7"></script>
-  <script src="executive2.js?v=7"></script>
+  <script src="cohort.js?v=8"></script>
+  <script src="executive1.js?v=8"></script>
+  <script src="executive2.js?v=8"></script>
 </body>
 </html>
