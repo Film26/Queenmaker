@@ -257,6 +257,23 @@
     let globalFirstPurchase = {}; 
     let availableMonths = [];
     let charts = {};
+
+    function precomputeGlobalFirstPurchases() {
+      globalFirstPurchase = {};
+      rawData.forEach(row => {
+        if (!isSaleOrder(row)) return;
+        const id = getRowValue(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+        const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+        if (!id || !dateStr) return;
+        const d = parseDate(dateStr);
+        if (!d) return;
+        const val = d.y * 10000 + d.m * 100 + d.d;
+        if (!globalFirstPurchase[id] || val < globalFirstPurchase[id].val) {
+          globalFirstPurchase[id] = { val: val, monthStr: d.str, year: d.y };
+        }
+      });
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('importBtn').addEventListener('click', () => document.getElementById('fileInput').click());
       document.getElementById('fileInput').addEventListener('change', (e) => {
@@ -265,7 +282,15 @@
           showLoading(true);
           Papa.parse(file, {
             header: true,
-            complete: (results) => { rawData = results.data; applyFilters(); showLoading(false); },
+            complete: (results) => {
+              for (let k in keyCache) delete keyCache[k];
+              window.userCohorts = null;
+              window.scFirstPurchase = null;
+              rawData = results.data;
+              precomputeGlobalFirstPurchases();
+              applyFilters();
+              showLoading(false);
+            },
             error: (err) => { console.error(err); showLoading(false); alert('Error parsing CSV'); }
           });
         }
@@ -275,7 +300,18 @@
         fetch(sampleUrl)
           .then(res => res.text())
           .then(text => {
-            Papa.parse(text, { header: true, complete: (results) => { rawData = results.data; applyFilters(); showLoading(false); }});
+            Papa.parse(text, { 
+              header: true, 
+              complete: (results) => {
+                for (let k in keyCache) delete keyCache[k];
+                window.userCohorts = null;
+                window.scFirstPurchase = null;
+                rawData = results.data;
+                precomputeGlobalFirstPurchases();
+                applyFilters();
+                showLoading(false);
+              }
+            });
           })
           .catch(err => { showLoading(false); alert('Failed to load sample data'); });
       });
@@ -590,21 +626,7 @@
     }
     function processData(data) {
       monthlyData = {};
-      globalFirstPurchase = {};
       if (data.length === 0) { renderEmpty(); return; }
-      // 1st pass: true global first purchase date from RAW data (ignoring filters to accurately tag "New" vs "Retained")
-      rawData.forEach(row => {
-        if (!isSaleOrder(row)) return;
-        const id = getRowValue(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
-        const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-        if (!id || !dateStr) return;
-        const d = parseDate(dateStr);
-        if (!d) return;
-        const val = d.y * 10000 + d.m * 100 + d.d;
-        if (!globalFirstPurchase[id] || val < globalFirstPurchase[id].val) {
-          globalFirstPurchase[id] = { val: val, monthStr: d.str, year: d.y };
-        }
-      });
       data.forEach(row => {
         if (!isSaleOrder(row)) return;
         const id = getRowValue(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
@@ -800,8 +822,8 @@
       });
     }
   </script>
-  <script src="cohort.js?v=5"></script>
-  <script src="executive1.js?v=5"></script>
-  <script src="executive2.js?v=5"></script>
+  <script src="cohort.js?v=7"></script>
+  <script src="executive1.js?v=7"></script>
+  <script src="executive2.js?v=7"></script>
 </body>
 </html>
