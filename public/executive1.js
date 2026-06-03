@@ -67,7 +67,7 @@ function renderExecutive1(filteredData, rawData) {
   const filterContextFirstPurchase = {};
   filteredData.forEach(row => {
     const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-    const id = getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+    const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
     const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
@@ -79,7 +79,7 @@ function renderExecutive1(filteredData, rawData) {
   // Aggregate data by month
   filteredData.forEach(row => {
     const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-    const id = getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+    const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
     const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
     const revenueStr = getVal(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']);
     
