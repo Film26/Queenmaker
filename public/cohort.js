@@ -21,29 +21,34 @@ function renderCohortHeatmap(filteredData, rawData) {
   };
 
   // 1. Find Cohort Month for each user using ALL rawData (True first purchase date)
-  const userCohorts = {};
-  rawData.forEach(row => {
-    if (window.isSaleOrder && !window.isSaleOrder(row)) return;
-    const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'] || row['phone'];
-    const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
-    if (!id || !dateStr) return;
-    
-    const parsed = parseDateStr(dateStr);
-    if (!parsed) return;
-    const y = parsed.y;
-    const m = parsed.m;
-    const val = y * 100 + m;
-    
-    if (!userCohorts[id] || val < userCohorts[id].val) {
-      userCohorts[id] = { val: val, monthStr: parsed.str, year: y, month: m };
-    }
-  });
+  if (!window.userCohorts) {
+    window.userCohorts = {};
+    rawData.forEach(row => {
+      if (window.isSaleOrder && !window.isSaleOrder(row)) return;
+      const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
+      const id = getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+      const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+      if (!id || !dateStr) return;
+      
+      const parsed = parseDateStr(dateStr);
+      if (!parsed) return;
+      const y = parsed.y;
+      const m = parsed.m;
+      const val = y * 100 + m;
+      
+      if (!window.userCohorts[id] || val < window.userCohorts[id].val) {
+        window.userCohorts[id] = { val: val, monthStr: parsed.str, year: y, month: m };
+      }
+    });
+  }
+  const userCohorts = window.userCohorts;
   // 2. Aggregate Active Users by Cohort Month and Lifetime Month based on filteredData
   const cohortData = {};
   let maxLifetime = 0;
   filteredData.forEach(row => {
-    const id = row['Customer ID'] || row['รหัสลูกค้า (ลูกค้า) ไม่ใช้'] || row['Phone'] || row['phone'];
-    const dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
+    const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
+    const id = getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+    const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
     if (!id || !dateStr || !userCohorts[id]) return;
     
     const parsed = parseDateStr(dateStr);
