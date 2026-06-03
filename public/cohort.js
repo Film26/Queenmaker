@@ -26,7 +26,7 @@ function renderCohortHeatmap(filteredData, rawData) {
     rawData.forEach(row => {
       if (window.isSaleOrder && !window.isSaleOrder(row)) return;
       const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-      const id = getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+      const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
       const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
       if (!id || !dateStr) return;
       
@@ -47,7 +47,7 @@ function renderCohortHeatmap(filteredData, rawData) {
   let maxLifetime = 0;
   filteredData.forEach(row => {
     const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-    const id = getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+    const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
     const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
     if (!id || !dateStr || !userCohorts[id]) return;
     
