@@ -83,8 +83,8 @@
       </div>
       
       <ul class="nav-menu">
-        <li class="nav-item"><a href="#" class="nav-link active"><i class="fas fa-th-large"></i>CRM DASHBOARD</a></li>
-        <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
+        <li class="nav-item"><a href="#" class="nav-link active" id="side-crm" onclick="event.preventDefault(); switchTab('overview')"><i class="fas fa-th-large"></i>CRM DASHBOARD</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" id="side-insight" onclick="event.preventDefault(); switchTab('insighthub')"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-pie"></i>MUSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-crown"></i>TOP SPENDER</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
@@ -271,11 +271,13 @@
            <h2>Retention View</h2>
            <p>หน้าแสดงผลนี้กำลังรอการออกแบบค่ะ</p>
         </div>
+        <!-- Customer Insight Hub View -->
+        <div id="view-insighthub" class="view-content" style="display:none; padding: 20px;"></div>
       
       </div>
     </main>
   </div>
- <div id="loadingOverlay" class="loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center;">
+  <div id="loadingOverlay" class="loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center;">
     <div class="spinner" style="width:40px; height:40px; border:4px solid #f3f3f3; border-top:4px solid #d95f1d; border-radius:50%; animation:spin 1s linear infinite;"></div>
   </div>
   <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
@@ -360,39 +362,70 @@
       }
       initCharts();
     });
+
     function switchTab(tabId) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.view-content').forEach(view => view.style.display = 'none');
       document.getElementById('view-overview').style.display = 'none';
       document.getElementById('view-cohort').style.display = 'none';
       
-      if (tabId === 'overview') {
-        document.getElementById('tab-overview').classList.add('active');
-        document.getElementById('view-overview').style.display = 'block';
-      } else if (tabId === 'cohort') {
-        document.getElementById('tab-cohort').classList.add('active');
-        document.getElementById('view-cohort').style.display = 'block';
-        if (typeof renderCohortHeatmap === 'function') {
-           renderCohortHeatmap(filteredData, rawData);
+      // Update sidebar active classes
+      document.getElementById('side-crm').classList.remove('active');
+      document.getElementById('side-insight').classList.remove('active');
+      
+      if (tabId === 'insighthub') {
+        document.getElementById('side-insight').classList.add('active');
+        document.getElementById('view-insighthub').style.display = 'block';
+        
+        // Hide CRM specific navigation elements (tabs and global filters)
+        const tabsContainer = document.querySelector('.tabs-container');
+        if (tabsContainer) tabsContainer.style.display = 'none';
+        const filtersBar = document.querySelector('.filters-bar');
+        if (filtersBar) filtersBar.style.display = 'none';
+        
+        if (typeof renderInsightHub === 'function') {
+           renderInsightHub(filteredData, rawData);
+         }
+      } else {
+        document.getElementById('side-crm').classList.add('active');
+        
+        // Show CRM specific navigation elements
+        const tabsContainer = document.querySelector('.tabs-container');
+        if (tabsContainer) tabsContainer.style.display = 'flex';
+        const filtersBar = document.querySelector('.filters-bar');
+        if (filtersBar) filtersBar.style.display = 'flex';
+        
+        if (tabId === 'overview') {
+          document.getElementById('tab-overview').classList.add('active');
+          document.getElementById('view-overview').style.display = 'block';
+        } else if (tabId === 'cohort') {
+          document.getElementById('tab-cohort').classList.add('active');
+          document.getElementById('view-cohort').style.display = 'block';
+          if (typeof renderCohortHeatmap === 'function') {
+             renderCohortHeatmap(filteredData, rawData);
+          }
+        } else if (tabId === 'executive1') {
+          document.getElementById('tab-executive1').classList.add('active');
+          document.getElementById('view-executive1').style.display = 'block';
+          if (typeof renderExecutive1 === 'function') {
+             renderExecutive1(filteredData, rawData);
+          }
+        } else if (tabId === 'executive2') {
+          document.getElementById('tab-executive2').classList.add('active');
+          document.getElementById('view-executive2').style.display = 'block';
+          if (typeof renderExecutive2 === 'function') {
+             renderExecutive2(filteredData, rawData);
+          }
+        } else if (tabId === 'retention') {
+          document.getElementById('tab-retention').classList.add('active');
+          document.getElementById('view-retention').style.display = 'block';
         }
-      } else if (tabId === 'executive1') {
-        document.getElementById('tab-executive1').classList.add('active');
-        document.getElementById('view-executive1').style.display = 'block';
-        if (typeof renderExecutive1 === 'function') {
-           renderExecutive1(filteredData, rawData);
-        }
-      } else if (tabId === 'executive2') {
-        document.getElementById('tab-executive2').classList.add('active');
-        document.getElementById('view-executive2').style.display = 'block';
-        if (typeof renderExecutive2 === 'function') {
-           renderExecutive2(filteredData, rawData);
-        }
-      } else if (tabId === 'retention') {
-        document.getElementById('tab-retention').classList.add('active');
-        document.getElementById('view-retention').style.display = 'block';
       }
     }
-        function toggleFilter(id) { document.getElementById(id).classList.toggle("show"); }
+    window.switchTab = switchTab;
+    window.applyFilters = applyFilters;
+
+    function toggleFilter(id) { document.getElementById(id).classList.toggle("show"); }
     function showLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none'; }
     function formatCurrency(num) { return '฿' + num.toLocaleString('th-TH', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
     function formatPercent(num) { 
@@ -680,6 +713,12 @@
       if (document.getElementById('view-executive2').style.display === 'block') {
         if (typeof renderExecutive2 === 'function') {
            renderExecutive2(filteredData, rawData);
+        }
+      }
+
+      if (document.getElementById('view-insighthub').style.display === 'block') {
+        if (typeof renderInsightHub === 'function') {
+           renderInsightHub(filteredData, rawData);
         }
       }
     }
@@ -1025,5 +1064,6 @@
   <script src="cohort.js?v=12"></script>
   <script src="executive1.js?v=12"></script>
   <script src="executive2.js?v=12"></script>
+  <script src="insighthub.js?v=12"></script>
 </body>
 </html>
