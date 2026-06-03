@@ -850,7 +850,7 @@
             const val = dataset.data[index];
             if (val === 0 || !val) return;
             
-            const isSales = chart.canvas.id === 'chart-sales' || chart.canvas.id === 'chart-admin';
+            const isSales = chart.canvas.id === 'chart-sales' || chart.canvas.id === 'chart-admin' || chart.canvas.id === 'chart-channel';
             let displayVal = '';
             if (isSales) {
               if (val >= 1000000) displayVal = '฿' + (val / 1000000).toFixed(1) + 'M';
@@ -864,9 +864,21 @@
             let x = bar.x;
             let y = bar.y;
             
-            ctx.fillStyle = '#ffffff'; // Default to white text inside bar
+            ctx.fillStyle = '#ffffff'; // Default to white text
             
-            if (isHorizontal) {
+            if (chart.config.type === 'doughnut') {
+              const arc = bar;
+              const centerAngle = arc.startAngle + (arc.endAngle - arc.startAngle) / 2;
+              const rangeFromCenter = arc.innerRadius + (arc.outerRadius - arc.innerRadius) / 2;
+              x = arc.x + Math.cos(centerAngle) * rangeFromCenter;
+              y = arc.y + Math.sin(centerAngle) * rangeFromCenter;
+              
+              const angleDiff = arc.endAngle - arc.startAngle;
+              if (angleDiff < 0.15) return; // Skip drawing label if slice is too narrow
+              
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+            } else if (isHorizontal) {
               // Horizontal Bar Chart
               const barWidth = bar.x - bar.base;
               if (barWidth > 45) {
@@ -975,7 +987,7 @@
       });
       charts.channel = new Chart(document.getElementById('chart-channel'), {
         type: 'doughnut',
-        data: { labels: [], datasets: [{ data: [], backgroundColor: ['#d95f1d', '#fce268', '#555', '#ccc', '#888'] }] },
+        data: { labels: [], datasets: [{ data: [], backgroundColor: ['#d95f1d', '#fce268', '#006E99', '#ccc', '#888'] }] },
         options: { 
           ...commonOpts, 
           plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } },
@@ -983,7 +995,8 @@
             x: { display: true, grid: { color: '#f5f5f5' } },
             y: { display: true, beginAtZero: true, grid: { color: '#f5f5f5' } }
           }
-        }
+        },
+        plugins: [datalabelsPlugin]
       });
       charts.admin = new Chart(document.getElementById('chart-admin'), {
         type: 'bar',
