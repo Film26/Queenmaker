@@ -94,7 +94,7 @@ function renderExecutive2(filteredData, rawData) {
       rawData.forEach(row => {
         if (window.isSaleOrder && !window.isSaleOrder(row)) return;
         const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-        const id = getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+        const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
         const sc = getExec2Group(row);
         const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
         if (!id || !dateStr) return;
@@ -127,7 +127,7 @@ function renderExecutive2(filteredData, rawData) {
     }
     
     const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-    const id = getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+    const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
     const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
     const revenueStr = getVal(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
     
