@@ -758,7 +758,7 @@
       document.getElementById('val-repeat').textContent = repeat.toFixed(2) + 'x';
       updateChangeUI('change-repeat', repeat, prevRepeat);
       // Update Charts
-      const trendMonths = focalMonths.slice(-6);
+      const trendMonths = focalMonths.slice(-12);
       
       const salesData = trendMonths.map(m => monthlyData[m].sales);
       const newCustArr = [];
@@ -795,6 +795,78 @@
       charts.admin.data.datasets[0].data = admins.map(a => curr.admins[a]);
       charts.admin.update();
     }
+    const datalabelsPlugin = {
+      id: 'datalabels',
+      afterDatasetsDraw(chart, args, options) {
+        const { ctx } = chart;
+        ctx.save();
+        ctx.font = 'bold 10px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        chart.data.datasets.forEach((dataset, i) => {
+          const meta = chart.getDatasetMeta(i);
+          const isHorizontal = chart.config.options.indexAxis === 'y';
+          
+          meta.data.forEach((bar, index) => {
+            const val = dataset.data[index];
+            if (val === 0 || !val) return;
+            
+            const isSales = chart.canvas.id === 'chart-sales' || chart.canvas.id === 'chart-admin';
+            let displayVal = '';
+            if (isSales) {
+              if (val >= 1000000) displayVal = '฿' + (val / 1000000).toFixed(1) + 'M';
+              else if (val >= 1000) displayVal = '฿' + (val / 1000).toFixed(0) + 'k';
+              else displayVal = '฿' + val;
+            } else {
+              if (val >= 1000) displayVal = (val / 1000).toFixed(1) + 'k';
+              else displayVal = val.toString();
+            }
+            
+            let x = bar.x;
+            let y = bar.y;
+            
+            ctx.fillStyle = '#ffffff'; // Default to white text inside bar
+            
+            if (isHorizontal) {
+              // Horizontal Bar Chart
+              const barWidth = bar.x - bar.base;
+              if (barWidth > 45) {
+                x = bar.x - 20;
+                ctx.textAlign = 'right';
+              } else {
+                x = bar.x + 5;
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#333333'; // Dark text if outside
+              }
+            } else {
+              // Vertical Bar Chart
+              const barHeight = bar.base - bar.y;
+              const isStacked = chart.config.options.scales?.y?.stacked === true;
+              
+              if (isStacked) {
+                if (barHeight < 14) return; // Skip tiny segments
+                y = bar.y + barHeight / 2;
+                ctx.textBaseline = 'middle';
+              } else {
+                if (barHeight > 25) {
+                  y = bar.y + 12; // Inside bar, near top
+                  ctx.textBaseline = 'middle';
+                } else {
+                  y = bar.y - 6; // Above bar
+                  ctx.textBaseline = 'bottom';
+                  ctx.fillStyle = '#333333'; // Dark text if outside
+                }
+              }
+            }
+            
+            ctx.fillText(displayVal, x, y);
+          });
+        });
+        ctx.restore();
+      }
+    };
+
     function initCharts() {
       Chart.defaults.font.family = 'Inter';
       Chart.defaults.color = '#777';
@@ -802,7 +874,8 @@
       charts.sales = new Chart(document.getElementById('chart-sales'), {
         type: 'bar',
         data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] },
-        options: commonOpts
+        options: commonOpts,
+        plugins: [datalabelsPlugin]
       });
       charts.retNew = new Chart(document.getElementById('chart-ret-new-stacked'), {
         type: 'bar',
@@ -810,17 +883,20 @@
           { label: 'Retained', data: [], backgroundColor: '#888' },
           { label: 'New', data: [], backgroundColor: '#d95f1d' }
         ]},
-        options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } } }, scales: { x: { stacked: true }, y: { stacked: true } } }
+        options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } } }, scales: { x: { stacked: true }, y: { stacked: true } } },
+        plugins: [datalabelsPlugin]
       });
       charts.newCust = new Chart(document.getElementById('chart-new'), {
         type: 'bar',
         data: { labels: [], datasets: [{ data: [], backgroundColor: '#e86c31', borderRadius: 6 }] },
-        options: commonOpts
+        options: commonOpts,
+        plugins: [datalabelsPlugin]
       });
       charts.retCust = new Chart(document.getElementById('chart-ret'), {
         type: 'bar',
         data: { labels: [], datasets: [{ data: [], backgroundColor: '#555', borderRadius: 6 }] },
-        options: commonOpts
+        options: commonOpts,
+        plugins: [datalabelsPlugin]
       });
       charts.channel = new Chart(document.getElementById('chart-channel'), {
         type: 'doughnut',
@@ -830,12 +906,13 @@
       charts.admin = new Chart(document.getElementById('chart-admin'), {
         type: 'bar',
         data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] },
-        options: { ...commonOpts, indexAxis: 'y' }
+        options: { ...commonOpts, indexAxis: 'y' },
+        plugins: [datalabelsPlugin]
       });
     }
   </script>
-  <script src="cohort.js?v=8"></script>
-  <script src="executive1.js?v=8"></script>
-  <script src="executive2.js?v=8"></script>
+  <script src="cohort.js?v=9"></script>
+  <script src="executive1.js?v=9"></script>
+  <script src="executive2.js?v=9"></script>
 </body>
 </html>
