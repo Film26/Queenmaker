@@ -5,7 +5,7 @@ if (!window.insightHubState) {
     currentPage: 1,
     rowsPerPage: 50,
     searchTerm: "",
-    sortColumn: "TotalRevenue",
+    sortColumn: "totalRevenue",
     sortAsc: false,
     filterLTV: "All",
     filterLoyalty: "All",
@@ -371,9 +371,9 @@ function renderInsightHub(filteredData, rawData) {
     customerHistoryMap[phone].push(row);
   });
 
-  // Calculate unique customer stats (Phone-based) from filteredData
+  // Calculate unique customer stats (Phone-based) from rawData
   const filteredCustomerPhones = new Set();
-  filteredData.forEach(row => {
+  rawData.forEach(row => {
     const phone = window.getRowValue(row, ['Phone']).toString().trim();
     if (phone) filteredCustomerPhones.add(phone);
   });
@@ -850,7 +850,7 @@ function renderInsightHub(filteredData, rawData) {
           Showing <b>${totalEntries === 0 ? 0 : startIndex + 1}</b> to <b>${endIndex}</b> of <b>${totalEntries.toLocaleString()}</b> entries
         </div>
         <div class="pagination-buttons">
-          <button class="pag-btn" onclick="setHubPage(1)" :disabled="${state.currentPage === 1}">First</button>
+          <button class="pag-btn" onclick="setHubPage(1)" ${state.currentPage === 1 ? 'disabled' : ''}>First</button>
           <button class="pag-btn" onclick="setHubPage(${state.currentPage - 1})" ${state.currentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
           
           ${getPageRange(state.currentPage, totalPages).map(p => `
@@ -858,7 +858,7 @@ function renderInsightHub(filteredData, rawData) {
           `).join('')}
           
           <button class="pag-btn" onclick="setHubPage(${state.currentPage + 1})" ${state.currentPage === totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
-          <button class="pag-btn" onclick="setHubPage(${totalPages})" :disabled="${state.currentPage === totalPages}">Last</button>
+          <button class="pag-btn" onclick="setHubPage(${totalPages})" ${state.currentPage === totalPages ? 'disabled' : ''}>Last</button>
         </div>
       </div>
     </div>
@@ -891,7 +891,7 @@ window.resetHubFilters = function() {
     currentPage: 1,
     rowsPerPage: 50,
     searchTerm: "",
-    sortColumn: "TotalRevenue",
+    sortColumn: "totalRevenue",
     sortAsc: false,
     filterLTV: "All",
     filterLoyalty: "All",
