@@ -68,6 +68,12 @@ function renderExecutive2(filteredData, rawData) {
   // Helper to parse date from string
   const parseD = (dateStr) => {
     if (!dateStr) return null;
+    if (window.parseDate) {
+      const parsed = window.parseDate(dateStr);
+      if (parsed) {
+        return { y: parsed.y, m: parsed.m, d: parsed.d, val: parsed.y * 10000 + parsed.m * 100 + parsed.d };
+      }
+    }
     const parts = dateStr.split(' ')[0].split('/');
     if (parts.length < 3) return null;
     let y = parseInt(parts[2]);
@@ -82,23 +88,26 @@ function renderExecutive2(filteredData, rawData) {
   }
 
   // Determine SubChannel first purchase dates globally (using ALL raw data)
-  const scFirstPurchase = {};
-  if (rawData && rawData.length > 0) {
-    rawData.forEach(row => {
-      if (window.isSaleOrder && !window.isSaleOrder(row)) return;
-      const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-      const id = getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
-      const sc = getExec2Group(row);
-      const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-      if (!id || !dateStr) return;
-      const d = parseD(dateStr);
-      if (!d) return;
-      const key = id + '_' + sc;
-      if (!scFirstPurchase[key] || d.val < scFirstPurchase[key]) {
-        scFirstPurchase[key] = d.val;
-      }
-    });
+  if (!window.scFirstPurchase) {
+    window.scFirstPurchase = {};
+    if (rawData && rawData.length > 0) {
+      rawData.forEach(row => {
+        if (window.isSaleOrder && !window.isSaleOrder(row)) return;
+        const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
+        const id = getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+        const sc = getExec2Group(row);
+        const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+        if (!id || !dateStr) return;
+        const d = parseD(dateStr);
+        if (!d) return;
+        const key = id + '_' + sc;
+        if (!window.scFirstPurchase[key] || d.val < window.scFirstPurchase[key]) {
+          window.scFirstPurchase[key] = d.val;
+        }
+      });
+    }
   }
+  const scFirstPurchase = window.scFirstPurchase;
 
   // Aggregate data by SubChannel for the CURRENTLY FILTERED data
   const agg = {};
