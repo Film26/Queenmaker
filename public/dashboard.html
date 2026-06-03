@@ -936,7 +936,7 @@
       charts.retNew = new Chart(document.getElementById('chart-ret-new-stacked'), {
         type: 'bar',
         data: { labels: [], datasets: [
-          { label: 'Retained', data: [], backgroundColor: '#fce268' },
+          { label: 'Retained', data: [], backgroundColor: '#006E99' },
           { label: 'New', data: [], backgroundColor: '#d95f1d' }
         ]},
         options: { 
@@ -963,7 +963,7 @@
       });
       charts.retCust = new Chart(document.getElementById('chart-ret'), {
         type: 'bar',
-        data: { labels: [], datasets: [{ data: [], backgroundColor: '#fce268', borderRadius: 6 }] },
+        data: { labels: [], datasets: [{ data: [], backgroundColor: '#006E99', borderRadius: 6 }] },
         options: {
           ...commonOpts,
           scales: {
