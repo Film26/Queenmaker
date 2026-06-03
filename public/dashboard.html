@@ -297,7 +297,7 @@
       globalFirstPurchase = {};
       rawData.forEach(row => {
         if (!isSaleOrder(row)) return;
-        const id = getRowValue(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+        const id = getCustomerUniqueId(row);
         const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
@@ -441,6 +441,15 @@
       return mappedKey ? (row[mappedKey] || '').toString().trim() : '';
     }
     window.getRowValue = getRowValue;
+
+    function getCustomerUniqueId(row) {
+      const addr = getRowValue(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่', 'Address', 'address']);
+      if (addr) {
+        return addr.toString().toLowerCase().replace(/[\s\r\n\t\-,\.\/\\_]+/g, '');
+      }
+      return getRowValue(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+    }
+    window.getCustomerUniqueId = getCustomerUniqueId;
 
     function parseDate(dateStr) {
       if (!dateStr) return null;
@@ -679,7 +688,7 @@
       if (data.length === 0) { renderEmpty(); return; }
       data.forEach(row => {
         if (!isSaleOrder(row)) return;
-        const id = getRowValue(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+        const id = getCustomerUniqueId(row);
         const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
         const revenueStr = getRowValue(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
         const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
@@ -752,7 +761,7 @@
       let totalEver = new Set();
       rawData.forEach(row => {
         if (!isSaleOrder(row)) return;
-        const id = getRowValue(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+        const id = getCustomerUniqueId(row);
         const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
@@ -762,7 +771,7 @@
       if (prev) {
         rawData.forEach(row => {
           if (!isSaleOrder(row)) return;
-          const id = getRowValue(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+          const id = getCustomerUniqueId(row);
           const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
           if (!id || !dateStr) return;
           const d = parseDate(dateStr);
