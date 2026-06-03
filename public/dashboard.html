@@ -548,9 +548,13 @@
       
       return 'Other';
     }
-    function getNormalizedAdmin(rawAdmin) {
-      let a = (rawAdmin || '').toString().trim().toLowerCase();
-      if (!a) return 'Other';
+    function getNormalizedAdmin(row) {
+      if (!row) return 'Other';
+      let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
+      if (!val) {
+        val = getRowValue(row, ['หมายเหตุ', 'Remark']);
+      }
+      let a = (val || '').toString().trim().toLowerCase();
       if (a.includes('may') || a.includes('เมย์')) return 'May';
       if (a.includes('บี')) return 'บี';
       if (a.includes('มิ้ว')) return 'มิ้ว';
@@ -584,7 +588,7 @@
         const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
         const product = getNormalizedProduct(rawProductName);
         const subProduct = getNormalizedSubProduct(rawProductName);
-        const admin = getNormalizedAdmin(getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']));
+        const admin = getNormalizedAdmin(row);
         
         options.Channel.add(channel);
         options.SubChannel.add(subChannel);
@@ -641,7 +645,7 @@
         const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
         const product = getNormalizedProduct(rawProductName);
         const subProduct = getNormalizedSubProduct(rawProductName);
-        const admin = getNormalizedAdmin(getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']));
+        const admin = getNormalizedAdmin(row);
         if (filters.Year !== 'All' && d.y.toString() !== filters.Year) return false;
         if (filters.Channel !== 'All' && channel !== filters.Channel) return false;
         if (filters.SubChannel !== 'All' && subChannel !== filters.SubChannel) return false;
@@ -679,7 +683,7 @@
         const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
         const revenueStr = getRowValue(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
         const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
-        const admin = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']) || 'Unknown';
+        const admin = getNormalizedAdmin(row);
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
@@ -976,8 +980,8 @@
           ...commonOpts, 
           plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } },
           scales: {
-            x: { display: false },
-            y: { display: false }
+            x: { display: true, grid: { color: '#f5f5f5' } },
+            y: { display: true, beginAtZero: true, grid: { color: '#f5f5f5' } }
           }
         }
       });
