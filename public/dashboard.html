@@ -348,9 +348,9 @@
       const rowKeys = Object.keys(row);
       const cleanPossible = possibleKeys.map(k => k.toLowerCase().replace(/[^a-zA-Z0-9\u0e00-\u0e7f]/g, ''));
       
-      for (let rk of rowKeys) {
-        const cleanRk = rk.toLowerCase().replace(/[^a-zA-Z0-9\u0e00-\u0e7f]/g, '');
-        for (let cp of cleanPossible) {
+      for (let cp of cleanPossible) {
+        for (let rk of rowKeys) {
+          const cleanRk = rk.toLowerCase().replace(/[^a-zA-Z0-9\u0e00-\u0e7f]/g, '');
           if (cleanRk === cp || cleanRk.includes(cp)) {
             return (row[rk] || '').toString().trim();
           }
@@ -800,8 +800,8 @@
       });
     }
   </script>
-  <script src="cohort.js?v=4"></script>
-  <script src="executive1.js?v=4"></script>
-  <script src="executive2.js?v=4"></script>
+  <script src="cohort.js?v=5"></script>
+  <script src="executive1.js?v=5"></script>
+  <script src="executive2.js?v=5"></script>
 </body>
 </html>
