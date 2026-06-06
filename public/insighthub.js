@@ -782,88 +782,6 @@ function renderInsightHub(filteredData, rawData) {
       </div>
     </div>
 
-    <!-- Local Table Search & Filters bar -->
-    <div class="table-filter-bar">
-      <div style="display:flex; gap:15px; align-items:center;">
-        <i class="fas fa-search" style="color: #999;"></i>
-        <input type="text" id="hub-search" class="search-bar-input" placeholder="Search by name or phone number..." value="${state.searchTerm}">
-        <button class="btn btn-import" onclick="resetHubFilters()">Reset Filters</button>
-      </div>
-      
-      <div class="filter-row">
-        <div class="filter-input-group">
-          <label>Life Time Value</label>
-          <select id="filt-ltv" class="filter-select" onchange="setHubFilter('filterLTV', this.value)">
-            <option value="All" ${state.filterLTV === 'All' ? 'selected' : ''}>All</option>
-            <option value="Whale" ${state.filterLTV === 'Whale' ? 'selected' : ''}>💎 VVIP Whale</option>
-            <option value="Dolphin" ${state.filterLTV === 'Dolphin' ? 'selected' : ''}>🐳 VIP Dolphin</option>
-            <option value="Minnow" ${state.filterLTV === 'Minnow' ? 'selected' : ''}>🐟 Regular Minnow</option>
-            <option value="General" ${state.filterLTV === 'General' ? 'selected' : ''}>🐚 General</option>
-          </select>
-        </div>
-        
-        <div class="filter-input-group">
-          <label>Loyalty Index</label>
-          <select id="filt-loy" class="filter-select" onchange="setHubFilter('filterLoyalty', this.value)">
-            <option value="All" ${state.filterLoyalty === 'All' ? 'selected' : ''}>All</option>
-            <option value="Legendary" ${state.filterLoyalty === 'Legendary' ? 'selected' : ''}>🏅 Legendary (1Y+)</option>
-            <option value="Veteran" ${state.filterLoyalty === 'Veteran' ? 'selected' : ''}>🥈 Veteran (6M+)</option>
-            <option value="Regular" ${state.filterLoyalty === 'Regular' ? 'selected' : ''}>🥉 Regular</option>
-            <option value="Seedling" ${state.filterLoyalty === 'Seedling' ? 'selected' : ''}>🌱 Seedling</option>
-          </select>
-        </div>
-        
-        <div class="filter-input-group">
-          <label>Segment 1</label>
-          <select id="filt-seg1" class="filter-select" onchange="setHubFilter('filterSeg1', this.value)">
-            <option value="All" ${state.filterSeg1 === 'All' ? 'selected' : ''}>All</option>
-            <option value="NEW" ${state.filterSeg1 === 'NEW' ? 'selected' : ''}>NEW</option>
-            <option value="ACTIVE" ${state.filterSeg1 === 'ACTIVE' ? 'selected' : ''}>ACTIVE</option>
-            <option value="RISK" ${state.filterSeg1 === 'RISK' ? 'selected' : ''}>RISK</option>
-            <option value="CHURN" ${state.filterSeg1 === 'CHURN' ? 'selected' : ''}>CHURN</option>
-          </select>
-        </div>
-        
-        <div class="filter-input-group">
-          <label>Segment 2</label>
-          <select id="filt-seg2" class="filter-select" onchange="setHubFilter('filterSeg2', this.value)">
-            <option value="All" ${state.filterSeg2 === 'All' ? 'selected' : ''}>All</option>
-            <option value="NEW" ${state.filterSeg2 === 'NEW' ? 'selected' : ''}>NEW</option>
-            <option value="ACTIVE" ${state.filterSeg2 === 'ACTIVE' ? 'selected' : ''}>ACTIVE</option>
-            <option value="REFILL" ${state.filterSeg2 === 'REFILL' ? 'selected' : ''}>REFILL</option>
-            <option value="RISK" ${state.filterSeg2 === 'RISK' ? 'selected' : ''}>RISK</option>
-            <option value="CHURN" ${state.filterSeg2 === 'CHURN' ? 'selected' : ''}>CHURN</option>
-          </select>
-        </div>
-
-        <div class="filter-input-group">
-          <label>Admin Priority</label>
-          <select id="filt-priority" class="filter-select" onchange="setHubFilter('filterAdminPriority', this.value)">
-            <option value="All" ${state.filterAdminPriority === 'All' ? 'selected' : ''}>All</option>
-            <option value="High" ${state.filterAdminPriority === 'High' ? 'selected' : ''}>🟢 High</option>
-            <option value="Medium" ${state.filterAdminPriority === 'Medium' ? 'selected' : ''}>🟡 Medium</option>
-            <option value="Low" ${state.filterAdminPriority === 'Low' ? 'selected' : ''}>🟠 Low</option>
-            <option value="Win-back" ${state.filterAdminPriority === 'Win-back' ? 'selected' : ''}>🔴 Win-back</option>
-          </select>
-        </div>
-
-        <div class="filter-input-group">
-          <label>Action Strategy</label>
-          <select id="filt-action" class="filter-select" onchange="setHubFilter('filterAction', this.value)">
-            <option value="All" ${state.filterAction === 'All' ? 'selected' : ''}>All</option>
-            <option value="Golden" ${state.filterAction === 'Golden' ? 'selected' : ''}>🎯 Golden Period</option>
-            <option value="Urgent" ${state.filterAction === 'Urgent' ? 'selected' : ''}>⚡ Urgent Opportunity</option>
-            <option value="High LTV" ${state.filterAction === 'High LTV' ? 'selected' : ''}>💎 High LTV</option>
-            <option value="Risk Alert" ${state.filterAction === 'Risk Alert' ? 'selected' : ''}>🟠 Risk Alert</option>
-            <option value="Slow User" ${state.filterAction === 'Slow User' ? 'selected' : ''}>⚠️ Slow User</option>
-            <option value="Speed Churn" ${state.filterAction === 'Speed Churn' ? 'selected' : ''}>🚨 Speed Churn</option>
-            <option value="Dead Churn" ${state.filterAction === 'Dead Churn' ? 'selected' : ''}>😴 Dead Churn</option>
-            <option value="Healthy Care" ${state.filterAction === 'Healthy Care' ? 'selected' : ''}>✅ Healthy Care</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
     <!-- Scrollable Customers Table Card -->
     <div class="table-card">
       <div class="table-wrapper">
@@ -964,17 +882,6 @@ function renderInsightHub(filteredData, rawData) {
   `;
 
   container.innerHTML = html;
-
-  // Bind keyup event to Search Bar
-  document.getElementById('hub-search').addEventListener('keyup', function(e) {
-    state.searchTerm = e.target.value;
-    state.currentPage = 1;
-    // Debounce re-render slightly to avoid lag
-    clearTimeout(window.searchDebounce);
-    window.searchDebounce = setTimeout(() => {
-      renderInsightHub(filteredData, rawData);
-    }, 150);
-  });
 }
 
 // Global actions connected to window to support HTML onclick events
