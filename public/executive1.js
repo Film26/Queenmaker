@@ -11,23 +11,103 @@ function renderExecutive1(filteredData, rawData) {
     const style = document.createElement('style');
     style.id = 'exec-styles';
     style.innerHTML = `
-      .exec-table { width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif; font-size: 13px; background-color: #fff; border: 1px solid #ddd; }
-      .exec-table th, .exec-table td { border: 1px solid #a6b5c9; padding: 8px 10px; text-align: right; }
-      .exec-table th { background-color: #e6d1d9; color: #333; font-weight: 600; text-align: center; }
-      .exec-table th:first-child, .exec-table td.metric-label { text-align: left; font-weight: 600; width: 20%; }
-      .exec-table td.col-total, .exec-table th.col-total { font-weight: bold; }
-      .exec-table .bg-light-green { background-color: #e2efe1 !important; }
-      .exec-table .bg-light-blue { background-color: #e3f2fb !important; }
-      .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
-      .dot-blue { background-color: #4a86e8; }
-      .dot-green { background-color: #57d48a; }
-      .dot-orange { background-color: #fa9b50; }
+      .exec-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-family: 'Inter', sans-serif;
+        font-size: 13px;
+        background-color: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+        margin-bottom: 30px;
+      }
+      .exec-table th, .exec-table td {
+        border-bottom: 1px solid #e2e8f0;
+        border-right: 1px solid #e2e8f0;
+        padding: 12px 14px;
+        text-align: right;
+      }
+      .exec-table th:last-child, .exec-table td:last-child {
+        border-right: none;
+      }
+      .exec-table tr:last-child td {
+        border-bottom: none;
+      }
+      .exec-table th {
+        background-color: #f8fafc;
+        color: #1e293b;
+        font-weight: 700;
+        text-align: center;
+        border-bottom: 2px solid #cbd5e1;
+      }
+      .exec-table th:first-child, .exec-table td.metric-label {
+        text-align: left;
+        font-weight: 600;
+        width: 22%;
+        color: #334155;
+      }
+      .exec-table td.col-total, .exec-table th.col-total {
+        font-weight: bold;
+        background-color: #f8fafc;
+        color: #0f172a;
+      }
+      .exec-table .bg-light-green {
+        background-color: #f0fdf4 !important;
+        color: #166534;
+      }
+      .exec-table .bg-light-blue {
+        background-color: #f0f9ff !important;
+        color: #0369a1;
+      }
+      .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+      .dot-blue { background-color: #38bdf8; }
+      .dot-green { background-color: #22c55e; }
+      .dot-orange { background-color: #ea580c; }
       
-      .ytd-table { border-collapse: collapse; font-family: 'Inter', sans-serif; font-size: 13px; background-color: #fff; border: 2px solid #666; margin-bottom: 20px; width: 60%; }
-      .ytd-table th, .ytd-table td { border: 1px solid #999; padding: 8px 10px; text-align: center; }
-      .ytd-table th { background-color: #0d3b66; color: #fff; font-weight: 600; }
-      .ytd-table td { background-color: #f5f5f5; font-weight: bold; color: #333; }
-      .ytd-table .bg-yellow { background-color: #fff500 !important; }
+      .ytd-table {
+        border-collapse: separate;
+        border-spacing: 0;
+        font-family: 'Inter', sans-serif;
+        font-size: 13px;
+        background-color: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+        margin-bottom: 25px;
+        width: 70%;
+      }
+      .ytd-table th, .ytd-table td {
+        border-bottom: 1px solid #e2e8f0;
+        border-right: 1px solid #e2e8f0;
+        padding: 12px 14px;
+        text-align: center;
+      }
+      .ytd-table th:last-child, .ytd-table td:last-child {
+        border-right: none;
+      }
+      .ytd-table tr:last-child td {
+        border-bottom: none;
+      }
+      .ytd-table th {
+        background-color: #1e293b;
+        color: #fff;
+        font-weight: 700;
+        border-bottom: 2px solid #0f172a;
+      }
+      .ytd-table td {
+        background-color: #fff;
+        font-weight: 700;
+        color: #1e293b;
+        font-size: 14px;
+      }
+      .ytd-table .bg-yellow {
+        background-color: #fffbeb !important;
+        color: #b45309;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -149,13 +229,13 @@ function renderExecutive1(filteredData, rawData) {
     <table class="ytd-table">
       <thead>
         <tr>
-          <th style="width: 30%;">YTD Revenue</th>
-          <th>YTD Buyer</th>
-          <th>YTD New<br>Customers</th>
-          <th>YTD Old<br>Customers</th>
-          <th>YTD AOV</th>
-          <th>YTD SPH</th>
-          <th>Repeat<br>Purchase</th>
+          <th style="width: 30%;">YTD Revenue<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดขาย YTD</span></th>
+          <th>YTD Buyer<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ลูกค้าจริง YTD</span></th>
+          <th>YTD New Customers<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ลูกค้าใหม่ YTD</span></th>
+          <th>YTD Old Customers<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ลูกค้าเก่า YTD</span></th>
+          <th>YTD AOV<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดต่อบิลเฉลี่ย YTD</span></th>
+          <th>YTD SPH<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดเฉลี่ยต่อคน YTD</span></th>
+          <th>Repeat Purchase<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">การซื้อซ้ำ</span></th>
         </tr>
       </thead>
       <tbody>
@@ -173,9 +253,9 @@ function renderExecutive1(filteredData, rawData) {
     <table class="exec-table">
       <thead>
         <tr>
-         <th>Metric / Month</th>
+         <th>Metric / Month<br><span style="font-size: 11px; font-weight: normal; color: #64748b;">ตัวชี้วัด / เดือน</span></th>
           ${months.map(m => `<th>${m}</th>`).join('')}
-          <th class="col-total">Total Year</th>
+          <th class="col-total">Total Year<br><span style="font-size: 11px; font-weight: normal; color: #64748b;">ยอดรวมทั้งปี</span></th>
         </tr>
       </thead>
       <tbody>
@@ -228,19 +308,19 @@ function renderExecutive1(filteredData, rawData) {
   newGShrArr.push(getSafely(total.newGlobalBuyers.size, uT));
   migArr.push(total.newToSubBuyers.size);
   migRtArr.push(getSafely(total.newToSubBuyers.size, uT));
-  html += renderRow('Revenue (ยอดขาย)', revArr, true, false, false, 'bg-light-green');
-  html += renderRow('Orders (ออเดอร์)', ordArr, true, false, false, 'bg-light-blue');
-  html += renderRow('AOV (ยอดต่อบิลเฉลี่ย)', aovArr, true, false, false, 'bg-light-blue');
-  html += renderRow('Unique Buyers (คนซื้อจริง)', ubArr, true, false, false, 'bg-light-green');
-  html += renderRow('Frequency (ความถี่ซื้อ)', freqArr, false, true, false, 'bg-light-blue');
-  html += renderRow('Spending per Head (เฉลี่ยต่อคน)', sphArr, true, false, false, 'bg-light-blue');
-  html += renderRow('Retained Buyers (คนเก่าซื้อซ้ำ)', retArr, true, false, false, 'bg-light-blue');
-  html += renderRow('New Customers (Global)', newGArr, true, false, false, 'bg-light-green');
-  html += renderRow('% New Customer Share', newGShrArr, false, false, true, 'bg-light-blue');
-  html += renderRow('New to Sub (Migration)', migArr, true, false, false, 'bg-light-green');
-  html += renderRow('% Migration Rate', migRtArr, false, false, true, 'bg-light-blue');
+  html += renderRow('Revenue<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดขาย</span>', revArr, true, false, false, 'bg-light-green');
+  html += renderRow('Orders<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ออเดอร์</span>', ordArr, true, false, false, 'bg-light-blue');
+  html += renderRow('AOV (Average Order Value)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดต่อบิลเฉลี่ย</span>', aovArr, true, false, false, 'bg-light-blue');
+  html += renderRow('Unique Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนซื้อจริง</span>', ubArr, true, false, false, 'bg-light-green');
+  html += renderRow('Frequency<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ความถี่ซื้อ</span>', freqArr, false, true, false, 'bg-light-blue');
+  html += renderRow('Spending per Head<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">เฉลี่ยต่อคน</span>', sphArr, true, false, false, 'bg-light-blue');
+  html += renderRow('Retained Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนเก่าซื้อซ้ำ</span>', retArr, true, false, false, 'bg-light-blue');
+  html += renderRow('New Customers (Global)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่ (Global)</span>', newGArr, true, false, false, 'bg-light-green');
+  html += renderRow('% New Customer Share<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สัดส่วนลูกค้าใหม่</span>', newGShrArr, false, false, true, 'bg-light-blue');
+  html += renderRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', migArr, true, false, false, 'bg-light-green');
+  html += renderRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', migRtArr, false, false, true, 'bg-light-blue');
   // Channel Status Row Placeholder
-  html += `<tr><td class="metric-label bg-light-blue">Channel Status</td>`;
+  html += `<tr><td class="metric-label bg-light-blue">Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span></td>`;
   for (let m = 1; m <= 12; m++) {
     // Placeholder logic based on image: showing some dots
     let u = agg[m].uniqueBuyers.size;
