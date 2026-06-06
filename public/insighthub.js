@@ -12,7 +12,9 @@ if (!window.insightHubState) {
     filterSeg1: "All",
     filterSeg2: "All",
     filterAdminPriority: "All",
-    filterAction: "All"
+    filterAction: "All",
+    selectedCustomerPhone: null,
+    allCustomers: []
   };
 }
 
@@ -350,6 +352,92 @@ function renderInsightHub(filteredData, rawData) {
         font-size: 10px;
         color: #999;
       }
+      
+      /* Profile View Styles */
+      .profile-kpi-grid-4 {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+      .profile-kpi-grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-bottom: 25px;
+      }
+      @media (max-width: 1024px) {
+        .profile-kpi-grid-4 {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .profile-kpi-grid-3 {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      @media (max-width: 600px) {
+        .profile-kpi-grid-4 {
+          grid-template-columns: 1fr;
+        }
+        .profile-kpi-grid-3 {
+          grid-template-columns: 1fr;
+        }
+      }
+      .profile-kpi-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 18px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.01);
+      }
+      .profile-kpi-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .profile-kpi-lbl {
+        font-size: 11px;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .profile-kpi-val {
+        font-size: 22px;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      .profile-kpi-icon {
+        font-size: 20px;
+        color: #2563eb;
+        background: #eff6ff;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .profile-detail-card h3 {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 15px 0;
+        border-bottom: 1px solid #f1f5f9;
+        padding-bottom: 10px;
+      }
+      .profile-detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid #f8fafc;
+      }
+      .profile-detail-row:last-child {
+        border-bottom: none;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -555,8 +643,18 @@ function renderInsightHub(filteredData, rawData) {
       tier2024: getYearTier(annualSpending[2024]),
       tier2025: getYearTier(annualSpending[2025]),
       tier2026: getYearTier(annualSpending[2026])
-    };
   }).filter(c => c !== null);
+
+  window.insightHubState.allCustomers = customers;
+
+  // Check if a single customer profile is selected
+  if (state.selectedCustomerPhone) {
+    const customer = customers.find(c => c.phone === state.selectedCustomerPhone);
+    if (customer) {
+      renderCustomerProfileView(customer, container, filteredData, rawData);
+      return;
+    }
+  }
 
   // 4. Calculate KPI aggregation counts
   let countWhale = 0, countDolphin = 0, countMinnow = 0, countGeneral = 0;
@@ -807,8 +905,8 @@ function renderInsightHub(filteredData, rawData) {
           <tbody>
             ${pageEntries.map(c => `
               <tr>
-                <td style="font-weight: 600;">${c.phone}</td>
-                <td>${c.name}</td>
+                <td style="font-weight: 600; cursor: pointer; color: #d95f1d; text-decoration: underline;" onclick="openCustomerProfile('${c.phone}')">${c.phone}</td>
+                <td style="font-weight: 600; cursor: pointer; color: #d95f1d; text-decoration: underline;" onclick="openCustomerProfile('${c.phone}')">${c.name}</td>
                 <td>${formatDateDisplay(c.firstPurchaseDate)}</td>
                 <td>${formatDateDisplay(c.lastPurchaseDate)}</td>
                 <td style="text-align: center;">${c.totalOrders}</td>
@@ -964,4 +1062,231 @@ function getPageRange(current, total) {
     range.push(i);
   }
   return range;
+}
+
+window.openCustomerProfile = function(phone) {
+  window.insightHubState.selectedCustomerPhone = phone;
+  if (window.applyFilters) window.applyFilters();
+};
+
+window.closeCustomerProfile = function() {
+  window.insightHubState.selectedCustomerPhone = null;
+  if (window.applyFilters) window.applyFilters();
+};
+
+window.searchProfileKey = function() {
+  const inputVal = document.getElementById('profile-search-input').value.trim();
+  if (!inputVal) return;
+  const match = (window.insightHubState.allCustomers || []).find(c => 
+    c.phone === inputVal || 
+    c.name.toLowerCase() === inputVal.toLowerCase() ||
+    c.phone.includes(inputVal) ||
+    c.name.toLowerCase().includes(inputVal.toLowerCase())
+  );
+  if (match) {
+    window.insightHubState.selectedCustomerPhone = match.phone;
+    if (window.applyFilters) window.applyFilters();
+  } else {
+    alert('ไม่พบข้อมูลลูกค้าสำหรับคีย์: ' + inputVal);
+  }
+};
+
+function generateAiSummary(c) {
+  const name = c.name || c.phone;
+  const ltvClean = c.ltvTier.replace(/[^\w\s\(\)>.\-\u0e00-\u0e7f]/g, '').trim();
+  const loyaltyClean = c.loyaltyTier.replace(/[^\w\s\(\)>.\-\u0e00-\u0e7f]/g, '').trim();
+  const nextPurchaseStr = formatDateDisplay(c.nextPurchaseDateObj);
+  const priorityClean = c.adminPriority.replace(/[^\w\s\(\)>.\-\u0e00-\u0e7f]/g, '').trim();
+  
+  return `<strong>AI Summary:</strong> ลูกค้า <strong>${name}</strong> เป็นสมาชิกระดับ <strong>${ltvClean}</strong> และมีระดับความภักดีเป็น <strong>${loyaltyClean}</strong> ซึ่งสั่งซื้อไปแล้ว <strong>${c.totalOrders} ครั้ง</strong> รวมยอดสั่งซื้อสะสม <strong>฿${c.totalRevenue.toLocaleString()}</strong> โดยมียอดสั่งซื้อเฉลี่ยต่อบิล (AOV) <strong>฿${c.aov.toLocaleString(undefined, {maximumFractionDigits: 0})}</strong> และมีความชอบในผลิตภัณฑ์ <strong>${c.currentFavorite || '-'}</strong> ปัจจุบันจัดอยู่ในกลุ่ม segment 1: <strong>${c.segment1}</strong> และ segment 2: <strong>${c.segment2}</strong> จากการสั่งซื้อล่าสุดเมื่อ <strong>${c.daysSinceLast.toFixed(0)} วันที่แล้ว</strong> คาดว่าลูกค้าจะกลับมาสั่งซื้ออีกครั้งในช่วงวันที่ <strong>${nextPurchaseStr}</strong> และควรได้รับการดูแลจากแอดมินในลำดับความสำคัญระดับ <strong>${priorityClean}</strong>`;
+}
+
+function renderCustomerProfileView(c, container, filteredData, rawData) {
+  const nextPurchaseStr = formatDateDisplay(c.nextPurchaseDateObj);
+  const firstPurchaseStr = formatDateDisplay(c.firstPurchaseDate);
+  const lastPurchaseStr = formatDateDisplay(c.lastPurchaseDate);
+  
+  const html = `
+    <!-- Back button and Navigation -->
+    <div style="margin-bottom: 20px;">
+      <button class="pag-btn" onclick="closeCustomerProfile()" style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer;">
+        <i class="fas fa-arrow-left"></i> ย้อนกลับไปหน้ารายการ
+      </button>
+    </div>
+
+    <!-- Title and Subtitle -->
+    <div style="text-align: center; margin-bottom: 30px;">
+      <h2 style="font-size: 26px; font-weight: 700; color: #0f172a; margin: 0 0 8px 0; font-family: 'Outfit', sans-serif;">Customer Profile</h2>
+      <p style="color: #64748b; font-size: 14px; margin: 0;">Enter a customer key to view their complete profile</p>
+    </div>
+
+    <!-- Profile search bar -->
+    <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 35px; max-width: 600px; margin-left: auto; margin-right: auto;">
+      <div style="position: relative; flex-grow: 1;">
+        <i class="fas fa-search" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #999;"></i>
+        <input type="text" id="profile-search-input" class="search-bar-input" style="padding-left: 45px; width: 100%; height: 45px; font-size: 14px; border: 1px solid #e2e8f0; border-radius: 8px;" placeholder="ค้นหาโดยใช้ชื่อ หรือ เบอร์โทรศัพท์..." value="${c.phone}">
+      </div>
+      <button class="btn" style="background: #2563eb; color: white; border: none; padding: 0 25px; border-radius: 8px; font-weight: 600; cursor: pointer; height: 45px; font-size: 14px;" onclick="searchProfileKey()">Search</button>
+    </div>
+
+    <!-- Profile Header Card -->
+    <div style="display: flex; justify-content: space-between; align-items: center; background: white; border: 1px solid #f0e6df; padding: 25px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.02);">
+      <div style="display: flex; align-items: center; gap: 20px;">
+        <div style="width: 60px; height: 60px; border-radius: 12px; background: #eff6ff; display: flex; align-items: center; justify-content: center; color: #2563eb; font-size: 24px;">
+          <i class="fas fa-user"></i>
+        </div>
+        <div>
+          <h3 style="margin: 0 0 5px 0; font-size: 22px; font-weight: 700; color: #1e293b;">${c.name}</h3>
+          <p style="margin: 0; color: #64748b; font-size: 13px;">Customer Profile (Key: ${c.phone})</p>
+        </div>
+      </div>
+      <div>
+        <span class="badge-span ${getLtvClass(c.ltvTier)}" style="font-size: 12px; padding: 6px 15px; border-radius: 20px;">${c.ltvTier}</span>
+      </div>
+    </div>
+
+    <!-- AI Summary Box -->
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; margin-bottom: 25px; line-height: 1.6; font-size: 14px; color: #334155;">
+      ${generateAiSummary(c)}
+    </div>
+
+    <!-- 7 KPI Cards Grid -->
+    <!-- Row 1: 4 cards -->
+    <div class="profile-kpi-grid-4">
+      <div class="profile-kpi-card">
+        <div class="profile-kpi-info">
+          <span class="profile-kpi-lbl">Total Revenue</span>
+          <span class="profile-kpi-val">฿${c.totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</span>
+        </div>
+        <div class="profile-kpi-icon" style="color: #2563eb; background: #eff6ff;">
+          <i class="fas fa-dollar-sign"></i>
+        </div>
+      </div>
+      
+      <div class="profile-kpi-card">
+        <div class="profile-kpi-info">
+          <span class="profile-kpi-lbl">Loyalty Index</span>
+          <span class="profile-kpi-val" style="font-size: 16px;">${c.loyaltyTier}</span>
+        </div>
+        <div class="profile-kpi-icon" style="color: #ec4899; background: #fdf2f8;">
+          <i class="fas fa-heart"></i>
+        </div>
+      </div>
+      
+      <div class="profile-kpi-card">
+        <div class="profile-kpi-info">
+          <span class="profile-kpi-lbl">Next Purchase</span>
+          <span class="profile-kpi-val" style="font-size: 18px; color: #0269a1;">${nextPurchaseStr}</span>
+        </div>
+        <div class="profile-kpi-icon" style="color: #0ea5e9; background: #f0f9ff;">
+          <i class="fas fa-chart-line"></i>
+        </div>
+      </div>
+      
+      <div class="profile-kpi-card">
+        <div class="profile-kpi-info">
+          <span class="profile-kpi-lbl">Avg. Order Value</span>
+          <span class="profile-kpi-val">฿${c.aov.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</span>
+        </div>
+        <div class="profile-kpi-icon" style="color: #10b981; background: #ecfdf5;">
+          <i class="fas fa-shopping-cart"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: 3 cards -->
+    <div class="profile-kpi-grid-3">
+      <div class="profile-kpi-card">
+        <div class="profile-kpi-info">
+          <span class="profile-kpi-lbl">First Purchase Date</span>
+          <span class="profile-kpi-val" style="font-size: 18px;">${firstPurchaseStr}</span>
+        </div>
+        <div class="profile-kpi-icon" style="color: #6366f1; background: #eef2ff;">
+          <i class="fas fa-calendar"></i>
+        </div>
+      </div>
+      
+      <div class="profile-kpi-card">
+        <div class="profile-kpi-info">
+          <span class="profile-kpi-lbl">Last Purchase Date</span>
+          <span class="profile-kpi-val" style="font-size: 18px;">${lastPurchaseStr}</span>
+        </div>
+        <div class="profile-kpi-icon" style="color: #8b5cf6; background: #f5f3ff;">
+          <i class="fas fa-calendar-alt"></i>
+        </div>
+      </div>
+      
+      <div class="profile-kpi-card">
+        <div class="profile-kpi-info">
+          <span class="profile-kpi-lbl">Total Orders</span>
+          <span class="profile-kpi-val">${c.totalOrders}</span>
+        </div>
+        <div class="profile-kpi-icon" style="color: #f59e0b; background: #fffbeb;">
+          <i class="fas fa-hashtag"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 Detail Columns -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 40px;">
+      <!-- Status & Segmentation -->
+      <div class="profile-detail-card" style="background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.02);">
+        <h3 style="font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 15px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">Status & Segmentation</h3>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <div class="profile-detail-row">
+            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-flag" style="margin-right: 8px; width: 15px;"></i> Priority</span>
+            <span style="font-size: 13px;"><span class="badge-span ${getAdminPriClass(c.adminPriority)}">${c.adminPriority}</span></span>
+          </div>
+          <div class="profile-detail-row">
+            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-layer-group" style="margin-right: 8px; width: 15px;"></i> Segment 1</span>
+            <span style="font-size: 13px;"><span class="badge-span ${getSegClass(c.segment1)}">${c.segment1}</span></span>
+          </div>
+          <div class="profile-detail-row">
+            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-tag" style="margin-right: 8px; width: 15px;"></i> Segment 2</span>
+            <span style="font-size: 13px;"><span class="badge-span ${getSegClass(c.segment2)}">${c.segment2}</span></span>
+          </div>
+          <div class="profile-detail-row" style="flex-direction: column; gap: 5px; align-items: flex-start; border-bottom: none;">
+            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-book" style="margin-right: 8px; width: 15px;"></i> Action Strategy Guideline</span>
+            <span style="font-size: 13px; color: #334155; font-weight: 500; margin-left: 23px; padding-top: 5px;">${c.actionStrategy || 'No guideline available.'}</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Purchase History -->
+      <div class="profile-detail-card" style="background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.02);">
+        <h3 style="font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 15px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">Purchase History</h3>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <div class="profile-detail-row">
+            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-box" style="margin-right: 8px; width: 15px;"></i> First Product</span>
+            <span style="font-size: 13px; font-weight: 600; color: #334155;">${c.entryProduct || '-'}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-star" style="margin-right: 8px; width: 15px;"></i> Most Frequent Product</span>
+            <span style="font-size: 13px; font-weight: 600; color: #334155;">${c.currentFavorite || '-'}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-calendar-alt" style="margin-right: 8px; width: 15px;"></i> Last Purchase Date</span>
+            <span style="font-size: 13px; font-weight: 600; color: #334155;">${lastPurchaseStr}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-clock" style="margin-right: 8px; width: 15px;"></i> Days Since Last</span>
+            <span style="font-size: 13px; font-weight: 600; color: #334155;">${c.daysSinceLast.toFixed(0)} วัน</span>
+          </div>
+          <div class="profile-detail-row">
+            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-shopping-basket" style="margin-right: 8px; width: 15px;"></i> Last Product</span>
+            <span style="font-size: 13px; font-weight: 600; color: #334155; max-width: 250px; overflow: hidden; text-overflow: ellipsis;" title="${c.lastProductStr}">${c.lastProductStr || '-'}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-sign-in-alt" style="margin-right: 8px; width: 15px;"></i> First Channel</span>
+            <span style="font-size: 13px; font-weight: 600; color: #334155;">${c.firstChannel || '-'}</span>
+          </div>
+          <div class="profile-detail-row">
+            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-sign-out-alt" style="margin-right: 8px; width: 15px;"></i> Last Channel</span>
+            <span style="font-size: 13px; font-weight: 600; color: #334155;">${c.lastChannel || '-'}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  container.innerHTML = html;
 }
