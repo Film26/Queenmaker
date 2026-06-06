@@ -161,7 +161,7 @@
           <div class="cards-grid">
             <!-- Row 1 -->
             <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title">ยอดขาย</div></div>
+              <div class="kpi-header"><div class="kpi-title" id="title-sales">ยอดขาย</div></div>
               <div class="kpi-val" id="val-sales">฿0</div>
               <div><span class="kpi-change-new neutral" id="change-sales">-</span></div>
             </div>
@@ -180,8 +180,8 @@
 
             <!-- Row 2 -->
             <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title">YTD Buyer</div></div>
-              <div class="kpi-val" id="val-ytd-buyer">0</div>
+              <div class="kpi-header"><div class="kpi-title" id="title-ytd-sales">ยอดขาย YTD</div></div>
+              <div class="kpi-val" id="val-ytd-sales">฿0</div>
             </div>
             
             <div class="kpi-card grid-span-1">
@@ -224,12 +224,12 @@
           <div class="charts-grid">
             <!-- Row 1 -->
             <div class="chart-box grid-span-1">
-              <div class="chart-title">กราฟแท่งยอดขาย</div>
+              <div class="chart-title">ยอดขาย</div>
               <div class="chart-container"><canvas id="chart-sales"></canvas></div>
             </div>
             
             <div class="chart-box grid-span-1">
-              <div class="chart-title" style="color:#d95f1d;">กราฟแท่ง ลูกค้าเก่า vs ลูกค้าใหม่</div>
+              <div class="chart-title" style="color:#d95f1d;">ลูกค้าเก่า vs ลูกค้าใหม่</div>
               <div class="chart-container"><canvas id="chart-ret-new-stacked"></canvas></div>
             </div>
 
@@ -246,12 +246,12 @@
 
             <!-- Row 3 -->
             <div class="chart-box grid-span-1">
-              <div class="chart-title">กราฟวงกลม แสดงสัดส่วนแต่ละ Channel</div>
+              <div class="chart-title">สัดส่วนยอดขายแต่ละ Channel</div>
               <div class="chart-container"><canvas id="chart-channel"></canvas></div>
             </div>
             
             <div class="chart-box grid-span-1">
-              <div class="chart-title">กราฟแท่งแนวนอน : ยอดขายของ Admin แต่ละคน</div>
+              <div class="chart-title">ยอดขายของ Admin แต่ละคน</div>
               <div class="chart-container"><canvas id="chart-admin"></canvas></div>
             </div>
           </div>
@@ -752,11 +752,28 @@
       availableMonths = Object.keys(monthlyData).sort();
       renderDashboard();
     }
+    const thaiMonths = {
+      '01': 'มกราคม', '02': 'กุมภาพันธ์', '03': 'มีนาคม', '04': 'เมษายน',
+      '05': 'พฤษภาคม', '06': 'มิถุนายน', '07': 'กรกฎาคม', '08': 'สิงหาคม',
+      '09': 'กันยายน', '10': 'ตุลาคม', '11': 'พฤศจิกายน', '12': 'ธันวาคม'
+    };
     function renderEmpty() {
-      const ids = ['sales','total-cust','active-cust','ytd-buyer','ytd-new','new-cust','ret-cust','aov','sph','repeat'];
+      const titleSalesEl = document.getElementById('title-sales');
+      if (titleSalesEl) titleSalesEl.textContent = 'ยอดขาย';
+      const ids = ['sales','total-cust','active-cust','ytd-sales','ytd-new','new-cust','ret-cust','aov','sph','repeat'];
       ids.forEach(id => {
         const el = document.getElementById('val-'+id);
-        if(el) el.textContent = '0';
+        if(el) {
+          if (id === 'sales' || id === 'aov' || id === 'sph' || id === 'ytd-sales') {
+            el.textContent = '฿0';
+          } else if (id === 'active-cust') {
+            el.textContent = '0%';
+          } else if (id === 'repeat') {
+            el.textContent = '0.0x';
+          } else {
+            el.textContent = '0';
+          }
+        }
       });
       Object.values(charts).forEach(c => { c.data.labels = []; c.update(); });
     }
@@ -788,9 +805,11 @@
         prevSph = prevBuyers > 0 ? prevSales / prevBuyers : 0;
         prevRepeat = prevBuyers > 0 ? prev.orders / prevBuyers : 0;
       }
+      let ytdSales = 0;
       let ytdBuyers = new Set(), ytdNew = 0;
       availableMonths.forEach(m => {
         if (monthlyData[m].year === currYear && m <= selectedMonthStr) {
+          ytdSales += monthlyData[m].sales;
           monthlyData[m].buyers.forEach(id => ytdBuyers.add(id));
           monthlyData[m].buyers.forEach(id => {
             if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === m) ytdNew++;
@@ -825,13 +844,18 @@
       const sph = activeCustThisMonth > 0 ? curr.sales / activeCustThisMonth : 0;
       const repeat = activeCustThisMonth > 0 ? curr.orders / activeCustThisMonth : 0;
       // Update UI Values
+      const monthPart = selectedMonthStr.split('-')[1];
+      const monthName = thaiMonths[monthPart] || monthPart;
+      const titleSalesEl = document.getElementById('title-sales');
+      if (titleSalesEl) titleSalesEl.textContent = `ยอดขายประจำเดือน ${monthName}`;
+
       document.getElementById('val-sales').textContent = formatCurrency(curr.sales);
       updateChangeUI('change-sales', curr.sales, prevSales);
       document.getElementById('val-total-cust').textContent = totalCust.toLocaleString();
       updateChangeUI('change-total-cust', totalCust, prev ? totalEverPrev.size : 0);
       document.getElementById('val-active-cust').textContent = (activePct * 100).toFixed(1) + '%';
       updateChangeUI('change-active-cust', activePct, prevActivePct);
-      document.getElementById('val-ytd-buyer').textContent = ytdBuyers.size.toLocaleString();
+      document.getElementById('val-ytd-sales').textContent = formatCurrency(ytdSales);
       document.getElementById('val-ytd-new').textContent = ytdNew.toLocaleString();
       document.getElementById('val-new-cust').textContent = newCount.toLocaleString();
       updateChangeUI('change-new-cust', newCount, prevNew);
@@ -872,9 +896,21 @@
       charts.retCust.data.labels = trendMonths;
       charts.retCust.data.datasets[0].data = retCustArr;
       charts.retCust.update();
+      const channelColors = {
+        'Facebook': '#38bdf8', // light blue
+        'Line': '#06c755',     // line green
+        'Instagram': '#1e40af',// dark blue
+        'CRM': '#d95f1d',      // theme orange
+        'Other': '#9ca3af',    // grey
+        'Tiktok': '#ff0050',   // tiktok red
+        'Shopee': '#ff5722',   // shopee orange
+        'Lazada': '#1a1446',   // lazada dark blue
+        'Call': '#71717a'      // call grey
+      };
       const channels = Object.keys(curr.channels).sort((a,b) => curr.channels[b] - curr.channels[a]).slice(0,5);
       charts.channel.data.labels = channels;
       charts.channel.data.datasets[0].data = channels.map(c => curr.channels[c]);
+      charts.channel.data.datasets[0].backgroundColor = channels.map(c => channelColors[c] || '#9ca3af');
       charts.channel.update();
       const admins = Object.keys(curr.admins).sort((a,b) => curr.admins[b] - curr.admins[a]).slice(0,5);
       charts.admin.data.labels = admins;
@@ -948,7 +984,7 @@
                 ctx.textBaseline = 'middle';
               } else {
                 if (barHeight > 25) {
-                  y = bar.y + 12; // Inside bar, near top
+                  y = bar.y + barHeight / 2; // Middle of the bar
                   ctx.textBaseline = 'middle';
                 } else {
                   y = bar.y - 6; // Above bar
