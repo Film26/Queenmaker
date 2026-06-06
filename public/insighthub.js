@@ -643,6 +643,7 @@ function renderInsightHub(filteredData, rawData) {
       tier2024: getYearTier(annualSpending[2024]),
       tier2025: getYearTier(annualSpending[2025]),
       tier2026: getYearTier(annualSpending[2026])
+    };
   }).filter(c => c !== null);
 
   window.insightHubState.allCustomers = customers;
