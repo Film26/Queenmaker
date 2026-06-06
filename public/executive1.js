@@ -12,15 +12,14 @@ function renderExecutive1(filteredData, rawData) {
     style.id = 'exec-styles';
     style.innerHTML = `
       #view-executive1 {
-        padding: 20px 10cm !important;
+        padding: 20px !important;
+        background-color: #f8f9fa !important;
         box-sizing: border-box;
       }
-      @media (max-width: 1200px) {
-        #view-executive1 {
-          padding: 20px 20px !important;
-        }
-      }
       .exec-table-wrapper {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
         overflow-x: auto;
         max-width: 100%;
         scrollbar-width: thin;
@@ -42,7 +41,7 @@ function renderExecutive1(filteredData, rawData) {
       .exec-table th, .exec-table td {
         border-bottom: 1px solid #e2e8f0;
         border-right: 1px solid #e2e8f0;
-        padding: 12px 14px;
+        padding: 10px 8px;
         text-align: right;
       }
       .exec-table th:last-child, .exec-table td:last-child {
@@ -98,7 +97,7 @@ function renderExecutive1(filteredData, rawData) {
       .ytd-table th, .ytd-table td {
         border-bottom: 1px solid #e2e8f0;
         border-right: 1px solid #e2e8f0;
-        padding: 12px 14px;
+        padding: 10px 8px;
         text-align: center;
       }
       .ytd-table th:last-child, .ytd-table td:last-child {
