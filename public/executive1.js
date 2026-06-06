@@ -11,6 +11,21 @@ function renderExecutive1(filteredData, rawData) {
     const style = document.createElement('style');
     style.id = 'exec-styles';
     style.innerHTML = `
+      #view-executive1 {
+        padding: 20px 10cm !important;
+        box-sizing: border-box;
+      }
+      @media (max-width: 1200px) {
+        #view-executive1 {
+          padding: 20px 20px !important;
+        }
+      }
+      .exec-table-wrapper {
+        overflow-x: auto;
+        max-width: 100%;
+        scrollbar-width: thin;
+        margin-bottom: 25px;
+      }
       .exec-table {
         width: 100%;
         border-collapse: separate;
@@ -226,31 +241,34 @@ function renderExecutive1(filteredData, rawData) {
 
   // Build Table HTML
    let html = `
-    <table class="ytd-table">
-      <thead>
-        <tr>
-          <th style="width: 30%;">YTD Revenue<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดขาย YTD</span></th>
-          <th>YTD Buyer<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ลูกค้าจริง YTD</span></th>
-          <th>YTD New Customers<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ลูกค้าใหม่ YTD</span></th>
-          <th>YTD Old Customers<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ลูกค้าเก่า YTD</span></th>
-          <th>YTD AOV<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดต่อบิลเฉลี่ย YTD</span></th>
-          <th>YTD SPH<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดเฉลี่ยต่อคน YTD</span></th>
-          <th>Repeat Purchase<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">การซื้อซ้ำ</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>${fmtNum(total.revenue)}</td>
-          <td>${fmtNum(total.uniqueBuyers.size)}</td>
-          <td class="bg-yellow">${fmtNum(total.newGlobalBuyers.size)}</td>
-          <td>${fmtNum(total.retainedBuyers.size)}</td>
-          <td>${fmtNum(getSafely(total.revenue, total.orders))}</td>
-          <td>${fmtNum(getSafely(total.revenue, total.uniqueBuyers.size))}</td>
-          <td>${fmtDec(getSafely(total.orders, total.uniqueBuyers.size))}</td>
-        </tr>
-      </tbody>
-    </table>
-    <table class="exec-table">
+    <div class="exec-table-wrapper">
+      <table class="ytd-table">
+        <thead>
+          <tr>
+            <th style="width: 30%;">YTD Revenue<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดขาย YTD</span></th>
+            <th>YTD Buyer<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ลูกค้าจริง YTD</span></th>
+            <th>YTD New Customers<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ลูกค้าใหม่ YTD</span></th>
+            <th>YTD Old Customers<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ลูกค้าเก่า YTD</span></th>
+            <th>YTD AOV<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดต่อบิลเฉลี่ย YTD</span></th>
+            <th>YTD SPH<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดเฉลี่ยต่อคน YTD</span></th>
+            <th>Repeat Purchase<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">การซื้อซ้ำ</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${fmtNum(total.revenue)}</td>
+            <td>${fmtNum(total.uniqueBuyers.size)}</td>
+            <td class="bg-yellow">${fmtNum(total.newGlobalBuyers.size)}</td>
+            <td>${fmtNum(total.retainedBuyers.size)}</td>
+            <td>${fmtNum(getSafely(total.revenue, total.orders))}</td>
+            <td>${fmtNum(getSafely(total.revenue, total.uniqueBuyers.size))}</td>
+            <td>${fmtDec(getSafely(total.orders, total.uniqueBuyers.size))}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="exec-table-wrapper">
+      <table class="exec-table">
       <thead>
         <tr>
          <th>Metric / Month<br><span style="font-size: 11px; font-weight: normal; color: #64748b;">ตัวชี้วัด / เดือน</span></th>
@@ -334,6 +352,6 @@ function renderExecutive1(filteredData, rawData) {
     html += `<td>${dot}${label}</td>`;
   }
   html += `<td class="col-total">-</td></tr>`;
-  html += `</tbody></table>`;
+  html += `</tbody></table></div>`;
   container.innerHTML = html;
 }
