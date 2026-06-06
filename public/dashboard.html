@@ -266,11 +266,8 @@
         <!-- Executive2 View -->
         <div id="view-executive2" class="view-content" style="display:none; padding: 20px; background-color: #f8f9fa;"></div>
       
-        <!-- Retention View Placeholder -->
-        <div id="view-retention" class="view-content" style="display:none; padding: 50px; text-align: center; color: #999;">
-           <h2>Retention View</h2>
-           <p>หน้าแสดงผลนี้กำลังรอการออกแบบค่ะ</p>
-        </div>
+        <!-- Retention View -->
+        <div id="view-retention" class="view-content" style="display:none; padding: 20px;"></div>
         <!-- Customer Insight Hub View -->
         <div id="view-insighthub" class="view-content" style="display:none; padding: 20px;"></div>
       
@@ -419,6 +416,9 @@
         } else if (tabId === 'retention') {
           document.getElementById('tab-retention').classList.add('active');
           document.getElementById('view-retention').style.display = 'block';
+          if (typeof renderRetention === 'function') {
+             renderRetention(filteredData, rawData);
+          }
         }
       }
     }
@@ -719,6 +719,12 @@
       if (document.getElementById('view-insighthub').style.display === 'block') {
         if (typeof renderInsightHub === 'function') {
            renderInsightHub(filteredData, rawData);
+        }
+      }
+
+      if (document.getElementById('view-retention').style.display === 'block') {
+        if (typeof renderRetention === 'function') {
+           renderRetention(filteredData, rawData);
         }
       }
     }
@@ -1101,5 +1107,6 @@
   <script src="executive1.js?v=15"></script>
   <script src="executive2.js?v=13"></script>
   <script src="insighthub.js?v=13"></script>
+  <script src="retention.js?v=1"></script>
 </body>
 </html>
