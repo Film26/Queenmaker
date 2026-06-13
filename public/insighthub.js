@@ -442,12 +442,28 @@ function renderInsightHub(filteredData, rawData) {
     document.head.appendChild(style);
   }
 
-  // Reference date: May 15, 2026, which matches the TODAY() evaluation in the Excel spreadsheet cache
-  const today = new Date(2026, 4, 15);
   const state = window.insightHubState;
 
   // 2. Pre-aggregate ALL transaction history from rawData by customer phone
   const rawSaleOrders = rawData.filter(row => window.isSaleOrder(row));
+  
+  // Find max date dynamically for "today" reference and gather available years
+  let maxTime = 0;
+  const availableYearsSet = new Set();
+  
+  rawSaleOrders.forEach(row => {
+    const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+    const d = parseToDateObj(dateStr);
+    if (d) {
+      if (d.getTime() > maxTime) maxTime = d.getTime();
+      availableYearsSet.add(d.getFullYear());
+    }
+  });
+  
+  const today = maxTime > 0 ? new Date(maxTime) : new Date();
+  const availableYears = Array.from(availableYearsSet).sort((a, b) => a - b);
+  window.insightHubState.availableYears = availableYears;
+
   const customerHistoryMap = {};
   
   rawSaleOrders.forEach(row => {
@@ -599,7 +615,9 @@ function renderInsightHub(filteredData, rawData) {
     }
 
     // Annual Tiers
-    const annualSpending = { 2023: 0, 2024: 0, 2025: 0, 2026: 0 };
+    const annualSpending = {};
+    availableYears.forEach(y => annualSpending[y] = 0);
+    
     sortedHistory.forEach(o => {
       const year = o.dateObj.getFullYear();
       if (annualSpending[year] !== undefined) {
@@ -617,7 +635,7 @@ function renderInsightHub(filteredData, rawData) {
       return "🐚 General";
     };
 
-    return {
+    const customerObj = {
       phone,
       name: window.getRowValue(lastOrder.row, ['CustomerName', 'ชื่อผู้ส่ง', 'Customer ID', 'รหัสลูกค้า']) || phone,
       firstPurchaseDate,
@@ -638,12 +656,14 @@ function renderInsightHub(filteredData, rawData) {
       actionStrategy,
       firstChannel,
       lastChannel,
-      lastAdmin,
-      tier2023: getYearTier(annualSpending[2023]),
-      tier2024: getYearTier(annualSpending[2024]),
-      tier2025: getYearTier(annualSpending[2025]),
-      tier2026: getYearTier(annualSpending[2026])
+      lastAdmin
     };
+    
+    availableYears.forEach(y => {
+      customerObj['tier' + y] = getYearTier(annualSpending[y] || 0);
+    });
+    
+    return customerObj;
   }).filter(c => c !== null);
 
   window.insightHubState.allCustomers = customers;
@@ -815,10 +835,7 @@ function renderInsightHub(filteredData, rawData) {
               <th class="th-action" onclick="setHubSort('lastAdmin')">Last Admin ${getSortIcon('lastAdmin')}</th>
               
               <!-- Annual Tiers (Green Headers) -->
-              <th class="th-tiers" onclick="setHubSort('tier2023')">Tier 2023 ${getSortIcon('tier2023')}</th>
-              <th class="th-tiers" onclick="setHubSort('tier2024')">Tier 2024 ${getSortIcon('tier2024')}</th>
-              <th class="th-tiers" onclick="setHubSort('tier2025')">Tier 2025 ${getSortIcon('tier2025')}</th>
-              <th class="th-tiers" onclick="setHubSort('tier2026')">Tier 2026 ${getSortIcon('tier2026')}</th>
+              ${state.availableYears.map(y => `<th class="th-tiers" onclick="setHubSort('tier${y}')">Tier ${y} \${getSortIcon('tier' + y)}</th>`).join('')}
             </tr>
           </thead>
           <tbody>
@@ -851,10 +868,7 @@ function renderInsightHub(filteredData, rawData) {
                 <td>${c.lastAdmin}</td>
                 
                 <!-- Tiers Columns -->
-                <td style="text-align: center;">${c.tier2023}</td>
-                <td style="text-align: center;">${c.tier2024}</td>
-                <td style="text-align: center;">${c.tier2025}</td>
-                <td style="text-align: center;">${c.tier2026}</td>
+                ${state.availableYears.map(y => `<td style="text-align: center;">\${c['tier' + y]}</td>`).join('')}
               </tr>
             `).join('')}
           </tbody>
