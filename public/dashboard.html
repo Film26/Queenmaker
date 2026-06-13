@@ -1027,7 +1027,7 @@
           ...commonOpts,
           scales: {
             x: { grid: { display: false } },
-            y: { beginAtZero: true, grid: { display: false } }
+            y: { beginAtZero: true, grid: { color: '#f5f5f5' } }
           }
         },
         plugins: [datalabelsPlugin]
@@ -1043,7 +1043,7 @@
           plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } } }, 
           scales: { 
             x: { stacked: true, grid: { display: false } }, 
-            y: { stacked: true, beginAtZero: true, grid: { display: false } } 
+            y: { stacked: true, beginAtZero: true, grid: { color: '#f5f5f5' } } 
           } 
         },
         plugins: [datalabelsPlugin]
@@ -1055,7 +1055,7 @@
           ...commonOpts,
           scales: {
             x: { grid: { display: false } },
-            y: { beginAtZero: true, grid: { display: false } }
+            y: { beginAtZero: true, grid: { color: '#f5f5f5' } }
           }
         },
         plugins: [datalabelsPlugin]
@@ -1067,7 +1067,7 @@
           ...commonOpts,
           scales: {
             x: { grid: { display: false } },
-            y: { beginAtZero: true, grid: { display: false } }
+            y: { beginAtZero: true, grid: { color: '#f5f5f5' } }
           }
         },
         plugins: [datalabelsPlugin]
@@ -1077,11 +1077,7 @@
         data: { labels: [], datasets: [{ data: [], backgroundColor: ['#d95f1d', '#73d18e', '#006E99', '#ccc', '#888'] }] },
         options: { 
           ...commonOpts, 
-          plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } },
-          scales: {
-            x: { display: false },
-            y: { display: false }
-          }
+          plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } }
         },
         plugins: [datalabelsPlugin]
       });
@@ -1092,7 +1088,7 @@
           ...commonOpts, 
           indexAxis: 'y',
           scales: {
-            x: { beginAtZero: true, grid: { display: false } },
+            x: { beginAtZero: true, grid: { color: '#f5f5f5' } },
             y: { grid: { display: false } }
           }
         },
