@@ -161,63 +161,63 @@
           <div class="cards-grid">
             <!-- Row 1 -->
             <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title" id="title-sales">ยอดขาย</div></div>
-              <div class="kpi-val" id="val-sales">฿0</div>
-              <div><span class="kpi-change-new neutral" id="change-sales">-</span></div>
-            </div>
-            
-            <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title">Total Customer</div></div>
-              <div class="kpi-val" id="val-total-cust">0</div>
-              <div><span class="kpi-change-new neutral" id="change-total-cust">-</span></div>
-            </div>
-            
-            <div class="kpi-card grid-span-2">
-              <div class="kpi-header"><div class="kpi-title">Active Customer</div></div>
-              <div class="kpi-val" id="val-active-cust">0%</div>
-              <div><span class="kpi-change-new neutral" id="change-active-cust">-</span></div>
-            </div>
-
-            <!-- Row 2 -->
-            <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title" id="title-ytd-sales">ยอดขาย YTD</div></div>
               <div class="kpi-val" id="val-ytd-sales">฿0</div>
             </div>
             
             <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title">YTD New Customers</div></div>
-              <div class="kpi-val" id="val-ytd-new">0</div>
+              <div class="kpi-header"><div class="kpi-title">Total Customer</div></div>
+              <div class="kpi-val" id="val-total-cust">0 คน</div>
+              <div><span class="kpi-change-new neutral" id="change-total-cust">-</span></div>
             </div>
             
-            <div class="kpi-card grid-span-2">
-              <div class="kpi-header"><div class="kpi-title">New Customer (Last Month)</div></div>
-              <div class="kpi-val" id="val-new-cust">0</div>
-              <div><span class="kpi-change-new neutral" id="change-new-cust">-</span></div>
+            <div class="kpi-card grid-span-1">
+              <div class="kpi-header"><div class="kpi-title">YTD New Customers</div></div>
+              <div class="kpi-val" id="val-ytd-new">0 คน</div>
             </div>
 
-            <!-- Row 3 -->
-            <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title">Retained Customer (Last Month)</div></div>
-              <div class="kpi-val" id="val-ret-cust">0</div>
-              <div><span class="kpi-change-new neutral" id="change-ret-cust">-</span></div>
-            </div>
-            
             <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title">AOV (ยอดต่อบิลเฉลี่ย)</div></div>
               <div class="kpi-val" id="val-aov">฿0</div>
               <div><span class="kpi-change-new neutral" id="change-aov">-</span></div>
             </div>
+
+            <!-- Row 2 -->
+            <div class="kpi-card grid-span-1">
+              <div class="kpi-header"><div class="kpi-title" id="title-sales">ยอดขายประจำเดือน</div></div>
+              <div class="kpi-val" id="val-sales">฿0</div>
+              <div><span class="kpi-change-new neutral" id="change-sales">-</span></div>
+            </div>
             
             <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title">Repeat Purchase</div></div>
-              <div class="kpi-val" id="val-repeat">0.0x</div>
-              <div><span class="kpi-change-new neutral" id="change-repeat">-</span></div>
+              <div class="kpi-header"><div class="kpi-title">Active Customer</div></div>
+              <div class="kpi-val" id="val-active-cust">0%</div>
+              <div><span class="kpi-change-new neutral" id="change-active-cust">-</span></div>
             </div>
 
             <div class="kpi-card grid-span-1">
+              <div class="kpi-header"><div class="kpi-title">New Customer</div></div>
+              <div class="kpi-val" id="val-new-cust">0 คน</div>
+              <div><span class="kpi-change-new neutral" id="change-new-cust">-</span></div>
+            </div>
+
+            <div class="kpi-card grid-span-1">
+              <div class="kpi-header"><div class="kpi-title">Retained Customer</div></div>
+              <div class="kpi-val" id="val-ret-cust">0 คน</div>
+              <div><span class="kpi-change-new neutral" id="change-ret-cust">-</span></div>
+            </div>
+
+            <!-- Row 3 -->
+            <div class="kpi-card grid-span-2">
               <div class="kpi-header"><div class="kpi-title">Spending per Head (ยอดเฉลี่ยต่อคน)</div></div>
               <div class="kpi-val" id="val-sph">฿0</div>
               <div><span class="kpi-change-new neutral" id="change-sph">-</span></div>
+            </div>
+            
+            <div class="kpi-card grid-span-2">
+              <div class="kpi-header"><div class="kpi-title">Repeat Purchase</div></div>
+              <div class="kpi-val" id="val-repeat">0.0 ครั้ง</div>
+              <div><span class="kpi-change-new neutral" id="change-repeat">-</span></div>
             </div>
           </div>
 
@@ -765,7 +765,7 @@
     };
     function renderEmpty() {
       const titleSalesEl = document.getElementById('title-sales');
-      if (titleSalesEl) titleSalesEl.textContent = 'ยอดขาย';
+      if (titleSalesEl) titleSalesEl.textContent = 'ยอดขายประจำเดือน';
       const ids = ['sales','total-cust','active-cust','ytd-sales','ytd-new','new-cust','ret-cust','aov','sph','repeat'];
       ids.forEach(id => {
         const el = document.getElementById('val-'+id);
@@ -775,9 +775,9 @@
           } else if (id === 'active-cust') {
             el.textContent = '0%';
           } else if (id === 'repeat') {
-            el.textContent = '0.0x';
+            el.textContent = '0.0 ครั้ง';
           } else {
-            el.textContent = '0';
+            el.textContent = '0 คน';
           }
         }
       });
@@ -857,21 +857,21 @@
 
       document.getElementById('val-sales').textContent = formatCurrency(curr.sales);
       updateChangeUI('change-sales', curr.sales, prevSales);
-      document.getElementById('val-total-cust').textContent = totalCust.toLocaleString();
+      document.getElementById('val-total-cust').textContent = totalCust.toLocaleString() + ' คน';
       updateChangeUI('change-total-cust', totalCust, prev ? totalEverPrev.size : 0);
       document.getElementById('val-active-cust').textContent = (activePct * 100).toFixed(1) + '%';
       updateChangeUI('change-active-cust', activePct, prevActivePct);
       document.getElementById('val-ytd-sales').textContent = formatCurrency(ytdSales);
-      document.getElementById('val-ytd-new').textContent = ytdNew.toLocaleString();
-      document.getElementById('val-new-cust').textContent = newCount.toLocaleString();
+      document.getElementById('val-ytd-new').textContent = ytdNew.toLocaleString() + ' คน';
+      document.getElementById('val-new-cust').textContent = newCount.toLocaleString() + ' คน';
       updateChangeUI('change-new-cust', newCount, prevNew);
-      document.getElementById('val-ret-cust').textContent = retCount.toLocaleString();
+      document.getElementById('val-ret-cust').textContent = retCount.toLocaleString() + ' คน';
       updateChangeUI('change-ret-cust', retCount, prevRet);
       document.getElementById('val-aov').textContent = formatCurrency(aov);
       updateChangeUI('change-aov', aov, prevAov);
       document.getElementById('val-sph').textContent = formatCurrency(sph);
       updateChangeUI('change-sph', sph, prevSph);
-      document.getElementById('val-repeat').textContent = repeat.toFixed(2) + 'x';
+      document.getElementById('val-repeat').textContent = repeat.toFixed(2) + ' ครั้ง';
       updateChangeUI('change-repeat', repeat, prevRepeat);
       // Update Charts
       const trendMonths = focalMonths.slice(-12);
@@ -903,7 +903,7 @@
       charts.retCust.data.datasets[0].data = retCustArr;
       charts.retCust.update();
       const channelColors = {
-        'Facebook': '#38bdf8', // light blue
+        'Facebook': '#1877f2', // facebook blue
         'Line': '#06c755',     // line green
         'Instagram': '#1e40af',// dark blue
         'CRM': '#d95f1d',      // theme orange
@@ -943,12 +943,9 @@
             const isSales = chart.canvas.id === 'chart-sales' || chart.canvas.id === 'chart-admin' || chart.canvas.id === 'chart-channel';
             let displayVal = '';
             if (isSales) {
-              if (val >= 1000000) displayVal = '฿' + (val / 1000000).toFixed(1) + 'M';
-              else if (val >= 1000) displayVal = '฿' + (val / 1000).toFixed(0) + 'k';
-              else displayVal = '฿' + val;
+              displayVal = '฿' + val.toLocaleString('th-TH', {minimumFractionDigits: 0, maximumFractionDigits: 0});
             } else {
-              if (val >= 1000) displayVal = (val / 1000).toFixed(1) + 'k';
-              else displayVal = val.toString();
+              displayVal = val.toLocaleString('th-TH');
             }
             
             let x = bar.x;
@@ -1030,7 +1027,7 @@
           ...commonOpts,
           scales: {
             x: { grid: { display: false } },
-            y: { beginAtZero: true, grid: { color: '#f5f5f5' } }
+            y: { display: false, beginAtZero: true, grid: { display: false } }
           }
         },
         plugins: [datalabelsPlugin]
@@ -1046,7 +1043,7 @@
           plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } } }, 
           scales: { 
             x: { stacked: true, grid: { display: false } }, 
-            y: { stacked: true, beginAtZero: true, grid: { color: '#f5f5f5' } } 
+            y: { stacked: true, display: false, beginAtZero: true, grid: { display: false } } 
           } 
         },
         plugins: [datalabelsPlugin]
@@ -1058,7 +1055,7 @@
           ...commonOpts,
           scales: {
             x: { grid: { display: false } },
-            y: { beginAtZero: true, grid: { color: '#f5f5f5' } }
+            y: { display: false, beginAtZero: true, grid: { display: false } }
           }
         },
         plugins: [datalabelsPlugin]
@@ -1070,7 +1067,7 @@
           ...commonOpts,
           scales: {
             x: { grid: { display: false } },
-            y: { beginAtZero: true, grid: { color: '#f5f5f5' } }
+            y: { display: false, beginAtZero: true, grid: { display: false } }
           }
         },
         plugins: [datalabelsPlugin]
@@ -1082,8 +1079,8 @@
           ...commonOpts, 
           plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } },
           scales: {
-            x: { display: true, grid: { color: '#f5f5f5' } },
-            y: { display: true, beginAtZero: true, grid: { color: '#f5f5f5' } }
+            x: { display: false },
+            y: { display: false }
           }
         },
         plugins: [datalabelsPlugin]
@@ -1095,7 +1092,7 @@
           ...commonOpts, 
           indexAxis: 'y',
           scales: {
-            x: { beginAtZero: true, grid: { color: '#f5f5f5' } },
+            x: { display: false, beginAtZero: true, grid: { display: false } },
             y: { grid: { display: false } }
           }
         },
