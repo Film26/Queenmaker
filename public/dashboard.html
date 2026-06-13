@@ -488,19 +488,20 @@
       if (!dateStr) return null;
       const datePart = dateStr.toString().split(' ')[0];
       let parts = datePart.split('/');
+      if (parts.length < 3) parts = datePart.split('-');
       if (parts.length >= 3) {
-        let d = parseInt(parts[0]);
-        let m = parseInt(parts[1]);
-        let y = parseInt(parts[2]);
-        if (y < 2000) y += 2000;
-        return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
-      }
-      parts = datePart.split('-');
-      if (parts.length >= 3) {
-        let y = parseInt(parts[0]);
-        let m = parseInt(parts[1]);
-        let d = parseInt(parts[2]);
-        if (y < 2000) y += 2000;
+        let p0 = parseInt(parts[0]);
+        let p1 = parseInt(parts[1]);
+        let p2 = parseInt(parts[2]);
+        let y, m, d;
+        if (p0 > 1000) {
+           y = p0; m = p1; d = p2;
+        } else if (p2 > 1000) {
+           d = p0; m = p1; y = p2;
+        } else {
+           d = p0; m = p1; y = p2;
+           if (y < 2000) y += 2000;
+        }
         return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
       }
       return null;
@@ -526,28 +527,32 @@
     }
     window.isSaleOrder = isSaleOrder;
     function getNormalizedChannel(rawChannel) {
-      let ch = (rawChannel || '').toString().trim().toLowerCase();
-      if (!ch) return 'Other';
-      if (ch.includes('facebook') || ch === 'fb') return 'Facebook';
-      if (ch.includes('line')) return 'Line';
-      if (ch.includes('tiktok')) return 'Tiktok';
-      if (ch.includes('shopee')) return 'Shopee';
-      if (ch.includes('lazada')) return 'Lazada';
-      if (ch.includes('ig') || ch.includes('instagram')) return 'Instagram';
-      if (ch.includes('call')) return 'Call';
-      if (ch.includes('crm')) return 'CRM';
-      return 'Other';
+      let ch = (rawChannel || '').toString().trim();
+      if (!ch) return 'Unknown';
+      let lower = ch.toLowerCase();
+      if (lower.includes('facebook') || lower === 'fb') return 'Facebook';
+      if (lower.includes('line')) return 'Line';
+      if (lower.includes('tiktok')) return 'Tiktok';
+      if (lower.includes('shopee')) return 'Shopee';
+      if (lower.includes('lazada')) return 'Lazada';
+      if (lower.includes('ig') || lower.includes('instagram')) return 'Instagram';
+      if (lower.includes('call')) return 'Call';
+      if (lower.includes('crm')) return 'CRM';
+      return ch;
     }
     function getNormalizedSubChannel(row) {
-      if (!row) return 'Other';
+      if (!row) return 'Unknown';
       
       let sub = getRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง']);
       if (!sub || sub.toString().trim() === '') {
-        sub = getRowValue(row, ['ช่องทาง', 'Channel']) || 'Other';
+        sub = getRowValue(row, ['ช่องทาง', 'Channel']) || 'Unknown';
       }
       
       let cleanSub = sub.toString().trim();
       let lower = cleanSub.toLowerCase();
+      
+      if (cleanSub === '865219993' || cleanSub === '986291641') return 'Unknown';
+      
       
       if (lower === 'facebook' || lower === 'fb') return 'FB';
       if (lower === 'line' || lower === 'line_oa') return 'Line';
@@ -560,59 +565,63 @@
       if (lower === 'email') return 'Email';
       if (lower === 'website' || lower === 'web' || lower === 'www') return 'Website';
       
-      return cleanSub || 'Other';
+      return cleanSub;
     }
     window.getNormalizedSubChannel = getNormalizedSubChannel;
     function getNormalizedProduct(rawProd) {
-      let p = (rawProd || '').toString().trim().toLowerCase();
-      if (!p) return 'Other';
-      if (p.includes('plus')) return 'Plus';
-      if (p.includes('gold')) return 'Gold';
-      if (p.includes('wiss')) return 'Wiss';
-      if (p.includes('kides') || p.includes('kide')) return 'Kides';
-      if (p.includes('collagen') || p.includes('callagen')) return 'Collagen';
-      return 'Other';
+      let p = (rawProd || '').toString().trim();
+      if (!p) return 'Unknown';
+      let lower = p.toLowerCase();
+      if (lower.includes('plus')) return 'Plus';
+      if (lower.includes('gold')) return 'Gold';
+      if (lower.includes('wiss')) return 'Wiss';
+      if (lower.includes('kides') || lower.includes('kide')) return 'Kides';
+      if (lower.includes('collagen') || lower.includes('callagen')) return 'Collagen';
+      return p;
     }
     function getNormalizedSubProduct(rawProd) {
-      let p = (rawProd || '').toString().trim().toLowerCase();
-      if (!p) return 'Other';
+      let p = (rawProd || '').toString().trim();
+      if (!p) return 'Unknown';
+      let lower = p.toLowerCase();
       
-      if (p.includes('kides') || p.includes('kide')) {
-        if (p.includes('ส้ม')) return 'Kidesส้ม';
-        if (p.includes('แตงโม')) return 'Kides แตงโม';
+      if (lower.includes('kides') || lower.includes('kide')) {
+        if (lower.includes('ส้ม')) return 'Kidesส้ม';
+        if (lower.includes('แตงโม')) return 'Kides แตงโม';
         return 'Kides original';
       }
       
-      if (p.includes('plus')) return 'Plus';
-      if (p.includes('gold')) return 'Gold';
-      if (p.includes('wiss')) return 'Wiss';
-      if (p.includes('collagen') || p.includes('callagen')) return 'Collagen';
+      if (lower.includes('plus')) return 'Plus';
+      if (lower.includes('gold')) return 'Gold';
+      if (lower.includes('wiss')) return 'Wiss';
+      if (lower.includes('collagen') || lower.includes('callagen')) return 'Collagen';
       
-      return 'Other';
+      return p;
     }
     function getNormalizedAdmin(row) {
-      if (!row) return 'Other';
+      if (!row) return 'Unknown';
       let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
       if (!val) {
         val = getRowValue(row, ['หมายเหตุ', 'Remark']);
       }
-      let a = (val || '').toString().trim().toLowerCase();
-      if (a.includes('may') || a.includes('เมย์')) return 'May';
-      if (a.includes('บี')) return 'บี';
-      if (a.includes('มิ้ว')) return 'มิ้ว';
-      if (a.includes('แอน')) return 'แอน';
-      if (a.includes('แอล')) return 'แอล';
-      return 'Other';
+      let a = (val || '').toString().trim();
+      if (!a) return 'Unknown';
+      let lower = a.toLowerCase();
+      if (lower.includes('may') || lower.includes('เมย์')) return 'May';
+      if (lower.includes('บี')) return 'บี';
+      if (lower.includes('มิ้ว')) return 'มิ้ว';
+      if (lower.includes('แอน')) return 'แอน';
+      if (lower.includes('แอล')) return 'แอล';
+      return a;
     }
     function populateDropdowns() {
       const options = { 
         Month: new Set(), 
         Year: new Set(), 
-        Channel: new Set(['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok']), 
-        SubChannel: new Set(['Call', 'CRM', 'Email', 'FB', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'Lazada', 'Line', 'Other', 'PC', 'Shopee', 'Telesale', 'TikTok', 'Website']), 
-        Product: new Set(['Plus', 'Gold', 'Wiss', 'Kides', 'Collagen', 'Other']), 
-        SubProduct: new Set(['Plus', 'Gold', 'Wiss', 'Kides original', 'Kidesส้ม', 'Kides แตงโม', 'Collagen', 'Other']), 
-        Admin: new Set(['May', 'บี', 'มิ้ว', 'แอน', 'แอล', 'Other']) 
+        Channel: new Set(), 
+        SubChannel: new Set(), 
+        Product: new Set(), 
+        SubProduct: new Set(), 
+        Admin: new Set() 
       };
       
       rawData.forEach(row => {
