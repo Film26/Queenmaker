@@ -250,7 +250,7 @@ function renderExecutive1(filteredData, rawData) {
             <th>YTD Old Customers<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ลูกค้าเก่า YTD (คน)</span></th>
             <th>YTD AOV<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดต่อบิลเฉลี่ย YTD (บาท)</span></th>
             <th>YTD SPH<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดเฉลี่ยต่อคน YTD (บาท)</span></th>
-            <th>Repeat Purchase<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">การซื้อซ้ำ</span></th>
+            <th>Repeat Purchase<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">การซื้อซ้ำ (ครั้ง)</span></th>
           </tr>
         </thead>
         <tbody>
@@ -325,15 +325,15 @@ function renderExecutive1(filteredData, rawData) {
   newGShrArr.push(getSafely(total.newGlobalBuyers.size, uT));
   migArr.push(total.newToSubBuyers.size);
   migRtArr.push(getSafely(total.newToSubBuyers.size, uT));
-  html += renderRow('Revenue<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดขาย</span>', revArr, true, false, false, 'bg-light-green');
+  html += renderRow('Revenue<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดขาย (บาท)</span>', revArr, true, false, false, 'bg-light-green');
   html += renderRow('Orders<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ออเดอร์</span>', ordArr, true, false, false, 'bg-light-blue');
-  html += renderRow('AOV (Average Order Value)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดต่อบิลเฉลี่ย</span>', aovArr, true, false, false, 'bg-light-blue');
-  html += renderRow('Unique Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนซื้อจริง</span>', ubArr, true, false, false, 'bg-light-green');
-  html += renderRow('Frequency<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ความถี่ซื้อ</span>', freqArr, false, true, false, 'bg-light-blue');
-  html += renderRow('Spending per Head<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">เฉลี่ยต่อคน</span>', sphArr, true, false, false, 'bg-light-blue');
-  html += renderRow('Retained Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนเก่าซื้อซ้ำ</span>', retArr, true, false, false, 'bg-light-blue');
-  html += renderRow('New Customers (Global)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่ (Global)</span>', newGArr, true, false, false, 'bg-light-green');
-  html += renderRow('% New Customer Share<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สัดส่วนลูกค้าใหม่</span>', newGShrArr, false, false, true, 'bg-light-blue');
+  html += renderRow('AOV (Average Order Value)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดต่อบิลเฉลี่ย (บาท)</span>', aovArr, true, false, false, 'bg-light-blue');
+  html += renderRow('Unique Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนซื้อจริง (คน)</span>', ubArr, true, false, false, 'bg-light-green');
+  html += renderRow('Frequency<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ความถี่ซื้อ (ครั้ง)</span>', freqArr, false, true, false, 'bg-light-blue');
+  html += renderRow('Spending per Head<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">เฉลี่ยต่อคน (คน)</span>', sphArr, true, false, false, 'bg-light-blue');
+  html += renderRow('Retained Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนเก่าซื้อซ้ำ (ครั้ง)</span>', retArr, true, false, false, 'bg-light-blue');
+  html += renderRow('New Customers (Global)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่ (Global)(คน))</span>', newGArr, true, false, false, 'bg-light-green');
+  html += renderRow('% New Customer Share<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สัดส่วนลูกค้าใหม่ (คน)</span>', newGShrArr, false, false, true, 'bg-light-blue');
   html += renderRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', migArr, true, false, false, 'bg-light-green');
   html += renderRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', migRtArr, false, false, true, 'bg-light-blue');
   // Channel Status Row Placeholder
