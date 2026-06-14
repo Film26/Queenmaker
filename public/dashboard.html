@@ -288,14 +288,18 @@
     let globalFirstPurchase = {}; 
     let availableMonths = [];
     let charts = {};
-    const keyCache = {};
+    const FIELD_ALIASES = {date:['OrderDate','Date','วันที่','วันที่สร้าง','วันที่โอนเงิน','Created At','Purchase Date','Transaction Date','Payment Date','Sales Date','Invoice Date'],
+                           revenue:['Net Sales','Revenue','Amount','ยอดขาย','ยอดโอน','Total','Grand Total','Sales Amount','Order Value','Total Amount']};
+    function getSmartValue(row,type){
+
+   return getRowValue(row,FIELD_ALIASES[type]);}
 
     function precomputeGlobalFirstPurchases() {
       globalFirstPurchase = {};
       rawData.forEach(row => {
         if (!isSaleOrder(row)) return;
         const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+        const dateStr = getSmartValue(row,'date');
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
@@ -474,42 +478,59 @@
     window.getRowValue = getRowValue;
 
     function getCustomerUniqueId(row) {
-      const addr = getRowValue(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่', 'Address', 'address']);
-      if (addr) {
-        return addr.toString().toLowerCase().replace(/[\s\r\n\t\-,\.\/\\_]+/g, '');
-      }
-      return getRowValue(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
-    }
-    window.getCustomerUniqueId = getCustomerUniqueId;
+      const phone = getRowValue(row, ['Phone', 'phone', 'Mobile', 'Tel','เบอร์โทร']);
+      if(phone){
+        return phone.toString() .replace(/\D/g,'');}
+      const customer = getRowValue(row,['Customer ID','CustomerName','Customer Name','รหัสลูกค้า','ชื่อลูกค้า']);
 
-    function parseDate(dateStr) {
-      if (!dateStr) return null;
-      const datePart = dateStr.toString().split(' ')[0];
-      let parts = datePart.split('/');
-      if (parts.length < 3) parts = datePart.split('-');
-      if (parts.length >= 3) {
-        let p0 = parseInt(parts[0]);
-        let p1 = parseInt(parts[1]);
-        let p2 = parseInt(parts[2]);
-        let y, m, d;
-        if (p0 > 1000) {
-           y = p0; m = p1; d = p2;
-        } else if (p2 > 1000) {
-           d = p0; m = p1; y = p2;
-        } else {
-           d = p0; m = p1; y = p2;
-           if (y < 2000) y += 2000;
-        }
-        return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
-      }
+  if(customer){
+
+      return customer.toString().toLowerCase().replace(/\s/g,'');}
+
+  const addr = getRowValue(row,['Address','address','ที่อยู่','ที่อยู่ (ลูกค้า)']);
+
+  if(addr){
+
+      return addr.toString().toLowerCase().replace(/[\s\r\n\t\-,\.\/\\_]+/g,'');
+
+  }
+
+  return '';
+}
+
+    function parseDate(dateStr){
+
+    if(!dateStr)
       return null;
-    }
-    window.parseDate = parseDate;
+
+    const d = new Date(dateStr);
+
+    if(isNaN(d))
+      return null;
+
+    return {
+
+      y:d.getFullYear(),
+
+      m:d.getMonth()+1,
+
+      d:d.getDate(),
+
+      str:
+
+      `${d.getFullYear()}-${
+      String(
+      d.getMonth()+1
+      ).padStart(2,'0')}`
+
+    };
+
+}
 
     function isSaleOrder(row) {
       const remark = getRowValue(row, ['หมายเหตุ', 'Remark']);
       const revenueStr = getRowValue(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-      const revenue = parseFloat(revenueStr.toString().replace(/,/g, ''));
+      const revenue = parseFloat(row,'revenue');
       if (isNaN(revenue)) return false;
       const nonSaleKeywords = [
         'ของขวัญวันเกิด', 'ของขวัญปีใหม่', 'เคลม', 'ของแถม', 'แจก',
@@ -524,20 +545,78 @@
       return revenue > 0;
     }
     window.isSaleOrder = isSaleOrder;
-    function getNormalizedChannel(rawChannel) {
-      let ch = (rawChannel || '').toString().trim();
-      if (!ch) return 'Unknown';
-      let lower = ch.toLowerCase();
-      if (lower.includes('facebook') || lower === 'fb') return 'Facebook';
-      if (lower.includes('line')) return 'Line';
-      if (lower.includes('tiktok')) return 'Tiktok';
-      if (lower.includes('shopee')) return 'Shopee';
-      if (lower.includes('lazada')) return 'Lazada';
-      if (lower.includes('ig') || lower.includes('instagram')) return 'Instagram';
-      if (lower.includes('call')) return 'Call';
-      if (lower.includes('crm')) return 'CRM';
-      return ch;
+   function getNormalizedChannel(rawChannel,row){
+
+    let ch = (rawChannel || '').toString().trim();
+
+    // ถ้าไม่มี Channel ให้ดึงจาก Remark
+    if(!ch){
+
+        const remark =
+        getRowValue(row,['Remark','หมายเหตุ'])
+        .toLowerCase();
+
+        if(
+          remark.includes('fb') ||
+          remark.includes('facebook')
+        ){
+
+          return 'Facebook';
+
+        }
+
+        if(
+          remark.includes('line')
+        ){
+
+          return 'Line';
+
+        }
+
+        if(
+          remark.includes('ig') ||
+          remark.includes('instagram')
+        ){
+
+          return 'Instagram';
+
+        }
+
+        if(
+          remark.includes('tiktok')
+        ){
+
+          return 'Tiktok';
+
+        }
+
+        return 'Unknown';
     }
+
+    let lower = ch.toLowerCase();
+
+    if(lower.includes('facebook') || lower==='fb')
+        return 'Facebook';
+
+    if(lower.includes('line'))
+        return 'Line';
+
+    if(lower.includes('tiktok'))
+        return 'Tiktok';
+
+    if(lower.includes('shopee'))
+        return 'Shopee';
+
+    if(lower.includes('lazada'))
+        return 'Lazada';
+
+    if(lower.includes('ig') ||
+       lower.includes('instagram'))
+        return 'Instagram';
+
+    return ch;
+
+}
     function getNormalizedSubChannel(row) {
       if (!row) return 'Unknown';
       
@@ -688,7 +767,7 @@
         if (!dateStr) return false;
         const d = parseDate(dateStr);
         if (!d) return false;
-        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
+        const channel = getNomalizedchannel(getRowValue(row,['ช่องทาง','Channel']),row);
         const subChannel = getNormalizedSubChannel(row);
         
         const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
