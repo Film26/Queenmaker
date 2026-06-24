@@ -292,72 +292,28 @@
 
     function precomputeGlobalFirstPurchases() {
       globalFirstPurchase = {};
+      if (!rawData || !Array.isArray(rawData)) return; // ป้องกันถ้าไม่มีข้อมูล
+      
       rawData.forEach(row => {
-        if (!isSaleOrder(row)) return;
-        const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-        if (!id || !dateStr) return;
-        const d = parseDate(dateStr);
-        if (!d) return;
-        const val = d.y * 10000 + d.m * 100 + d.d;
-        if (!globalFirstPurchase[id] || val < globalFirstPurchase[id].val) {
-          globalFirstPurchase[id] = { val: val, monthStr: d.str, year: d.y };
+        try {
+          if (!row || !isSaleOrder(row)) return;
+          const id = getCustomerUniqueId(row);
+          const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+          if (!id || !dateStr) return;
+          const d = parseDate(dateStr);
+          if (!d) return;
+          const val = d.y * 10000 + d.m * 100 + d.d;
+          
+          // เพิ่มตัวดักจับป้องกันอาการ undefined.val ถล่มระบบ
+          if (!globalFirstPurchase[id] || (globalFirstPurchase[id] && val < globalFirstPurchase[id].val)) {
+            globalFirstPurchase[id] = { val: val, monthStr: d.str, year: d.y };
+          }
+        } catch (err) {
+          console.error("Skip bad row in precompute:", err);
         }
       });
     }
-
-    window.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('importBtn').addEventListener('click', () => document.getElementById('fileInput').click());
-      document.getElementById('fileInput').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          showLoading(true);
-          Papa.parse(file, {
-            header: true,
-            complete: (results) => {
-              for (let k in keyCache) delete keyCache[k];
-              window.userCohorts = null;
-              window.scFirstPurchase = null;
-              rawData = results.data;
-              precomputeGlobalFirstPurchases();
-              applyFilters();
-              showLoading(false);
-            },
-            error: (err) => { console.error(err); showLoading(false); alert('Error parsing CSV'); }
-          });
-        }
-      });
-      document.getElementById('loadSampleBtn').addEventListener('click', () => {
-        showLoading(true);
-        fetch(sampleUrl)
-          .then(res => res.text())
-          .then(text => {
-            Papa.parse(text, { 
-              header: true, 
-              complete: (results) => {
-                for (let k in keyCache) delete keyCache[k];
-                window.userCohorts = null;
-                window.scFirstPurchase = null;
-                rawData = results.data;
-                precomputeGlobalFirstPurchases();
-                applyFilters();
-                showLoading(false);
-              }
-            });
-          })
-          .catch(err => { showLoading(false); alert('Failed to load sample data'); });
-      });
-      window.onclick = function(event) {
-        if (!event.target.closest('.filter-dropdown')) {
-          var dropdowns = document.getElementsByClassName("filter-content");
-          for (var i = 0; i < dropdowns.length; i++) {
-            dropdowns[i].classList.remove('show');
-          }
-        }
-      }
-      initCharts();
-    });
-
+    
     function switchTab(tabId) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.view-content').forEach(view => view.style.display = 'none');
