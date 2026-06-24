@@ -524,113 +524,137 @@
       return revenue > 0;
     }
     window.isSaleOrder = isSaleOrder;
-    // ฟังก์ชันช่วยหาค่าจากคอลัมน์แบบปลอดภัย (ป้องกันอาการหน้าเว็บค้าง/ล่ม)
+   // ==========================================================
+    
     function safeGetRowValue(row, possibleKeys) {
-      if (!row || typeof row !== 'object') return ''; // ดักจับถ้า row เป็นค่าว่างหรือรูปแบบผิดพลาด
-      const rowKeys = Object.keys(row);
-      if (rowKeys.length === 0) return '';
-      
-      for (let key of possibleKeys) {
-        if (!key) continue;
-        const foundKey = rowKeys.find(rk => rk && rk.trim().toLowerCase() === key.trim().toLowerCase());
-        if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null) {
-          return row[foundKey].toString().trim();
+      try {
+        if (!row || typeof row !== 'object') return '';
+        const rowKeys = Object.keys(row);
+        if (rowKeys.length === 0) return '';
+        
+        for (let key of possibleKeys) {
+          if (!key) continue;
+          const foundKey = rowKeys.find(rk => rk && rk.trim().toLowerCase() === key.trim().toLowerCase());
+          if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null) {
+            return row[foundKey].toString().trim();
+          }
         }
+      } catch (e) {
+        console.error("Error in safeGetRowValue:", e);
       }
       return '';
     }
 
     // 1. ช่องทางหลัก (Channel)
     function getNormalizedChannel(row) {
-      let ch = safeGetRowValue(row, ['ช่องทาง', 'Channel']);
-      if (!ch) return 'Other';
-      
-      let lower = ch.toLowerCase();
-      if (lower.includes('line')) return 'Line';
-      
-      const MASTER_CHANNELS = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Shopee', 'Tiktok'];
-      const matched = MASTER_CHANNELS.find(c => c.toUpperCase() === lower.toUpperCase());
-      return matched ? matched : 'Other';
+      try {
+        let ch = safeGetRowValue(row, ['ช่องทาง', 'Channel']);
+        if (!ch) return 'Other';
+        
+        let lower = ch.toLowerCase();
+        if (lower.includes('line')) return 'Line';
+        
+        const localMaster = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Shopee', 'Tiktok'];
+        const matched = localMaster.find(c => c.toUpperCase() === lower.toUpperCase());
+        return matched ? matched : 'Other';
+      } catch (err) {
+        return 'Other';
+      }
     }
     window.getNormalizedChannel = getNormalizedChannel;
 
     // 2. ช่องทางย่อย (SubChannel)
     function getNormalizedSubChannel(row) {
-      let sub = safeGetRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง', 'ชื่อคลัง (คลังสินค้า)']);
-      if (!sub) {
-        sub = safeGetRowValue(row, ['ช่องทาง', 'Channel']) || 'Other';
+      try {
+        let sub = safeGetRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง', 'ชื่อคลัง (คลังสินค้า)']);
+        if (!sub) {
+          sub = safeGetRowValue(row, ['ช่องทาง', 'Channel']) || 'Other';
+        }
+        
+        let lower = sub.toLowerCase();
+        if (sub === '865219993' || sub === '986291641') return 'Other';
+        if (lower.includes('line')) return 'Line';
+        
+        const localSubMaster = [
+          'Call', 'CRM', 'Email', 'FB', 'FBC', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 
+          'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'IG-FBH', 'IG-FBSS', 'IG-FBW', 'Lazada', 
+          'PC', 'Shopee', 'Telesale', 'Tiktok', 'Website'
+        ];
+        
+        const matchedSub = localSubMaster.find(s => s.toUpperCase() === lower.toUpperCase());
+        return matchedSub ? matchedSub : 'Other';
+      } catch (err) {
+        return 'Other';
       }
-      
-      let lower = sub.toLowerCase();
-      if (sub === '865219993' || sub === '986291641') return 'Other';
-      if (lower.includes('line')) return 'Line';
-      
-      const MASTER_SUB_CHANNELS = [
-        'Call', 'CRM', 'Email', 'FB', 'FBC', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 
-        'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'IG-FBH', 'IG-FBSS', 'IG-FBW', 'Lazada', 
-        'PC', 'Shopee', 'Telesale', 'Tiktok', 'Website'
-      ];
-      
-      const matchedSub = MASTER_SUB_CHANNELS.find(s => s.toUpperCase() === lower.toUpperCase());
-      return matchedSub ? matchedSub : 'Other';
     }
     window.getNormalizedSubChannel = getNormalizedSubChannel;
 
     // 3. ผลิตภัณฑ์หลัก (Product)
     function getNormalizedProduct(row) {
-      let p = safeGetRowValue(row, ['รายการขาย', 'Product', 'สินค้า']);
-      if (!p) return 'Unknown';
-      let lower = p.toLowerCase();
-      
-      if (lower.includes('plus') || lower.includes('พลัส')) return 'Plus';
-      if (lower.includes('gold') || lower.includes('โกลด์')) return 'Gold';
-      if (lower.includes('wiss') || lower.includes('วิสส์')) return 'Wiss';
-      if (lower.includes('kides') || lower.includes('คิดส์')) return 'Kides';
-      if (lower.includes('collagen') || lower.includes('คลอลาเจน') || lower.includes('คอลลาเจน')) return 'Collagen';
-      
-      return 'Unknown';
+      try {
+        let p = safeGetRowValue(row, ['รายการขาย', 'Product', 'สินค้า']);
+        if (!p) return 'Unknown';
+        let lower = p.toLowerCase();
+        
+        if (lower.includes('plus') || lower.includes('พลัส')) return 'Plus';
+        if (lower.includes('gold') || lower.includes('โกลด์')) return 'Gold';
+        if (lower.includes('wiss') || lower.includes('วิสส์')) return 'Wiss';
+        if (lower.includes('kides') || lower.includes('คิดส์')) return 'Kides';
+        if (lower.includes('collagen') || lower.includes('คลอลาเจน') || lower.includes('คอลลาเจน')) return 'Collagen';
+        
+        return 'Unknown';
+      } catch (err) {
+        return 'Unknown';
+      }
     }
     window.getNormalizedProduct = getNormalizedProduct;
 
     // 4. ผลิตภัณฑ์ย่อย (Sub Product)
     function getNormalizedSubProduct(row) {
-      let p = safeGetRowValue(row, ['รายการขาย', 'Product', 'สินค้า']);
-      if (!p) return 'Unknown';
-      let lower = p.toLowerCase();
-      
-      if (lower.includes('kides') || lower.includes('คิดส์') || lower.includes('kide')) {
-        if (p.includes('ส้ม')) return 'Kidesส้ม';
-        if (p.includes('แตงโม')) return 'Kides แตงโม';
-        return 'Kides original';
+      try {
+        let p = safeGetRowValue(row, ['รายการขาย', 'Product', 'สินค้า']);
+        if (!p) return 'Unknown';
+        let lower = p.toLowerCase();
+        
+        if (lower.includes('kides') || lower.includes('คิดส์') || lower.includes('kide')) {
+          if (p.includes('ส้ม')) return 'Kidesส้ม';
+          if (p.includes('แตงโม')) return 'Kides แตงโม';
+          return 'Kides original';
+        }
+        
+        if (lower.includes('plus') || lower.includes('พลัส')) return 'Plus';
+        if (lower.includes('gold') || lower.includes('โกลด์')) return 'Gold';
+        if (lower.includes('wiss') || lower.includes('วิสส์')) return 'Wiss';
+        if (lower.includes('collagen') || lower.includes('คลอลาเจน') || lower.includes('คอลลาเจน')) return 'Collagen';
+        
+        return 'Unknown';
+      } catch (err) {
+        return 'Unknown';
       }
-      
-      if (lower.includes('plus') || lower.includes('พลัส')) return 'Plus';
-      if (lower.includes('gold') || lower.includes('โกลด์')) return 'Gold';
-      if (lower.includes('wiss') || lower.includes('วิสส์')) return 'Wiss';
-      if (lower.includes('collagen') || lower.includes('คลอลาเจน') || lower.includes('คอลลาเจน')) return 'Collagen';
-      
-      return 'Unknown';
     }
     window.getNormalizedSubProduct = getNormalizedSubProduct;
 
     // 5. พนักงานขาย (Admin)
     function getNormalizedAdmin(row) {
-      let val = safeGetRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name', 'Tags (ลูกค้า)']);
-      if (!val) {
-        val = safeGetRowValue(row, ['หมายเหตุ', 'Remark']);
+      try {
+        let val = safeGetRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name', 'Tags (ลูกค้า)']);
+        if (!val) {
+          val = safeGetRowValue(row, ['หมายเหตุ', 'Remark']);
+        }
+        if (!val) return 'Other';
+        
+        if (val.includes('May') || val.includes('เมย์')) return 'May';
+        if (val.includes('บี')) return 'บี';
+        if (val.includes('มิ้ว')) return 'มิ้ว';
+        if (val.includes('แอน')) return 'แอน';
+        if (val.includes('แอล')) return 'แอล';
+        
+        return 'Other';
+      } catch (err) {
+        return 'Other';
       }
-      if (!val) return 'Other';
-      
-      if (val.includes('May') || val.includes('เมย์')) return 'May';
-      if (val.includes('บี')) return 'บี';
-      if (val.includes('มิ้ว')) return 'มิ้ว';
-      if (val.includes('แอน')) return 'แอน';
-      if (val.includes('แอล')) return 'แอล';
-      
-      return 'Other';
     }
-    window.getNormalizedAdmin = getNormalizedAdmin;
-    
+    window.getNormalizedAdmin = getNormalizedAdmin;    
         function populateDropdowns() {
       const options = { 
         Month: new Set(), 
