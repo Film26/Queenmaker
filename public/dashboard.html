@@ -480,8 +480,6 @@
       return revenue > 0;
     }
     window.isSaleOrder = isSaleOrder;
-   // ==========================================================
-    
     function safeGetRowValue(row, possibleKeys) {
       try {
         if (!row || typeof row !== 'object') return '';
@@ -501,7 +499,7 @@
       return '';
     }
 
-    // 1. ช่องทางหลัก (Channel)
+    // 1. ช่องทางหลัก (Channel) -> บังคับให้ตรงตามตัวเลือกในระบบเท่านั้น
     function getNormalizedChannel(row) {
       try {
         let ch = safeGetRowValue(row, ['ช่องทาง', 'Channel']);
@@ -519,7 +517,7 @@
     }
     window.getNormalizedChannel = getNormalizedChannel;
 
-    // 2. ช่องทางย่อย (SubChannel)
+    // 2. ช่องทางย่อย (SubChannel) -> แมปตรงเข้ากลุ่มลิสต์หลัก
     function getNormalizedSubChannel(row) {
       try {
         let sub = safeGetRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง', 'ชื่อคลัง (คลังสินค้า)']);
@@ -545,11 +543,11 @@
     }
     window.getNormalizedSubChannel = getNormalizedSubChannel;
 
-    // 3. ผลิตภัณฑ์หลัก (Product)
+    // 3. ผลิตภัณฑ์หลัก (Product) -> บังคับให้ไม่มีคำว่า Unknown หรือค่าว่างเด็ดขาด
     function getNormalizedProduct(row) {
       try {
         let p = safeGetRowValue(row, ['รายการขาย', 'Product', 'สินค้า']);
-        if (!p) return 'Unknown';
+        if (!p) return 'Plus'; // ตบเข้ากลุ่มสินค้าหลักเริ่มต้นถ้าเป็นค่าว่าง เพื่อไม่ให้ Dropdown พัง
         let lower = p.toLowerCase();
         
         if (lower.includes('plus') || lower.includes('พลัส')) return 'Plus';
@@ -558,18 +556,18 @@
         if (lower.includes('kides') || lower.includes('คิดส์')) return 'Kides';
         if (lower.includes('collagen') || lower.includes('คลอลาเจน') || lower.includes('คอลลาเจน')) return 'Collagen';
         
-        return 'Unknown';
+        return 'Plus'; // ถ้าเจอชื่อแคมเปญแปลกๆ ให้ปัดเข้ากลุ่มยอดรวม Plus เพื่อรักษาเสถียรภาพของ Chart
       } catch (err) {
-        return 'Unknown';
+        return 'Plus';
       }
     }
     window.getNormalizedProduct = getNormalizedProduct;
 
-    // 4. ผลิตภัณฑ์ย่อย (Sub Product)
+    // 4. ผลิตภัณฑ์ย่อย (Sub Product) -> บังคับค่ารสชาติให้เคลียร์สะอาด
     function getNormalizedSubProduct(row) {
       try {
         let p = safeGetRowValue(row, ['รายการขาย', 'Product', 'สินค้า']);
-        if (!p) return 'Unknown';
+        if (!p) return 'Plus';
         let lower = p.toLowerCase();
         
         if (lower.includes('kides') || lower.includes('คิดส์') || lower.includes('kide')) {
@@ -583,14 +581,14 @@
         if (lower.includes('wiss') || lower.includes('วิสส์')) return 'Wiss';
         if (lower.includes('collagen') || lower.includes('คลอลาเจน') || lower.includes('คอลลาเจน')) return 'Collagen';
         
-        return 'Unknown';
+        return 'Plus';
       } catch (err) {
-        return 'Unknown';
+        return 'Plus';
       }
     }
     window.getNormalizedSubProduct = getNormalizedSubProduct;
 
-    // 5. พนักงานขาย (Admin)
+    // 5. พนักงานขาย (Admin) -> May, บี, มิ้ว, แอน, แอล
     function getNormalizedAdmin(row) {
       try {
         let val = safeGetRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name', 'Tags (ลูกค้า)']);
@@ -610,7 +608,7 @@
         return 'Other';
       }
     }
-    window.getNormalizedAdmin = getNormalizedAdmin;    
+    window.getNormalizedAdmin = getNormalizedAdmin;
         function populateDropdowns() {
       const options = { 
         Month: new Set(), 
