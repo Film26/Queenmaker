@@ -292,28 +292,72 @@
 
     function precomputeGlobalFirstPurchases() {
       globalFirstPurchase = {};
-      if (!rawData || !Array.isArray(rawData)) return; // ป้องกันถ้าไม่มีข้อมูล
-      
       rawData.forEach(row => {
-        try {
-          if (!row || !isSaleOrder(row)) return;
-          const id = getCustomerUniqueId(row);
-          const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-          if (!id || !dateStr) return;
-          const d = parseDate(dateStr);
-          if (!d) return;
-          const val = d.y * 10000 + d.m * 100 + d.d;
-          
-          // เพิ่มตัวดักจับป้องกันอาการ undefined.val ถล่มระบบ
-          if (!globalFirstPurchase[id] || (globalFirstPurchase[id] && val < globalFirstPurchase[id].val)) {
-            globalFirstPurchase[id] = { val: val, monthStr: d.str, year: d.y };
-          }
-        } catch (err) {
-          console.error("Skip bad row in precompute:", err);
+        if (!isSaleOrder(row)) return;
+        const id = getCustomerUniqueId(row);
+        const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+        if (!id || !dateStr) return;
+        const d = parseDate(dateStr);
+        if (!d) return;
+        const val = d.y * 10000 + d.m * 100 + d.d;
+        if (!globalFirstPurchase[id] || val < globalFirstPurchase[id].val) {
+          globalFirstPurchase[id] = { val: val, monthStr: d.str, year: d.y };
         }
       });
     }
-    
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('importBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+      document.getElementById('fileInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          showLoading(true);
+          Papa.parse(file, {
+            header: true,
+            complete: (results) => {
+              for (let k in keyCache) delete keyCache[k];
+              window.userCohorts = null;
+              window.scFirstPurchase = null;
+              rawData = results.data;
+              precomputeGlobalFirstPurchases();
+              applyFilters();
+              showLoading(false);
+            },
+            error: (err) => { console.error(err); showLoading(false); alert('Error parsing CSV'); }
+          });
+        }
+      });
+      document.getElementById('loadSampleBtn').addEventListener('click', () => {
+        showLoading(true);
+        fetch(sampleUrl)
+          .then(res => res.text())
+          .then(text => {
+            Papa.parse(text, { 
+              header: true, 
+              complete: (results) => {
+                for (let k in keyCache) delete keyCache[k];
+                window.userCohorts = null;
+                window.scFirstPurchase = null;
+                rawData = results.data;
+                precomputeGlobalFirstPurchases();
+                applyFilters();
+                showLoading(false);
+              }
+            });
+          })
+          .catch(err => { showLoading(false); alert('Failed to load sample data'); });
+      });
+      window.onclick = function(event) {
+        if (!event.target.closest('.filter-dropdown')) {
+          var dropdowns = document.getElementsByClassName("filter-content");
+          for (var i = 0; i < dropdowns.length; i++) {
+            dropdowns[i].classList.remove('show');
+          }
+        }
+      }
+      initCharts();
+    });
+
     function switchTab(tabId) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.view-content').forEach(view => view.style.display = 'none');
@@ -480,106 +524,94 @@
       return revenue > 0;
     }
     window.isSaleOrder = isSaleOrder;
-
-    function getNormalizedChannel(row) {
-      const val = getRowValue(row, ['ช่องทาง', 'Channel']);
-      let ch = (val || '').toString().trim();
-      if (!ch) return 'Other';
-      
+    function getNormalizedChannel(rawChannel) {
+      let ch = (rawChannel || '').toString().trim();
+      if (!ch) return 'Unknown';
       let lower = ch.toLowerCase();
-      // Line และ Line OA จัดอยู่ใน Line
+      if (lower.includes('facebook') || lower === 'fb') return 'Facebook';
       if (lower.includes('line')) return 'Line';
-      
-      const MASTER_CHANNELS = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Shopee', 'Tiktok'];
-      const matched = MASTER_CHANNELS.find(c => c.toUpperCase() === lower.toUpperCase());
-      return matched ? matched : 'Other';
+      if (lower.includes('tiktok')) return 'Tiktok';
+      if (lower.includes('shopee')) return 'Shopee';
+      if (lower.includes('lazada')) return 'Lazada';
+      if (lower.includes('ig') || lower.includes('instagram')) return 'Instagram';
+      if (lower.includes('call')) return 'Call';
+      if (lower.includes('crm')) return 'CRM';
+      return ch;
     }
-    window.getNormalizedChannel = getNormalizedChannel;
-
     function getNormalizedSubChannel(row) {
-      if (!row) return 'Other';
-      let sub = getRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง', 'ชื่อคลัง (คลังสินค้า)']);
+      if (!row) return 'Unknown';
+      
+      let sub = getRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง']);
       if (!sub || sub.toString().trim() === '') {
-        sub = getRowValue(row, ['ช่องทาง', 'Channel']) || 'Other';
+        sub = getRowValue(row, ['ช่องทาง', 'Channel']) || 'Unknown';
       }
       
       let cleanSub = sub.toString().trim();
       let lower = cleanSub.toLowerCase();
       
-      if (cleanSub === '865219993' || cleanSub === '986291641') return 'Other';
-      // Line และ Line OA จัดอยู่ใน Line
-      if (lower.includes('line')) return 'Line';
+      if (cleanSub === '865219993' || cleanSub === '986291641') return 'Unknown';
       
-      const MASTER_SUB_CHANNELS = [
-        'Call', 'CRM', 'Email', 'FB', 'FBC', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 
-        'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'IG-FBH', 'IG-FBSS', 'IG-FBW', 'Lazada', 
-        'PC', 'Shopee', 'Telesale', 'Tiktok', 'Website'
-      ];
       
-      const matchedSub = MASTER_SUB_CHANNELS.find(s => s.toUpperCase() === lower.toUpperCase());
-      return matchedSub ? matchedSub : 'Other';
+      if (lower === 'facebook' || lower === 'fb') return 'FB';
+      if (lower === 'line' || lower === 'line_oa') return 'Line';
+      if (lower === 'tiktok') return 'TikTok';
+      if (lower === 'shopee') return 'Shopee';
+      if (lower === 'lazada') return 'Lazada';
+      if (lower === 'instagram' || lower === 'ig') return 'IG';
+      if (lower === 'phone' || lower === 'call') return 'Call';
+      if (lower === 'crm') return 'CRM';
+      if (lower === 'email') return 'Email';
+      if (lower === 'website' || lower === 'web' || lower === 'www') return 'Website';
+      
+      return cleanSub;
     }
     window.getNormalizedSubChannel = getNormalizedSubChannel;
-
-    function getNormalizedProduct(row) {
-      const val = getRowValue(row, ['รายการขาย', 'Product', 'สินค้า']);
-      let p = (val || '').toString().trim();
-      if (!p) return 'Plus';
+    function getNormalizedProduct(rawProd) {
+      let p = (rawProd || '').toString().trim();
+      if (!p) return 'Unknown';
       let lower = p.toLowerCase();
-      
-      // ล็อกผลลัพธ์ให้ตรงตามสูตรหลักเท่านั้น
-      if (lower.includes('plus') || lower.includes('พลัส')) return 'Plus';
-      if (lower.includes('gold') || lower.includes('โกลด์')) return 'Gold';
-      if (lower.includes('wiss') || lower.includes('วิสส์')) return 'Wiss';
-      if (lower.includes('kides') || lower.includes('คิดส์')) return 'Kides';
-      if (lower.includes('collagen') || lower.includes('คลอลาเจน') || lower.includes('คอลลาเจน')) return 'Collagen';
-      
-      return 'Plus'; // คืนค่าเริ่มต้นเพื่อไม่ให้เกิด Unknown หลุดไปใน Dropdown
+      if (lower.includes('plus')) return 'Plus';
+      if (lower.includes('gold')) return 'Gold';
+      if (lower.includes('wiss')) return 'Wiss';
+      if (lower.includes('kides') || lower.includes('kide')) return 'Kides';
+      if (lower.includes('collagen') || lower.includes('callagen')) return 'Collagen';
+      return p;
     }
-    window.getNormalizedProduct = getNormalizedProduct;
-
-    function getNormalizedSubProduct(row) {
-      const val = getRowValue(row, ['รายการขาย', 'Product', 'สินค้า']);
-      let p = (val || '').toString().trim();
-      if (!p) return 'Plus';
+    function getNormalizedSubProduct(rawProd) {
+      let p = (rawProd || '').toString().trim();
+      if (!p) return 'Unknown';
       let lower = p.toLowerCase();
       
-      // ดักจับกลุ่มรสชาติของเคส Kides ตามสเปกใหม่ของคุณมือหนึ่ง
-      if (lower.includes('kides') || lower.includes('คิดส์') || lower.includes('kide')) {
-        if (p.includes('ส้ม')) return 'Kidesส้ม';
-        if (p.includes('แตงโม')) return 'Kides แตงโม';
+      if (lower.includes('kides') || lower.includes('kide')) {
+        if (lower.includes('ส้ม')) return 'Kidesส้ม';
+        if (lower.includes('แตงโม')) return 'Kides แตงโม';
         return 'Kides original';
       }
       
-      if (lower.includes('plus') || lower.includes('พลัส')) return 'Plus';
-      if (lower.includes('gold') || lower.includes('โกลด์')) return 'Gold';
-      if (lower.includes('wiss') || lower.includes('วิสส์')) return 'Wiss';
-      if (lower.includes('collagen') || lower.includes('คลอลาเจน') || lower.includes('คอลลาเจน')) return 'Collagen';
+      if (lower.includes('plus')) return 'Plus';
+      if (lower.includes('gold')) return 'Gold';
+      if (lower.includes('wiss')) return 'Wiss';
+      if (lower.includes('collagen') || lower.includes('callagen')) return 'Collagen';
       
-      return 'Plus';
+      return p;
     }
-    window.getNormalizedSubProduct = getNormalizedSubProduct;
-
     function getNormalizedAdmin(row) {
-      let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name', 'Tags (ลูกค้า)']);
+      if (!row) return 'Unknown';
+      let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
       if (!val) {
         val = getRowValue(row, ['หมายเหตุ', 'Remark']);
       }
       let a = (val || '').toString().trim();
-      if (!a) return 'Other';
-      
-      // กรองเฉพาะ Admin ตามสเปก (May, บี, มิ้ว, แอน, แอล)
-      if (a.includes('May') || a.includes('เมย์')) return 'May';
-      if (a.includes('บี')) return 'บี';
-      if (a.includes('มิ้ว')) return 'มิ้ว';
-      if (a.includes('แอน')) return 'แอน';
-      if (a.includes('แอล')) return 'แอล';
-      
-      return 'Other';
+      if (!a) return 'Unknown';
+      let lower = a.toLowerCase();
+      if (lower.includes('may') || lower.includes('เมย์')) return 'May';
+      if (lower.includes('บี')) return 'บี';
+      if (lower.includes('มิ้ว')) return 'มิ้ว';
+      if (lower.includes('แอน')) return 'แอน';
+      if (lower.includes('แอล')) return 'แอล';
+      return a;
     }
-    window.getNormalizedAdmin = getNormalizedAdmin;
-    
-        function populateDropdowns() {
+    function populateDropdowns() {
       const options = { 
         Month: new Set(), 
         Year: new Set(), 
