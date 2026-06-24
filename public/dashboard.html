@@ -524,19 +524,27 @@
       return revenue > 0;
     }
     window.isSaleOrder = isSaleOrder;
-    // ==========================================================
-    // 🌟 QUEENMAKER NEW SPECIFICATION MAPPING (CHANNEL & PRODUCT)
-    // ==========================================================
-    
-    // 1. ช่องทางหลัก (Channel) ตามสเปกเป๊ะๆ
+    // ฟังก์ชันช่วยหาค่าจากคอลัมน์แบบอัจฉริยะ (ไม่สนพิมพ์เล็กพิมพ์ใหญ่ / ตัดเว้นวรรค)
+    function safeGetRowValue(row, possibleKeys) {
+      if (!row) return '';
+      const rowKeys = Object.keys(row);
+      
+      // วนหาคีย์ที่มีความใกล้เคียงที่สุด
+      for (let key of possibleKeys) {
+        const foundKey = rowKeys.find(rk => rk.trim().toLowerCase() === key.trim().toLowerCase());
+        if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null) {
+          return row[foundKey].toString().trim();
+        }
+      }
+      return '';
+    }
+
+    // 1. ช่องทางหลัก (Channel)
     function getNormalizedChannel(row) {
-      if (!row) return 'Other';
-      let rawChannel = getRowValue(row, ['ช่องทาง', 'Channel']) || '';
-      let ch = rawChannel.toString().trim();
+      let ch = safeGetRowValue(row, ['ช่องทาง', 'Channel']);
       if (!ch) return 'Other';
       
       let lower = ch.toLowerCase();
-      // Line และ Line OA จัดอยู่ใน Line
       if (lower.includes('line')) return 'Line';
       
       const MASTER_CHANNELS = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Shopee', 'Tiktok'];
@@ -545,18 +553,15 @@
     }
     window.getNormalizedChannel = getNormalizedChannel;
 
-    // 2. ช่องทางย่อย (SubChannel) ตามสเปกเป๊ะๆ
+    // 2. ช่องทางย่อย (SubChannel)
     function getNormalizedSubChannel(row) {
-      if (!row) return 'Other';
-      let sub = getRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง']);
-      if (!sub || sub.toString().trim() === '') {
-        sub = getRowValue(row, ['ช่องทาง', 'Channel']) || 'Other';
+      let sub = safeGetRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง', 'ชื่อคลัง (คลังสินค้า)']);
+      if (!sub) {
+        sub = safeGetRowValue(row, ['ช่องทาง', 'Channel']) || 'Other';
       }
       
-      let cleanSub = sub.toString().trim();
-      let lower = cleanSub.toLowerCase();
-      
-      // Line และ Line OA จัดอยู่ใน Line
+      let lower = sub.toLowerCase();
+      if (sub === '865219993' || sub === '986291641') return 'Other';
       if (lower.includes('line')) return 'Line';
       
       const MASTER_SUB_CHANNELS = [
@@ -570,11 +575,9 @@
     }
     window.getNormalizedSubChannel = getNormalizedSubChannel;
 
-    // 3. ผลิตภัณฑ์หลัก (Product) -> Plus, Gold, Wiss, Kides, Collagen
+    // 3. ผลิตภัณฑ์หลัก (Product)
     function getNormalizedProduct(row) {
-      if (!row) return 'Unknown';
-      let rawProd = getRowValue(row, ['รายการขาย', 'Product', 'สินค้า']) || '';
-      let p = rawProd.toString().trim();
+      let p = safeGetRowValue(row, ['รายการขาย', 'Product', 'สินค้า']);
       if (!p) return 'Unknown';
       let lower = p.toLowerCase();
       
@@ -588,15 +591,12 @@
     }
     window.getNormalizedProduct = getNormalizedProduct;
 
-    // 4. ผลิตภัณฑ์ย่อย (Sub Product) -> Plus, Gold, Wiss, Kides original, Kidesส้ม, Kides แตงโม, Collagen
+    // 4. ผลิตภัณฑ์ย่อย (Sub Product)
     function getNormalizedSubProduct(row) {
-      if (!row) return 'Unknown';
-      let rawProd = getRowValue(row, ['รายการขาย', 'Product', 'สินค้า']) || '';
-      let p = rawProd.toString().trim();
+      let p = safeGetRowValue(row, ['รายการขาย', 'Product', 'สินค้า']);
       if (!p) return 'Unknown';
       let lower = p.toLowerCase();
       
-      // ดักจับและแยกประเภทของรสชาติ Kides
       if (lower.includes('kides') || lower.includes('คิดส์') || lower.includes('kide')) {
         if (p.includes('ส้ม')) return 'Kidesส้ม';
         if (p.includes('แตงโม')) return 'Kides แตงโม';
@@ -612,149 +612,23 @@
     }
     window.getNormalizedSubProduct = getNormalizedSubProduct;
 
-    // 5. พนักงานขาย (Admin) -> May, บี, มิ้ว, แอน, แอล
+    // 5. พนักงานขาย (Admin)
     function getNormalizedAdmin(row) {
-      if (!row) return 'Other';
-      let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
+      let val = safeGetRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name', 'Tags (ลูกค้า)']);
       if (!val) {
-        val = getRowValue(row, ['หมายเหตุ', 'Remark', 'Tags (ลูกค้า)']);
+        val = safeGetRowValue(row, ['หมายเหตุ', 'Remark']);
       }
-      let a = (val || '').toString().trim();
-      if (!a) return 'Other';
+      if (!val) return 'Other';
       
-      if (a.includes('May') || a.includes('เมย์')) return 'May';
-      if (a.includes('บี')) return 'บี';
-      if (a.includes('มิ้ว')) return 'มิ้ว';
-      if (a.includes('แอน')) return 'แอน';
-      if (a.includes('แอล')) return 'แอล';
+      if (val.includes('May') || val.includes('เมย์')) return 'May';
+      if (val.includes('บี')) return 'บี';
+      if (val.includes('มิ้ว')) return 'มิ้ว';
+      if (val.includes('แอน')) return 'แอน';
+      if (val.includes('แอล')) return 'แอล';
       
       return 'Other';
     }
     window.getNormalizedAdmin = getNormalizedAdmin;
-    function populateDropdowns() {
-      const options = { 
-        Month: new Set(), 
-        Year: new Set(), 
-        Channel: new Set(), 
-        SubChannel: new Set(), 
-        Product: new Set(), 
-        SubProduct: new Set(), 
-        Admin: new Set() 
-      };
-      
-      rawData.forEach(row => {
-        const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-        if (!dateStr) return;
-        const d = parseDate(dateStr);
-        if (!d) return;
-        
-        options.Month.add(d.str);
-        options.Year.add(d.y.toString());
-        
-        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
-        const subChannel = getNormalizedSubChannel(row);
-        
-        const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
-        const product = getNormalizedProduct(rawProductName);
-        const subProduct = getNormalizedSubProduct(rawProductName);
-        const admin = getNormalizedAdmin(row);
-        
-        options.Channel.add(channel);
-        options.SubChannel.add(subChannel);
-        options.Product.add(product);
-        options.SubProduct.add(subProduct);
-        options.Admin.add(admin);
-      });
-      ['Year', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].forEach(type => {
-        const menu = document.getElementById('menu-' + type);
-        menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
-        Array.from(options[type]).sort().forEach(val => {
-          menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
-        });
-      });
-      const monthMenu = document.getElementById('menu-Month');
-      monthMenu.innerHTML = `<div onclick="setFilter('Month', 'All')">All</div>`;
-      Array.from(options.Month).sort().reverse().forEach(val => {
-        monthMenu.innerHTML += `<div onclick="setFilter('Month', '${val}')">${val}</div>`;
-      });
-    }
-    function setFilter(type, val) {
-      filters[type] = val;
-      document.getElementById('lbl-' + type).textContent = val;
-      document.getElementById('menu-' + type).classList.remove('show');
-      
-      if (val !== 'All') {
-        document.getElementById('btn-' + type).classList.add('active');
-        document.getElementById('clearFiltersBtn').style.display = 'inline-block';
-      } else {
-        document.getElementById('btn-' + type).classList.remove('active');
-      }
-      applyFilters();
-    }
-    function clearFilters() {
-      ['Month', 'Year', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].forEach(type => {
-        filters[type] = 'All';
-        document.getElementById('lbl-' + type).textContent = 'All';
-        document.getElementById('btn-' + type).classList.remove('active');
-      });
-      document.getElementById('clearFiltersBtn').style.display = 'none';
-      applyFilters();
-    }
-    function applyFilters() {
-      if (rawData.length > 0 && document.getElementById('menu-Year').children.length === 0) populateDropdowns();
-      filteredData = rawData.filter(row => {
-        if (!isSaleOrder(row)) return false;
-        const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-        if (!dateStr) return false;
-        const d = parseDate(dateStr);
-        if (!d) return false;
-        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
-        const subChannel = getNormalizedSubChannel(row);
-        
-        const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
-        const product = getNormalizedProduct(rawProductName);
-        const subProduct = getNormalizedSubProduct(rawProductName);
-        const admin = getNormalizedAdmin(row);
-        if (filters.Year !== 'All' && d.y.toString() !== filters.Year) return false;
-        if (filters.Channel !== 'All' && channel !== filters.Channel) return false;
-        if (filters.SubChannel !== 'All' && subChannel !== filters.SubChannel) return false;
-        if (filters.Product !== 'All' && product !== filters.Product) return false;
-        if (filters.SubProduct !== 'All' && subProduct !== filters.SubProduct) return false;
-        if (filters.Admin !== 'All' && admin !== filters.Admin) return false;
-        return true;
-      });
-      processData(filteredData);
-      
-      if (document.getElementById('view-cohort').style.display === 'block') {
-        if (typeof renderCohortHeatmap === 'function') {
-           renderCohortHeatmap(filteredData, rawData);
-        }
-      }
-      
-      if (document.getElementById('view-executive1').style.display === 'block') {
-        if (typeof renderExecutive1 === 'function') {
-           renderExecutive1(filteredData, rawData);
-        }
-      }
-      
-      if (document.getElementById('view-executive2').style.display === 'block') {
-        if (typeof renderExecutive2 === 'function') {
-           renderExecutive2(filteredData, rawData);
-        }
-      }
-
-      if (document.getElementById('view-insighthub').style.display === 'block') {
-        if (typeof renderInsightHub === 'function') {
-           renderInsightHub(filteredData, rawData);
-        }
-      }
-
-      if (document.getElementById('view-retention').style.display === 'block') {
-        if (typeof renderRetention === 'function') {
-           renderRetention(filteredData, rawData);
-        }
-      }
-    }
     function processData(data) {
       monthlyData = {};
       if (data.length === 0) { renderEmpty(); return; }
