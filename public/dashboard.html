@@ -545,17 +545,21 @@
       let ch = (rawChannel || '').toString().trim();
       if (!ch) return 'Other';
       let lower = ch.toLowerCase();
+      
+      // ตรวจสอบเช็กคำหลัก
       if (lower.includes('facebook') || lower === 'fb') return 'Facebook';
-      if (lower.includes('line')) return 'Line';
+      if (lower.includes('line')) return 'Line'; // รวบ Line และ Line OA ไว้ด้วยกัน
       if (lower.includes('tiktok')) return 'Tiktok';
       if (lower.includes('shopee')) return 'Shopee';
       if (lower.includes('lazada')) return 'Lazada';
       if (lower.includes('ig') || lower.includes('instagram')) return 'Instagram';
-      if (lower.includes('call')) return 'Call';
+      if (lower.includes('call') || lower.includes('phone')) return 'Call';
       if (lower.includes('crm')) return 'CRM';
-      return ch;
+      if (lower.includes('other')) return 'Other';
+      
+      return 'Other'; 
     }
-
+    
     function getNormalizedSubChannel(row) {
       if (!row) return 'Other';
       let sub = getRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง']);
