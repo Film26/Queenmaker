@@ -277,7 +277,7 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script>
-    const sampleUrl = '/assets/RAW%202025%20-%20RAW.csv';
+    const sampleUrl = '/assets/RAW%202025.csv';
     let rawData = [];
     let filteredData = [];
     
@@ -290,10 +290,12 @@
 
     function precomputeGlobalFirstPurchases() {
       globalFirstPurchase = {};
+      if (!rawData || rawData.length === 0) return;
+      
       rawData.forEach(row => {
         if (!isSaleOrder(row)) return;
         const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
@@ -304,65 +306,100 @@
       });
     }
 
+    // --- DOMContentLoaded Section ---
     window.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('importBtn').addEventListener('click', () => document.getElementById('fileInput').click());
-      document.getElementById('fileInput').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          showLoading(true);
-          Papa.parse(file, {
-            header: true,
-            complete: (results) => {
-              for (let k in keyCache) delete keyCache[k];
-              window.userCohorts = null;
-              window.scFirstPurchase = null;
-              rawData = results.data;
-              precomputeGlobalFirstPurchases();
-              applyFilters();
-              showLoading(false);
-            },
-            error: (err) => { console.error(err); showLoading(false); alert('Error parsing CSV'); }
-          });
-        }
-      });
-      document.getElementById('loadSampleBtn').addEventListener('click', () => {
-        showLoading(true);
-        fetch(sampleUrl)
-          .then(res => res.text())
-          .then(text => {
-            Papa.parse(text, { 
-              header: true, 
-              complete: (results) => {
-                for (let k in keyCache) delete keyCache[k];
-                window.userCohorts = null;
-                window.scFirstPurchase = null;
-                rawData = results.data;
-                precomputeGlobalFirstPurchases();
-                applyFilters();
-                showLoading(false);
-              }
-            });
-          })
-          .catch(err => { showLoading(false); alert('Failed to load sample data'); });
-      });
-      window.onclick = function(event) {
-        if (!event.target.closest('.filter-dropdown')) {
-          var dropdowns = document.getElementsByClassName("filter-content");
-          for (var i = 0; i < dropdowns.length; i++) {
-            dropdowns[i].classList.remove('show');
-          }
-        }
+      const importBtn = document.getElementById('importBtn');
+      const fileInput = document.getElementById('fileInput');
+      
+      if (importBtn && fileInput) {
+        importBtn.addEventListener('click', () => fileInput.click());
       }
+      
+      if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            showLoading(true);
+            Papa.parse(file, {
+              header: true,
+              skipEmptyLines: true, // ตัดแถวว่างตั้งแต่ตอนโหลด
+              complete: (results) => {
+                try {
+                  for (let k in keyCache) delete keyCache[k];
+                  window.userCohorts = null;
+                  window.scFirstPurchase = null;
+                  
+                  // คลีนแถวขยะออกให้หมดก่อนประมวลผล
+                  rawData = results.data.filter(row => {
+                    if (!row) return false;
+                    return Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
+                  });
+
+                  precomputeGlobalFirstPurchases();
+                  applyFilters();
+                } catch (err) {
+                  console.error(err);
+                  alert('เกิดข้อผิดพลาดในการประมวลผลข้อมูล');
+                } finally {
+                  showLoading(false); // การันตีว่าตัวหมุนต้องปิดเสมอ
+                }
+              },
+              error: (err) => { console.error(err); showLoading(false); alert('Error parsing CSV'); }
+            });
+          }
+        });
+      }
+
+      const loadSampleBtn = document.getElementById('loadSampleBtn');
+      if (loadSampleBtn) {
+        loadSampleBtn.addEventListener('click', () => {
+          showLoading(true);
+          fetch(sampleUrl)
+            .then(res => res.text())
+            .then(text => {
+              Papa.parse(text, { 
+                header: true, 
+                skipEmptyLines: true,
+                complete: (results) => {
+                  try {
+                    for (let k in keyCache) delete keyCache[k];
+                    window.userCohorts = null;
+                    window.scFirstPurchase = null;
+                    rawData = results.data.filter(row => {
+                      if (!row) return false;
+                      return Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
+                    });
+                    precomputeGlobalFirstPurchases();
+                    applyFilters();
+                  } finally {
+                    showLoading(false);
+                  }
+                }
+              });
+            })
+            .catch(err => { showLoading(false); alert('Failed to load sample data'); });
+        });
+      }
+
       initCharts();
     });
 
+    window.onclick = function(event) {
+      if (!event.target.closest('.filter-dropdown')) {
+        var dropdowns = document.getElementsByClassName("filter-content");
+        for (var i = 0; i < dropdowns.length; i++) {
+          dropdowns[i].classList.remove('show');
+        }
+      }
+    };
+
+    // --- Navigation & UI Control ---
     function switchTab(tabId) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.view-content').forEach(view => view.style.display = 'none');
       document.getElementById('view-overview').style.display = 'none';
       document.getElementById('view-cohort').style.display = 'none';
       
-      // Update sidebar active classes
       document.getElementById('side-crm').classList.remove('active');
       document.getElementById('side-insight').classList.remove('active');
       
@@ -370,19 +407,14 @@
         document.getElementById('side-insight').classList.add('active');
         document.getElementById('view-insighthub').style.display = 'block';
         
-        // Hide CRM specific navigation elements (tabs and global filters)
         const tabsContainer = document.querySelector('.tabs-container');
         if (tabsContainer) tabsContainer.style.display = 'none';
         const filtersBar = document.querySelector('.filters-bar');
         if (filtersBar) filtersBar.style.display = 'none';
         
-        if (typeof renderInsightHub === 'function') {
-           renderInsightHub(filteredData, rawData);
-         }
+        if (typeof renderInsightHub === 'function') { renderInsightHub(filteredData, rawData); }
       } else {
         document.getElementById('side-crm').classList.add('active');
-        
-        // Show CRM specific navigation elements
         const tabsContainer = document.querySelector('.tabs-container');
         if (tabsContainer) tabsContainer.style.display = 'flex';
         const filtersBar = document.querySelector('.filters-bar');
@@ -394,43 +426,35 @@
         } else if (tabId === 'cohort') {
           document.getElementById('tab-cohort').classList.add('active');
           document.getElementById('view-cohort').style.display = 'block';
-          if (typeof renderCohortHeatmap === 'function') {
-             renderCohortHeatmap(filteredData, rawData);
-          }
+          if (typeof renderCohortHeatmap === 'function') { renderCohortHeatmap(filteredData, rawData); }
         } else if (tabId === 'executive1') {
           document.getElementById('tab-executive1').classList.add('active');
           document.getElementById('view-executive1').style.display = 'block';
-          if (typeof renderExecutive1 === 'function') {
-             renderExecutive1(filteredData, rawData);
-          }
+          if (typeof renderExecutive1 === 'function') { renderExecutive1(filteredData, rawData); }
         } else if (tabId === 'executive2') {
           document.getElementById('tab-executive2').classList.add('active');
           document.getElementById('view-executive2').style.display = 'block';
-          if (typeof renderExecutive2 === 'function') {
-             renderExecutive2(filteredData, rawData);
-          }
+          if (typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, rawData); }
         } else if (tabId === 'retention') {
           document.getElementById('tab-retention').classList.add('active');
           document.getElementById('view-retention').style.display = 'block';
-          if (typeof renderRetention === 'function') {
-             renderRetention(filteredData, rawData);
-          }
+          if (typeof renderRetention === 'function') { renderRetention(filteredData, rawData); }
         }
       }
     }
-    window.switchTab = switchTab;
-    window.applyFilters = applyFilters;
 
     function toggleFilter(id) { document.getElementById(id).classList.toggle("show"); }
     function showLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none'; }
     function formatCurrency(num) { return '฿' + num.toLocaleString('th-TH', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
     function formatPercent(num) { 
-      if (!isFinite(num)) return '-';
+      if (!isFinite(num) || isNaN(num)) return '-';
       const sign = num > 0 ? '+' : '';
       return sign + (num * 100).toFixed(1) + '%';
     }
+
     function updateChangeUI(elId, current, previous) {
       const el = document.getElementById(elId);
+      if (!el) return;
       if (!previous || previous === 0) {
         el.textContent = '-'; el.className = 'kpi-change-new neutral'; return;
       }
@@ -443,9 +467,10 @@
       else { el.className = 'kpi-change-new neutral'; }
       el.innerHTML = icon + el.textContent;
     }
+
+    // --- Data Mapping & Parsing ---
     function getRowValue(row, possibleKeys) {
       if (!row) return '';
-      
       const cacheKey = possibleKeys.join('|');
       let mappedKey = keyCache[cacheKey];
       
@@ -466,10 +491,8 @@
         }
         keyCache[cacheKey] = mappedKey;
       }
-      
       return mappedKey ? (row[mappedKey] || '').toString().trim() : '';
     }
-    window.getRowValue = getRowValue;
 
     function getCustomerUniqueId(row) {
       const addr = getRowValue(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่', 'Address', 'address']);
@@ -478,50 +501,35 @@
       }
       return getRowValue(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
     }
-    window.getCustomerUniqueId = getCustomerUniqueId;
 
-    // 3. ปรับปรุงฟังก์ชันแปลงวันที่ให้รองรับทุกรูปแบบอย่างเสถียร
     function parseDate(dateStr) {
       if (!dateStr) return null;
-      // ตัดส่วนที่เป็นเวลาออก (ถ้ามี) เอาเฉพาะวันที่
       const datePart = dateStr.toString().trim().split(' ')[0];
       let parts = datePart.split('/');
       if (parts.length < 3) parts = datePart.split('-');
-      
       if (parts.length >= 3) {
         let p0 = parseInt(parts[0], 10);
         let p1 = parseInt(parts[1], 10);
         let p2 = parseInt(parts[2], 10);
         if (isNaN(p0) || isNaN(p1) || isNaN(p2)) return null;
-        
         let y, m, d;
-        if (p0 > 1000) { // ฟอร์แมต YTD เช่น 2025/01/25
-          y = p0; m = p1; d = p2;
-        } else if (p2 > 1000) { // ฟอร์แมตดั้งเดิม เช่น 25/01/2025
-          d = p0; m = p1; y = p2;
-        } else {
+        if (p0 > 1000) { y = p0; m = p1; d = p2; } 
+        else if (p2 > 1000) { d = p0; m = p1; y = p2; } 
+        else {
           d = p0; m = p1; y = p2;
           if (y < 2000) y += 2000;
         }
-        
-        // ดักเคสปี พ.ศ. (ถ้าในไฟล์บันทึกเป็นปีไทย เช่น 2568 ให้แปลงเป็น ค.ศ. 2025)
-        if (y > 2500) y -= 543; 
-        
+        if (y > 2500) y -= 543; // แปลง พ.ศ. เป็น ค.ศ. ถ้าจำเป็น
         return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
       }
       return null;
     }
+
     function isSaleOrder(row) {
       if (!row) return false;
       const remark = getRowValue(row, ['หมายเหตุ', 'Remark']);
-      
-      // เพิ่มคำว่า 'ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ' เพื่อให้ตรงกับไฟล์ CSV จริง
       const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-      
-      // คลีนตัวเลข ตัด comma และช่องว่างออก
-      const cleanRevenueStr = revenueStr.toString().replace(/,/g, '').trim();
-      const revenue = parseFloat(cleanRevenueStr);
-      
+      const revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim());
       if (isNaN(revenue) || revenue <= 0) return false;
       
       const nonSaleKeywords = ['ของขวัญวันเกิด', 'ของขวัญปีใหม่', 'เคลม', 'ของแถม', 'แจก', 'sample', 'replace', 'คืนเงิน', 'rerund', 'refund'];
@@ -531,39 +539,33 @@
       }
       return true;
     }
-    // 1. จัดกลุ่ม Channel (เพิ่มความยืดหยุ่นในการดักคำ)
+
+    // --- Normalization functions ---
     function getNormalizedChannel(rawChannel) {
       let ch = (rawChannel || '').toString().trim();
       if (!ch) return 'Other';
       let lower = ch.toLowerCase();
-      
       if (lower.includes('facebook') || lower === 'fb') return 'Facebook';
-      if (lower.includes('line')) return 'Line'; 
+      if (lower.includes('line')) return 'Line';
       if (lower.includes('tiktok')) return 'Tiktok';
       if (lower.includes('shopee')) return 'Shopee';
       if (lower.includes('lazada')) return 'Lazada';
       if (lower.includes('ig') || lower.includes('instagram')) return 'Instagram';
       if (lower.includes('call')) return 'Call';
       if (lower.includes('crm')) return 'CRM';
-      
-      return ch; // ถ้ามีแชนแนลใหม่อื่นๆ ให้ผ่านไปก่อน ระบบจะได้ไม่ค้าง
+      return ch;
     }
 
-    // 2. จัดกลุ่ม SubChannel (แปลงตัวพิมพ์เล็กเป็นพิมพ์ใหญ่ให้ตรงลิสต์อัตโนมัติ)
     function getNormalizedSubChannel(row) {
       if (!row) return 'Other';
-      
       let sub = getRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง']);
       if (!sub || sub.toString().trim() === '') {
         sub = getRowValue(row, ['ช่องทาง', 'Channel']) || 'Other';
       }
-      
       let cleanSub = sub.toString().trim();
       let lower = cleanSub.toLowerCase();
-      
       if (cleanSub === '865219993' || cleanSub === '986291641') return 'Other';
       
-      // แปลง Case อัตโนมัติให้ตรงกับที่คุณต้องการเป๊ะๆ
       if (lower === 'fb' || lower === 'facebook') return 'FB';
       if (lower === 'fbc') return 'FBC';
       if (lower === 'fbd') return 'FBD';
@@ -580,7 +582,7 @@
       if (lower === 'ig-fbh' || lower === 'ig_fbh') return 'IG-FBH';
       if (lower === 'ig-fbss' || lower === 'ig_fbss') return 'IG-FBSS';
       if (lower === 'ig-fbw' || lower === 'ig_fbw') return 'IG-FBW';
-      if (lower.includes('line')) return 'Line'; // รวบ Line และ Line OA เข้าด้วยกัน
+      if (lower.includes('line')) return 'Line';
       if (lower === 'lazada') return 'Lazada';
       if (lower === 'shopee') return 'Shopee';
       if (lower === 'tiktok') return 'Tiktok';
@@ -591,42 +593,58 @@
       if (lower === 'email') return 'Email';
       if (lower === 'crm') return 'CRM';
       if (lower === 'call' || lower === 'phone') return 'Call';
-      
-      return cleanSub; // ถ้ามีชื่อคลังใหม่อื่นๆ ให้แสดงตามจริงไปก่อนเพื่อความปลอดภัย
+      return cleanSub;
     }
 
-    // 3. จัดกลุ่ม Admin
+    function getNormalizedProduct(rawProd) {
+      let p = (rawProd || '').toString().trim();
+      if (!p) return 'Unknown';
+      let lower = p.toLowerCase();
+      if (lower.includes('plus')) return 'Plus';
+      if (lower.includes('gold')) return 'Gold';
+      if (lower.includes('wiss')) return 'Wiss';
+      if (lower.includes('kides') || lower.includes('kide')) return 'Kides';
+      if (lower.includes('collagen') || lower.includes('callagen')) return 'Collagen';
+      return p;
+    }
+
+    function getNormalizedSubProduct(rawProd) {
+      let p = (rawProd || '').toString().trim();
+      if (!p) return 'Unknown';
+      let lower = p.toLowerCase();
+      if (lower.includes('kides') || lower.includes('kide')) {
+        if (lower.includes('ส้ม')) return 'Kidesส้ม';
+        if (lower.includes('แตงโม')) return 'Kides แตงโม';
+        return 'Kides original';
+      }
+      if (lower.includes('plus')) return 'Plus';
+      if (lower.includes('gold')) return 'Gold';
+      if (lower.includes('wiss')) return 'Wiss';
+      if (lower.includes('collagen') || lower.includes('callagen')) return 'Collagen';
+      return p;
+    }
+
     function getNormalizedAdmin(row) {
       if (!row) return 'Unknown';
       let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
       if (!val) val = getRowValue(row, ['หมายเหตุ', 'Remark']);
-      
       let a = (val || '').toString().trim();
       if (!a) return 'Unknown';
       let lower = a.toLowerCase();
-      
       if (lower.includes('may') || lower.includes('เมย์')) return 'May';
       if (lower.includes('บี')) return 'บี';
       if (lower.includes('มิ้ว')) return 'มิ้ว';
       if (lower.includes('แอน')) return 'แอน';
       if (lower.includes('แอล')) return 'แอล';
-      
-      return a; // ให้ผ่านชื่อแอดมินคนอื่นไปก่อน ระบบจะได้ไม่ติดขัดค่ะ
+      return a;
     }
-    
+
+    // --- Dropdowns & Filters Logic ---
     function populateDropdowns() {
-      const options = { 
-        Month: new Set(), 
-        Year: new Set(), 
-        Channel: new Set(), 
-        SubChannel: new Set(), 
-        Product: new Set(), 
-        SubProduct: new Set(), 
-        Admin: new Set() 
-      };
+      const options = { Month: new Set(), Year: new Set(), Channel: new Set(), SubChannel: new Set(), Product: new Set(), SubProduct: new Set(), Admin: new Set() };
       
       rawData.forEach(row => {
-        const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         if (!dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
@@ -636,7 +654,6 @@
         
         const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
         const subChannel = getNormalizedSubChannel(row);
-        
         const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
         const product = getNormalizedProduct(rawProductName);
         const subProduct = getNormalizedSubProduct(rawProductName);
@@ -648,19 +665,24 @@
         options.SubProduct.add(subProduct);
         options.Admin.add(admin);
       });
+
       ['Year', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].forEach(type => {
         const menu = document.getElementById('menu-' + type);
+        if (!menu) return;
         menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
         Array.from(options[type]).sort().forEach(val => {
           menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
         });
       });
       const monthMenu = document.getElementById('menu-Month');
-      monthMenu.innerHTML = `<div onclick="setFilter('Month', 'All')">All</div>`;
-      Array.from(options.Month).sort().reverse().forEach(val => {
-        monthMenu.innerHTML += `<div onclick="setFilter('Month', '${val}')">${val}</div>`;
-      });
+      if (monthMenu) {
+        monthMenu.innerHTML = `<div onclick="setFilter('Month', 'All')">All</div>`;
+        Array.from(options.Month).sort().reverse().forEach(val => {
+          monthMenu.innerHTML += `<div onclick="setFilter('Month', '${val}')">${val}</div>`;
+        });
+      }
     }
+
     function setFilter(type, val) {
       filters[type] = val;
       document.getElementById('lbl-' + type).textContent = val;
@@ -674,6 +696,7 @@
       }
       applyFilters();
     }
+
     function clearFilters() {
       ['Month', 'Year', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].forEach(type => {
         filters[type] = 'All';
@@ -683,11 +706,12 @@
       document.getElementById('clearFiltersBtn').style.display = 'none';
       applyFilters();
     }
+
     function applyFilters() {
       if (rawData.length > 0 && document.getElementById('menu-Year').children.length === 0) populateDropdowns();
       filteredData = rawData.filter(row => {
         if (!isSaleOrder(row)) return false;
-        const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         if (!dateStr) return false;
         const d = parseDate(dateStr);
         if (!d) return false;
@@ -706,40 +730,17 @@
         if (filters.Admin !== 'All' && admin !== filters.Admin) return false;
         return true;
       });
+      
       processData(filteredData);
       
-      if (document.getElementById('view-cohort').style.display === 'block') {
-        if (typeof renderCohortHeatmap === 'function') {
-           renderCohortHeatmap(filteredData, rawData);
-        }
-      }
-      
-      if (document.getElementById('view-executive1').style.display === 'block') {
-        if (typeof renderExecutive1 === 'function') {
-           renderExecutive1(filteredData, rawData);
-        }
-      }
-      
-      if (document.getElementById('view-executive2').style.display === 'block') {
-        if (typeof renderExecutive2 === 'function') {
-           renderExecutive2(filteredData, rawData);
-        }
-      }
-
-      if (document.getElementById('view-insighthub').style.display === 'block') {
-        if (typeof renderInsightHub === 'function') {
-           renderInsightHub(filteredData, rawData);
-        }
-      }
-
-      if (document.getElementById('view-retention').style.display === 'block') {
-        if (typeof renderRetention === 'function') {
-           renderRetention(filteredData, rawData);
-        }
-      }
+      // ดักจับ Error แยกแต่ละไฟล์อย่างปลอดภัย
+      try { if (document.getElementById('view-cohort').style.display === 'block' && typeof renderCohortHeatmap === 'function') { renderCohortHeatmap(filteredData, rawData); } } catch(e) { console.error(e); }
+      try { if (document.getElementById('view-executive1').style.display === 'block' && typeof renderExecutive1 === 'function') { renderExecutive1(filteredData, rawData); } } catch(e) { console.error(e); }
+      try { if (document.getElementById('view-executive2').style.display === 'block' && typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, rawData); } } catch(e) { console.error(e); }
+      try { if (document.getElementById('view-insighthub').style.display === 'block' && typeof renderInsightHub === 'function') { renderInsightHub(filteredData, rawData); } } catch(e) { console.error(e); }
+      try { if (document.getElementById('view-retention').style.display === 'block' && typeof renderRetention === 'function') { renderRetention(filteredData, rawData); } } catch(e) { console.error(e); }
     }
-    
-    // 2. ปรับปรุงระบบประมวลผลข้อมูลหลักให้ปลอดภัย 100%
+
     function processData(data) {
       monthlyData = {};
       if (!data || data.length === 0) { renderEmpty(); return; }
@@ -747,40 +748,39 @@
       data.forEach(row => {
         if (!isSaleOrder(row)) return;
         const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-        
-        // ดึงราคาขายอีกครั้งแบบปลอดภัย
+        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-        const revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim());
-        
         const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
         const admin = getNormalizedAdmin(row);
         
-        if (!id || !dateStr || isNaN(revenue)) return; // ถ้าข้อมูลสำคัญพัง ให้ข้ามแถวนี้ไปเลย ระบบจะไม่ค้าง
-        
+        if (!id || !dateStr) return;
         const d = parseDate(dateStr);
-        if (!d) return; 
-        
+        if (!d) return;
+        const revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim()) || 0;
         const mStr = d.str;
+        
         if (!monthlyData[mStr]) {
           monthlyData[mStr] = { sales: 0, orders: 0, buyers: new Set(), channels: {}, admins: {}, year: d.y };
         }
-        
         let m = monthlyData[mStr];
         m.sales += revenue;
         m.orders++;
         m.buyers.add(id);
-        
         if (!m.channels[channel]) m.channels[channel] = 0;
         m.channels[channel] += revenue;
-        
         if (!m.admins[admin]) m.admins[admin] = 0;
         m.admins[admin] += revenue;
       });
-      
       availableMonths = Object.keys(monthlyData).sort();
       renderDashboard();
     }
+
+    const thaiMonths = {
+      '01': 'มกราคม', '02': 'กุมภาพันธ์', '03': 'มีนาคม', '04': 'เมษายน',
+      '05': 'พฤษภาคม', '06': 'มิถุนายน', '07': 'กรกฎาคม', '08': 'สิงหาคม',
+      '09': 'กันยายน', '10': 'ตุลาคม', '11': 'พฤศจิกายน', '12': 'ธันวาคม'
+    };
+
     function renderEmpty() {
       const titleSalesEl = document.getElementById('title-sales');
       if (titleSalesEl) titleSalesEl.textContent = 'ยอดขายประจำเดือน';
@@ -788,19 +788,15 @@
       ids.forEach(id => {
         const el = document.getElementById('val-'+id);
         if(el) {
-          if (id === 'sales' || id === 'aov' || id === 'sph' || id === 'ytd-sales') {
-            el.textContent = '฿0';
-          } else if (id === 'active-cust') {
-            el.textContent = '0%';
-          } else if (id === 'repeat') {
-            el.textContent = '0.0 ครั้ง';
-          } else {
-            el.textContent = '0 คน';
-          }
+          if (id === 'sales' || id === 'aov' || id === 'sph' || id === 'ytd-sales') el.textContent = '฿0';
+          else if (id === 'active-cust') el.textContent = '0%';
+          else if (id === 'repeat') el.textContent = '0.0 ครั้ง';
+          else el.textContent = '0 คน';
         }
       });
-      Object.values(charts).forEach(c => { c.data.labels = []; c.update(); });
+      Object.values(charts).forEach(c => { if(c && c.data) { c.data.labels = []; c.update(); } });
     }
+
     function renderDashboard() {
       if (availableMonths.length === 0) { renderEmpty(); return; }
       let focalMonths = availableMonths;
@@ -819,8 +815,7 @@
       });
       let prevNew = 0, prevRet = 0, prevSales = 0, prevBuyers = 0, prevAov = 0, prevSph = 0, prevRepeat = 0;
       if (prev) {
-        prevSales = prev.sales;
-        prevBuyers = prev.buyers.size;
+        prevSales = prev.sales; prevBuyers = prev.buyers.size;
         prev.buyers.forEach(id => {
           if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === availableMonths[idx - 1]) prevNew++;
           else prevRet++;
@@ -829,8 +824,7 @@
         prevSph = prevBuyers > 0 ? prevSales / prevBuyers : 0;
         prevRepeat = prevBuyers > 0 ? prev.orders / prevBuyers : 0;
       }
-      let ytdSales = 0;
-      let ytdBuyers = new Set(), ytdNew = 0;
+      let ytdSales = 0, ytdBuyers = new Set(), ytdNew = 0;
       availableMonths.forEach(m => {
         if (monthlyData[m].year === currYear && m <= selectedMonthStr) {
           ytdSales += monthlyData[m].sales;
@@ -844,7 +838,7 @@
       rawData.forEach(row => {
         if (!isSaleOrder(row)) return;
         const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
         if (d && d.str <= selectedMonthStr) totalEver.add(id);
@@ -854,7 +848,7 @@
         rawData.forEach(row => {
           if (!isSaleOrder(row)) return;
           const id = getCustomerUniqueId(row);
-          const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+          const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
           if (!id || !dateStr) return;
           const d = parseDate(dateStr);
           if (d && d.str <= availableMonths[idx - 1]) totalEverPrev.add(id);
@@ -867,7 +861,7 @@
       const aov = curr.orders > 0 ? curr.sales / curr.orders : 0;
       const sph = activeCustThisMonth > 0 ? curr.sales / activeCustThisMonth : 0;
       const repeat = activeCustThisMonth > 0 ? curr.orders / activeCustThisMonth : 0;
-      // Update UI Values
+      
       const monthPart = selectedMonthStr.split('-')[1];
       const monthName = thaiMonths[monthPart] || monthPart;
       const titleSalesEl = document.getElementById('title-sales');
@@ -891,130 +885,68 @@
       updateChangeUI('change-sph', sph, prevSph);
       document.getElementById('val-repeat').textContent = repeat.toFixed(2) + ' ครั้ง';
       updateChangeUI('change-repeat', repeat, prevRepeat);
-      // Update Charts
-      const trendMonths = focalMonths.slice(-12);
       
+      const trendMonths = focalMonths.slice(-12);
       const salesData = trendMonths.map(m => monthlyData[m].sales);
-      const newCustArr = [];
-      const retCustArr = [];
+      const newCustArr = [], retCustArr = [];
       
       trendMonths.forEach(m => {
         let n = 0, r = 0;
         monthlyData[m].buyers.forEach(id => {
-          if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === m) n++;
-          else r++;
+          if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === m) n++; else r++;
         });
-        newCustArr.push(n);
-        retCustArr.push(r);
+        newCustArr.push(n); retCustArr.push(r);
       });
-      charts.sales.data.labels = trendMonths;
-      charts.sales.data.datasets[0].data = salesData;
-      charts.sales.update();
-      charts.retNew.data.labels = trendMonths;
-      charts.retNew.data.datasets[0].data = retCustArr;
-      charts.retNew.data.datasets[1].data = newCustArr;
-      charts.retNew.update();
-      charts.newCust.data.labels = trendMonths;
-      charts.newCust.data.datasets[0].data = newCustArr;
-      charts.newCust.update();
-      charts.retCust.data.labels = trendMonths;
-      charts.retCust.data.datasets[0].data = retCustArr;
-      charts.retCust.update();
-      const channelColors = {
-        'Facebook': '#1877f2', // facebook blue
-        'Line': '#06c755',     // line green
-        'Instagram': '#1e40af',// dark blue
-        'CRM': '#d95f1d',      // theme orange
-        'Other': '#9ca3af',    // grey
-        'Tiktok': '#ff0050',   // tiktok red
-        'Shopee': '#ff5722',   // shopee orange
-        'Lazada': '#1a1446',   // lazada dark blue
-        'Call': '#71717a'      // call grey
-      };
+      
+      if(charts.sales) { charts.sales.data.labels = trendMonths; charts.sales.data.datasets[0].data = salesData; charts.sales.update(); }
+      if(charts.retNew) { charts.retNew.data.labels = trendMonths; charts.retNew.data.datasets[0].data = retCustArr; charts.retNew.data.datasets[1].data = newCustArr; charts.retNew.update(); }
+      if(charts.newCust) { charts.newCust.data.labels = trendMonths; charts.newCust.data.datasets[0].data = newCustArr; charts.newCust.update(); }
+      if(charts.retCust) { charts.retCust.data.labels = trendMonths; charts.retCust.data.datasets[0].data = retCustArr; charts.retCust.update(); }
+      
+      const channelColors = { 'Facebook': '#1877f2', 'Line': '#06c755', 'Instagram': '#1e40af', 'CRM': '#d95f1d', 'Other': '#9ca3af', 'Tiktok': '#ff0050', 'Shopee': '#ff5722', 'Lazada': '#1a1446', 'Call': '#71717a' };
       const channels = Object.keys(curr.channels).sort((a,b) => curr.channels[b] - curr.channels[a]).slice(0,5);
-      charts.channel.data.labels = channels;
-      charts.channel.data.datasets[0].data = channels.map(c => curr.channels[c]);
-      charts.channel.data.datasets[0].backgroundColor = channels.map(c => channelColors[c] || '#9ca3af');
-      charts.channel.update();
+      if(charts.channel) {
+        charts.channel.data.labels = channels;
+        charts.channel.data.datasets[0].data = channels.map(c => curr.channels[c]);
+        charts.channel.data.datasets[0].backgroundColor = channels.map(c => channelColors[c] || '#9ca3af');
+        charts.channel.update();
+      }
+      
+      // ✅ แก้ไขบล็อกอัปเดตกราฟแท่ง Admin ให้ถูกต้อง (ไม่พังชนิดกราฟ)
       const admins = Object.keys(curr.admins).sort((a,b) => curr.admins[b] - curr.admins[a]).slice(0,5);
-      charts.admin.data.labels = admins;
-      charts.admin.data.datasets[0].data = admins.map(a => curr.admins[a]);
-      charts.admin.update();
+      if(charts.admin) {
+        charts.admin.data.labels = admins;
+        charts.admin.data.datasets[0].data = admins.map(a => curr.admins[a]);
+        charts.admin.update();
+      }
     }
+
     const datalabelsPlugin = {
       id: 'datalabels',
       afterDatasetsDraw(chart, args, options) {
-        const { ctx } = chart;
-        ctx.save();
-        ctx.font = 'bold 10px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
+        const { ctx } = chart; ctx.save();
+        ctx.font = 'bold 10px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         chart.data.datasets.forEach((dataset, i) => {
           const meta = chart.getDatasetMeta(i);
           const isHorizontal = chart.config.options.indexAxis === 'y';
-          
           meta.data.forEach((bar, index) => {
-            const val = dataset.data[index];
-            if (val === 0 || !val) return;
-            
+            const val = dataset.data[index]; if (val === 0 || !val) return;
             const isSales = chart.canvas.id === 'chart-sales' || chart.canvas.id === 'chart-admin' || chart.canvas.id === 'chart-channel';
-            let displayVal = '';
-            if (isSales) {
-              displayVal = '฿' + val.toLocaleString('th-TH', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-            } else {
-              displayVal = val.toLocaleString('th-TH');
-            }
-            
-            let x = bar.x;
-            let y = bar.y;
-            
-            ctx.fillStyle = '#ffffff'; // Default to white text
-            
+            let displayVal = isSales ? '฿' + val.toLocaleString('th-TH', {minimumFractionDigits: 0, maximumFractionDigits: 0}) : val.toLocaleString('th-TH');
+            let x = bar.x, y = bar.y; ctx.fillStyle = '#ffffff'; 
             if (chart.config.type === 'doughnut') {
-              const arc = bar;
-              const centerAngle = arc.startAngle + (arc.endAngle - arc.startAngle) / 2;
-              const rangeFromCenter = arc.innerRadius + (arc.outerRadius - arc.innerRadius) / 2;
-              x = arc.x + Math.cos(centerAngle) * rangeFromCenter;
-              y = arc.y + Math.sin(centerAngle) * rangeFromCenter;
-              
-              const angleDiff = arc.endAngle - arc.startAngle;
-              if (angleDiff < 0.15) return; // Skip drawing label if slice is too narrow
-              
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
+              const arc = bar; const centerAngle = arc.startAngle + (arc.endAngle - arc.startAngle) / 2; const rangeFromCenter = arc.innerRadius + (arc.outerRadius - arc.innerRadius) / 2;
+              x = arc.x + Math.cos(centerAngle) * rangeFromCenter; y = arc.y + Math.sin(centerAngle) * rangeFromCenter;
+              if (arc.endAngle - arc.startAngle < 0.15) return;
+              ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             } else if (isHorizontal) {
-              // Horizontal Bar Chart
               const barWidth = bar.x - bar.base;
-              if (barWidth > 45) {
-                x = bar.x - 20;
-                ctx.textAlign = 'right';
-              } else {
-                x = bar.x + 5;
-                ctx.textAlign = 'left';
-                ctx.fillStyle = '#333333'; // Dark text if outside
-              }
+              if (barWidth > 45) { x = bar.x - 20; ctx.textAlign = 'right'; } else { x = bar.x + 5; ctx.textAlign = 'left'; ctx.fillStyle = '#333333'; }
             } else {
-              // Vertical Bar Chart
-              const barHeight = bar.base - bar.y;
-              const isStacked = chart.config.options.scales?.y?.stacked === true;
-              
-              if (isStacked) {
-                if (barHeight < 14) return; // Skip tiny segments
-                y = bar.y + barHeight / 2;
-                ctx.textBaseline = 'middle';
-              } else {
-                if (barHeight > 25) {
-                  y = bar.y + barHeight / 2; // Middle of the bar
-                  ctx.textBaseline = 'middle';
-                } else {
-                  y = bar.y - 6; // Above bar
-                  ctx.textBaseline = 'bottom';
-                  ctx.fillStyle = '#333333'; // Dark text if outside
-                }
-              }
+              const barHeight = bar.base - bar.y; const isStacked = chart.config.options.scales?.y?.stacked === true;
+              if (isStacked) { if (barHeight < 14) return; y = bar.y + barHeight / 2; ctx.textBaseline = 'middle'; } 
+              else { if (barHeight > 25) { y = bar.y + barHeight / 2; ctx.textBaseline = 'middle'; } else { y = bar.y - 6; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#333333'; } }
             }
-            
             ctx.fillText(displayVal, x, y);
           });
         });
@@ -1023,96 +955,17 @@
     };
 
     function initCharts() {
-      Chart.defaults.font.family = 'Inter';
-      Chart.defaults.color = '#777';
-      const commonOpts = { 
-        maintainAspectRatio: false, 
-        responsive: true, 
-        plugins: { legend: { display: false } },
-        layout: {
-          padding: {
-            top: 25,
-            bottom: 15,
-            left: 20,
-            right: 20
-          }
-        }
-      };
-      charts.sales = new Chart(document.getElementById('chart-sales'), {
-        type: 'bar',
-        data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] },
-        options: {
-          ...commonOpts,
-          scales: {
-            x: { grid: { display: false } },
-            y: { beginAtZero: true, grid: { color: '#f5f5f5' } }
-          }
-        },
-        plugins: [datalabelsPlugin]
-      });
-      charts.retNew = new Chart(document.getElementById('chart-ret-new-stacked'), {
-        type: 'bar',
-        data: { labels: [], datasets: [
-          { label: 'Retained', data: [], backgroundColor: '#006E99' },
-          { label: 'New', data: [], backgroundColor: '#d95f1d' }
-        ]},
-        options: { 
-          ...commonOpts, 
-          plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } } }, 
-          scales: { 
-            x: { stacked: true, grid: { display: false } }, 
-            y: { stacked: true, beginAtZero: true, grid: { color: '#f5f5f5' } } 
-          } 
-        },
-        plugins: [datalabelsPlugin]
-      });
-      charts.newCust = new Chart(document.getElementById('chart-new'), {
-        type: 'bar',
-        data: { labels: [], datasets: [{ data: [], backgroundColor: '#e86c31', borderRadius: 6 }] },
-        options: {
-          ...commonOpts,
-          scales: {
-            x: { grid: { display: false } },
-            y: { beginAtZero: true, grid: { color: '#f5f5f5' } }
-          }
-        },
-        plugins: [datalabelsPlugin]
-      });
-      charts.retCust = new Chart(document.getElementById('chart-ret'), {
-        type: 'bar',
-        data: { labels: [], datasets: [{ data: [], backgroundColor: '#006E99', borderRadius: 6 }] },
-        options: {
-          ...commonOpts,
-          scales: {
-            x: { grid: { display: false } },
-            y: { beginAtZero: true, grid: { color: '#f5f5f5' } }
-          }
-        },
-        plugins: [datalabelsPlugin]
-      });
-      charts.channel = new Chart(document.getElementById('chart-channel'), {
-        type: 'doughnut',
-        data: { labels: [], datasets: [{ data: [], backgroundColor: ['#d95f1d', '#73d18e', '#006E99', '#ccc', '#888'] }] },
-        options: { 
-          ...commonOpts, 
-          plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } }
-        },
-        plugins: [datalabelsPlugin]
-      });
-      charts.admin = new Chart(document.getElementById('chart-admin'), {
-        type: 'bar',
-        data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] },
-        options: { 
-          ...commonOpts, 
-          indexAxis: 'y',
-          scales: {
-            x: { beginAtZero: true, grid: { color: '#f5f5f5' } },
-            y: { grid: { display: false } }
-          }
-        },
-        plugins: [datalabelsPlugin]
-      });
+      Chart.defaults.font.family = 'Inter'; Chart.defaults.color = '#777';
+      const commonOpts = { maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } }, layout: { padding: { top: 25, bottom: 15, left: 20, right: 20 } } };
+      charts.sales = new Chart(document.getElementById('chart-sales'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] }, options: { ...commonOpts, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
+      charts.retNew = new Chart(document.getElementById('chart-ret-new-stacked'), { type: 'bar', data: { labels: [], datasets: [{ label: 'Retained', data: [], backgroundColor: '#006E99' }, { label: 'New', data: [], backgroundColor: '#d95f1d' }] }, options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
+      charts.newCust = new Chart(document.getElementById('chart-new'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#e86c31', borderRadius: 6 }] }, options: { ...commonOpts, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
+      charts.retCust = new Chart(document.getElementById('chart-ret'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#006E99', borderRadius: 6 }] }, options: { ...commonOpts, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
+      charts.channel = new Chart(document.getElementById('chart-channel'), { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: ['#d95f1d', '#73d18e', '#006E99', '#ccc', '#888'] }] }, options: { ...commonOpts, plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } } }, plugins: [datalabelsPlugin] });
+      charts.admin = new Chart(document.getElementById('chart-admin'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] }, options: { ...commonOpts, indexAxis: 'y', scales: { x: { beginAtZero: true, grid: { color: '#f5f5f5' } }, y: { grid: { display: false } } } }, plugins: [datalabelsPlugin] });
     }
+
+    window.switchTab = switchTab; window.applyFilters = applyFilters; window.setFilter = setFilter; window.clearFilters = clearFilters; window.toggleFilter = toggleFilter;
   </script>
   <script src="cohort.js?v=13"></script>
   <script src="executive1.js?v=15"></script>
