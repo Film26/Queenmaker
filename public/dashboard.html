@@ -674,7 +674,6 @@
       document.getElementById('clearFiltersBtn').style.display = 'none';
       applyFilters();
     }
-
     function applyFilters() {
       if (rawData.length > 0 && document.getElementById('menu-Year').children.length === 0) populateDropdowns();
       filteredData = rawData.filter(row => {
@@ -698,40 +697,37 @@
         if (filters.Admin !== 'All' && admin !== filters.Admin) return false;
         return true;
       });
-      
-      // ส่วนประมวลผลข้อมูลหลักของหน้าแรก
       processData(filteredData);
       
-      // ใช้ try...catch ครอบสคริปต์แยกย่อย เพื่อป้องกันไม่ให้ระบบหมุนค้างหากไฟล์ข้างนอกมี Error
-      try {
-        if (document.getElementById('view-cohort').style.display === 'block' && typeof renderCohortHeatmap === 'function') {
+      if (document.getElementById('view-cohort').style.display === 'block') {
+        if (typeof renderCohortHeatmap === 'function') {
            renderCohortHeatmap(filteredData, rawData);
         }
-      } catch (e) { console.error("Cohort Error: ", e); }
-
-      try {
-        if (document.getElementById('view-executive1').style.display === 'block' && typeof renderExecutive1 === 'function') {
+      }
+      
+      if (document.getElementById('view-executive1').style.display === 'block') {
+        if (typeof renderExecutive1 === 'function') {
            renderExecutive1(filteredData, rawData);
         }
-      } catch (e) { console.error("Executive1 Error: ", e); }
-
-      try {
-        if (document.getElementById('view-executive2').style.display === 'block' && typeof renderExecutive2 === 'function') {
+      }
+      
+      if (document.getElementById('view-executive2').style.display === 'block') {
+        if (typeof renderExecutive2 === 'function') {
            renderExecutive2(filteredData, rawData);
         }
-      } catch (e) { console.error("Executive2 Error: ", e); }
+      }
 
-      try {
-        if (document.getElementById('view-insighthub').style.display === 'block' && typeof renderInsightHub === 'function') {
+      if (document.getElementById('view-insighthub').style.display === 'block') {
+        if (typeof renderInsightHub === 'function') {
            renderInsightHub(filteredData, rawData);
         }
-      } catch (e) { console.error("InsightHub Error: ", e); }
+      }
 
-      try {
-        if (document.getElementById('view-retention').style.display === 'block' && typeof renderRetention === 'function') {
+      if (document.getElementById('view-retention').style.display === 'block') {
+        if (typeof renderRetention === 'function') {
            renderRetention(filteredData, rawData);
         }
-      } catch (e) { console.error("Retention Error: ", e); }
+      }
     }
     
     function processData(data) {
