@@ -82,62 +82,62 @@ function renderExecutive2(filteredData, rawData) {
     return { y, m, d, val: y * 10000 + m * 100 + d };
   };
 
-  // ลิสต์รายการมาตรฐานที่คุณกำหนดสำหรับ SubChannel
-  const allowedSubChannels = ['Call', 'CRM', 'Email', 'FB', 'FBC', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'IG-FBH', 'IG-FBSS', 'IG-FBW', 'Lazada', 'Line', 'Other', 'PC', 'Shopee', 'Telesale', 'Tiktok', 'Website'];
+  // 🚨 ล็อกรายชื่อ 9 ช่องทางหลักตามที่คุณเลือก
+  const allowedChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'];
 
   function getExec2Group(row) {
-    const rawGroup = window.getNormalizedSubChannel ? window.getNormalizedSubChannel(row) : 'Other';
-    // 🚨 จุดแก้ไขสำคัญ 1: ถ้าค่าที่ได้เป็น Main หรือไม่อยู่ในกลุ่มรายชื่อที่ตกลงไว้ ให้ดีดไปที่ Other ทันที
-    if (rawGroup === 'Main' || !allowedSubChannels.includes(rawGroup)) {
+    // ดึงค่าช่องทางหลักผ่านฟังก์ชันกลาง getNormalizedChannel
+    const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
+    let rawCh = getVal(row, ['ช่องทาง', 'Channel']);
+    let ch = window.getNormalizedChannel ? window.getNormalizedChannel(rawCh) : 'Other';
+    
+    // หากค่าที่ได้ไม่อยู่ใน 9 กลุ่มหลักนี้ ให้ดีดไปที่ Other ทันที
+    if (!allowedChannels.includes(ch)) {
       return 'Other';
     }
-    return rawGroup;
+    return ch;
   }
 
-  // Determine SubChannel first purchase dates globally (using ALL raw data)
-  if (!window.scFirstPurchase) {
-    window.scFirstPurchase = {};
+  // Determine Channel first purchase dates globally (using ALL raw data)
+  if (!window.chFirstPurchase) {
+    window.chFirstPurchase = {};
     if (rawData && rawData.length > 0) {
       rawData.forEach(row => {
         if (window.isSaleOrder && !window.isSaleOrder(row)) return;
         const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
         const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
-        const sc = getExec2Group(row);
+        const ch = getExec2Group(row);
         const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
         if (!id || !dateStr) return;
         const d = parseD(dateStr);
         if (!d) return;
-        const key = id + '_' + sc;
-        if (!window.scFirstPurchase[key] || d.val < window.scFirstPurchase[key]) {
-          window.scFirstPurchase[key] = d.val;
+        const key = id + '_' + ch;
+        if (!window.chFirstPurchase[key] || d.val < window.chFirstPurchase[key]) {
+          window.chFirstPurchase[key] = d.val;
         }
       });
     }
   }
-  const scFirstPurchase = window.scFirstPurchase;
+  const chFirstPurchase = window.chFirstPurchase;
 
-  // Aggregate data by SubChannel for the CURRENTLY FILTERED data
+  // Aggregate data by Channel for the CURRENTLY FILTERED data
   const agg = {};
   
-  // 🚨 จุดแก้ไขสำคัญ 2: ประกาศเตรียมพื้นที่ให้กับช่องทางย่อยในลิสต์มาตรฐานล่วงหน้า เพื่อให้ดึงข้อมูลได้นิ่งและเรียงสวยงาม
-  allowedSubChannels.forEach(sc => {
-    agg[sc] = { 
+  // ตั้งค่าเตรียมพื้นที่ให้กับทั้ง 9 ช่องทางหลักล่วงหน้า
+  allowedChannels.forEach(ch => {
+    agg[ch] = { 
       revenue: 0, 
       orders: 0, 
       uniqueBuyers: new Set(), 
       retainedBuyers: new Set(), 
       newGlobalBuyers: new Set(), 
-      newToSubBuyers: new Set() 
+      newToSubBuyers: new Set() // (คีย์เวิร์ดระบบภายในนับเป็น New-to-Channel)
     };
   });
   
   filteredData.forEach(row => {
-    let sc = getExec2Group(row);
-
-    // ป้องกันเคสตกหล่นฉุกเฉิน
-    if (!agg[sc]) {
-      agg[sc] = { revenue: 0, orders: 0, uniqueBuyers: new Set(), retainedBuyers: new Set(), newGlobalBuyers: new Set(), newToSubBuyers: new Set() };
-    }
+    let ch = getExec2Group(row);
+    if (!agg[ch]) ch = 'Other';
     
     const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
     const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
@@ -149,41 +149,40 @@ function renderExecutive2(filteredData, rawData) {
     if (!d) return;
     
     const rev = parseFloat((revenueStr || '0').toString().replace(/,/g, ''));
-    agg[sc].revenue += isNaN(rev) ? 0 : rev;
-    agg[sc].orders += 1;
-    agg[sc].uniqueBuyers.add(id);
+    agg[ch].revenue += isNaN(rev) ? 0 : rev;
+    agg[ch].orders += 1;
+    agg[ch].uniqueBuyers.add(id);
 
     // Global New vs Retained
     if (globalFirstPurchase && globalFirstPurchase[id]) {
       const firstDate = globalFirstPurchase[id];
       if (firstDate.val < d.val) {
-        agg[sc].retainedBuyers.add(id);
+        agg[ch].retainedBuyers.add(id);
       } else {
-        agg[sc].newGlobalBuyers.add(id);
+        agg[ch].newGlobalBuyers.add(id);
       }
     }
 
-    // New-to-Sub (Migration) logic
-    const key = id + '_' + sc;
-    if (scFirstPurchase[key]) {
-      if (scFirstPurchase[key] === d.val) {
-        if (!agg[sc].newGlobalBuyers.has(id)) {
-          agg[sc].newToSubBuyers.add(id);
+    // New-to-Channel (Migration) logic
+    const key = id + '_' + ch;
+    if (chFirstPurchase[key]) {
+      if (chFirstPurchase[key] === d.val) {
+        if (!agg[ch].newGlobalBuyers.has(id)) {
+          agg[ch].newToSubBuyers.add(id);
         }
       }
     }
   });
 
   // Convert to array and calculate metrics
-  // 🚨 จุดแก้ไขสำคัญ 3: วนลูปสร้างอาเรย์ผลลัพธ์ตามลำดับ allowedSubChannels จะได้ตัดพวกค่าขยะหรือ Main ออกทั้งหมด
-  const results = allowedSubChannels.map(sc => {
-    const data = agg[sc];
+  const results = allowedChannels.map(ch => {
+    const data = agg[ch];
     const buyers = data.uniqueBuyers.size;
     const newCust = data.newGlobalBuyers.size;
-    const newToSub = data.newToSubBuyers.size;
+    const newToChannel = data.newToSubBuyers.size;
     
     const pctNew = buyers === 0 ? 0 : (newCust / buyers) * 100;
-    const pctMig = buyers === 0 ? 0 : (newToSub / buyers) * 100;
+    const pctMig = buyers === 0 ? 0 : (newToChannel / buyers) * 100;
     
     // Categorization Logic
     let category = '';
@@ -215,11 +214,11 @@ function renderExecutive2(filteredData, rawData) {
     }
 
     return {
-      subChannel: sc,
+      channel: ch,
       revenue: data.revenue,
       buyers: buyers,
       newCust: newCust,
-      newToSub: newToSub,
+      newToSub: newToChannel,
       pctMig: pctMig,
       pctNew: pctNew,
       category: category,
@@ -228,7 +227,7 @@ function renderExecutive2(filteredData, rawData) {
     };
   });
 
-  // สั่งเรียงลำดับตารางตามรายได้ที่มากที่สุดไปน้อยที่สุด (ยอดที่มีข้อมูลจะดันขึ้นด้านบนสุด)
+  // เรียงลำดับตารางตามยอดรายได้จากมากไปน้อย
   results.sort((a, b) => b.revenue - a.revenue);
 
   // Formatting helpers
@@ -280,11 +279,11 @@ function renderExecutive2(filteredData, rawData) {
       <table class="exec2-table">
         <thead>
           <tr>
-            <th>Sub-Channel</th>
+            <th>Channel</th>
             <th>Revenue</th>
             <th>Buyers</th>
             <th>New Customers</th>
-            <th>New-to-Sub</th>
+            <th>New-to-Channel</th>
             <th>% Migration</th>
             <th>% New Share</th>
             <th>Category</th>
@@ -293,29 +292,25 @@ function renderExecutive2(filteredData, rawData) {
         <tbody>
   `;
 
-  if (results.length === 0) {
-    html += `<tr><td colspan="8" style="text-align:center; padding: 30px; color: #999;">No sub-channels found.</td></tr>`;
-  } else {
-    results.forEach(r => {
-      html += `
-        <tr>
-          <td style="font-weight: 700;">${r.subChannel}</td>
-          <td>${fmtNum(r.revenue)}</td>
-          <td>${fmtNum(r.buyers)}</td>
-          <td>${fmtNum(r.newCust)}</td>
-          <td>${fmtNum(r.newToSub)}</td>
-          <td>${fmtPct(r.pctMig)}</td>
-          <td>${fmtPct(r.pctNew)}</td>
-          <td>
-            <span class="exec2-badge ${r.categoryClass}">
-              <span class="badge-dot ${r.dotClass}"></span>
-              ${r.category}
-            </span>
-          </td>
-        </tr>
-      `;
-    });
-  }
+  results.forEach(r => {
+    html += `
+      <tr>
+        <td style="font-weight: 700;">${r.channel}</td>
+        <td>${fmtNum(r.revenue)}</td>
+        <td>${fmtNum(r.buyers)}</td>
+        <td>${fmtNum(r.newCust)}</td>
+        <td>${fmtNum(r.newToSub)}</td>
+        <td>${fmtPct(r.pctMig)}</td>
+        <td>${fmtPct(r.pctNew)}</td>
+        <td>
+          <span class="exec2-badge ${r.categoryClass}">
+            <span class="badge-dot ${r.dotClass}"></span>
+            ${r.category}
+          </span>
+        </td>
+      </tr>
+    `;
+  });
 
   html += `
         </tbody>
