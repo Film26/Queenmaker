@@ -638,13 +638,12 @@
       if (lower.includes('แอล')) return 'แอล';
       return a;
     }
-
     // --- Dropdowns & Filters Logic ---
     function populateDropdowns() {
       const options = { Month: new Set(), Year: new Set(), Channel: new Set(), SubChannel: new Set(), Product: new Set(), SubProduct: new Set(), Admin: new Set() };
       
       rawData.forEach(row => {
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
         if (!dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
@@ -652,11 +651,16 @@
         options.Month.add(d.str);
         options.Year.add(d.y.toString());
         
-        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
+        // ดักจับข้อมูลอย่างปลอดภัย หากไฟล์ไม่มีคอลัมน์นี้ จะได้ไม่พังค้าง
+        const rawChannel = getRowValue(row, ['ช่องทาง', 'Channel']);
+        const channel = rawChannel ? getNormalizedChannel(rawChannel) : 'Other';
+        
         const subChannel = getNormalizedSubChannel(row);
-        const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
-        const product = getNormalizedProduct(rawProductName);
-        const subProduct = getNormalizedSubProduct(rawProductName);
+        
+        const rawProductName = getRowValue(row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']);
+        const product = rawProductName ? getNormalizedProduct(rawProductName) : 'Unknown';
+        const subProduct = rawProductName ? getNormalizedSubProduct(rawProductName) : 'Unknown';
+        
         const admin = getNormalizedAdmin(row);
         
         options.Channel.add(channel);
@@ -666,14 +670,19 @@
         options.Admin.add(admin);
       });
 
+      // สั่งสร้างปุ่มในเมนูเฉพาะเมื่อเซ็ตข้อมูลมีค่าจริงเท่านั้น ป้องกันเมนูเอเรอร์
       ['Year', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].forEach(type => {
         const menu = document.getElementById('menu-' + type);
         if (!menu) return;
         menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
-        Array.from(options[type]).sort().forEach(val => {
+        
+        // ล้างค่าว่างหรือค่า undefined ออกก่อนเอาไปสร้างปุ่ม
+        const sortedOptions = Array.from(options[type]).filter(v => v && v !== 'null' && v !== 'undefined').sort();
+        sortedOptions.forEach(val => {
           menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
         });
       });
+      
       const monthMenu = document.getElementById('menu-Month');
       if (monthMenu) {
         monthMenu.innerHTML = `<div onclick="setFilter('Month', 'All')">All</div>`;
