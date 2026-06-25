@@ -2,7 +2,7 @@
 function renderExecutive2(filteredData, rawData) {
   const container = document.getElementById('view-executive2');
   
-  // ป้องกันกรณีระบบหลักส่งค่าว่างมา
+  // เลือกแหล่งข้อมูลที่ปลอดภัยที่สุด
   const dataSrc = (rawData && rawData.length > 0) ? rawData : (filteredData || []);
 
   if (!dataSrc || dataSrc.length === 0) {
@@ -67,46 +67,65 @@ function renderExecutive2(filteredData, rawData) {
     document.head.appendChild(style);
   }
 
-  // แมปปิ้งแปลงชื่อเดือนภาษาอังกฤษหน้าระบบให้เข้ากับตัวเลขไฟล์จริง
+  // ฟังก์ชันกลางสำหรับดึงค่าคอลัมน์แบบไม่สนใจตัวพิมพ์เล็ก-ใหญ่ หรือช่องว่างแฝง (Case-Insensitive Match)
+  function getFlexibleValue(row, keysArray) {
+    if (!row) return '';
+    const rowKeys = Object.keys(row);
+    for (let targetKey of keysArray) {
+      const cleanTarget = targetKey.toLowerCase().replace(/[\s_\-]+/g, '');
+      // วิ่งหาคีย์ที่ชื่อตรงกัน
+      for (let rKey of rowKeys) {
+        const cleanRowKey = rKey.toLowerCase().replace(/[\s_\-]+/g, '');
+        if (cleanRowKey === cleanTarget) {
+          return row[rKey];
+        }
+      }
+    }
+    return '';
+  }
+
+  // เดือนแมปปิ้งหน้าระบบ
   const monthMap = {
     'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
     'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
     'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
   };
 
-  // ฟังก์ชันแปลงวันที่
+  // ฟังก์ชันแปลงวันที่ที่อัปเกรดให้แกะค่าไฟล์จริงได้ชัวร์
   const parseD = (dateStr) => {
     if (!dateStr) return null;
-    const datePart = dateStr.toString().trim().split(' ')[0];
+    const datePart = dateStr.toString().trim().split(' ')[0]; // ตัดส่วนเวลาออกไปก่อน
     let parts = datePart.split('/');
-    if (parts.length < 3) parts = datePart.split('-');
+    if (parts.length < 3) parts = datePart.split('-'); // รองรับทั้ง format / และ -
+    
     if (parts.length >= 3) {
       let p0 = parseInt(parts[0], 10);
       let p1 = parseInt(parts[1], 10);
       let p2 = parseInt(parts[2], 10);
       if (isNaN(p0) || isNaN(p1) || isNaN(p2)) return null;
+      
       let y, m, d;
-      if (p0 > 1000) { y = p0; m = p1; d = p2; } 
-      else if (p2 > 1000) { d = p0; m = p1; y = p2; } 
+      if (p0 > 1000) { y = p0; m = p1; d = p2; } // YYYY-MM-DD
+      else if (p2 > 1000) { d = p0; m = p1; y = p2; } // DD/MM/YYYY
       else { d = p0; m = p1; y = p2; if (y < 2000) y += 2000; }
-      if (y > 2500) y -= 543;
-      return { y, m, d, val: y * 10000 + m * 100 + d, monthNum: m };
+      
+      if (y > 2500) y -= 543; // แก้ไขกรณีเป็นปี พ.ศ. ให้กลับเป็น ค.ศ.
+      return { y, m, d, val: y * 10000 + m * 100 + d, monthNum: m, str: `${y}-${m.toString().padStart(2, '0')}` };
     }
     return null;
   };
 
   // ดึงกลุ่มแชนเนลหลัก
   function getExec2Group(row) {
-    if (!row) return 'Other';
-    let rawCh = row['ช่องทาง'] || row['channel'] || row['Channel'] || row['Platform'] || '';
-    let chStr = rawCh.toString().trim();
+    let rawCh = getFlexibleValue(row, ['ช่องทาง', 'channel', 'platform']);
+    let chStr = (rawCh || '').toString().trim();
     let lower = chStr.toLowerCase();
     
     if (lower.includes('facebook') || lower === 'fb' || lower.includes('เพจ')) return 'Facebook';
     if (lower.includes('line') || lower.includes('ไลน์')) return 'Line';
-    if (lower.includes('tiktok') || lower.includes('tt')) return 'Tiktok';
-    if (lower.includes('lazada') || lower.includes('ลาซาด้า')) return 'Lazada';
-    if (lower.includes('shopee') || lower.includes('ช้อปปี้')) return 'Shopee';
+    if (lower.includes('tiktok') || lower === 'tt' || lower.includes('ติ๊ก')) return 'Tiktok';
+    if (lower.includes('lazada') || lower.includes('ลาซา')) return 'Lazada';
+    if (lower.includes('shopee') || lower.includes('ช้อป')) return 'Shopee';
     if (lower.includes('call') || lower.includes('โทร') || lower.includes('tele')) return 'Call';
     if (lower.includes('crm')) return 'CRM';
     if (lower.includes('instagram') || lower === 'ig') return 'Instagram';
@@ -114,15 +133,15 @@ function renderExecutive2(filteredData, rawData) {
     return 'Other';
   }
 
-  // ตรวจสอบออเดอร์
+  // ตรวจสอบความถูกต้องของออเดอร์
   function isLocalSaleOrder(row) {
     if (!row) return false;
-    let revenueStr = row['ยอดโอน'] || row['ราคารวม'] || row['ยอดขาย'] || row['ราคาสุทธิ'] || '0';
-    let revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim());
+    let revenueStr = getFlexibleValue(row, ['ยอดโอน', 'ราคารวม', 'ยอดขาย', 'ราคาสุทธิ', 'revenue', 'amount']);
+    let revenue = parseFloat((revenueStr || '0').toString().replace(/,/g, '').trim());
     if (isNaN(revenue) || revenue <= 0) return false;
 
-    const remark = (row['หมายเหตุ'] || row['Remark'] || '').toString().toUpperCase();
-    const nonSaleKeywords = ['ของขวัญวันเกิด', 'ของขวัญปีใหม่', 'เคลม', 'ของแถม', 'แจก', 'SAMPLE', 'REPLACE', 'คืนเงิน', 'REFUND', 'RERUND'];
+    const remark = getFlexibleValue(row, ['หมายเหตุ', 'remark']).toString().toUpperCase();
+    const nonSaleKeywords = ['ของขวัญวันเกิด', 'ของขวัญปีใหม่', 'เคลม', 'ของแถม', 'แจก', 'SAMPLE', 'REPLACE', 'คืนเงิน', 'REFUND'];
     for (let kw of nonSaleKeywords) {
       if (remark.includes(kw)) return false;
     }
@@ -130,19 +149,20 @@ function renderExecutive2(filteredData, rawData) {
   }
 
   function getLocalCustomerId(row) {
-    let addr = row['ที่อยู่ (ลูกค้า)'] || row['ที่อยู่'] || row['Address'] || '';
+    let addr = getFlexibleValue(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่', 'address']);
     if (addr) return addr.toString().toLowerCase().replace(/[\s\r\n\t\-,\.\/\\_]+/g, '');
-    return (row['รหัสลูกค้า'] || row['Customer ID'] || row['Phone'] || '').toString().trim();
+    let cid = getFlexibleValue(row, ['รหัสลูกค้า', 'customerid', 'phone']);
+    return cid.toString().trim();
   }
 
-  // 1. ค้นหาออเดอร์แรกของลูกค้า
+  // 1. ค้นหาประวัติการซื้อครั้งแรก
   const localGlobalFirstPurchase = {};
   const localChFirstPurchase = {};
 
   dataSrc.forEach(row => {
     if (!isLocalSaleOrder(row)) return;
     const id = getLocalCustomerId(row);
-    const dateStr = row['วันที่โอนเงิน'] || row['วันที่สร้าง'] || row['OrderDate'] || row['Date'] || row['วันที่'];
+    const dateStr = getFlexibleValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'orderdate', 'date', 'วันที่']);
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
     if (!d) return;
@@ -177,23 +197,23 @@ function renderExecutive2(filteredData, rawData) {
     }
   }
 
-  // 3. กวาดข้อมูลและกรองตามมิติ
+  // 3. กวาดข้อมูลและกรองเก็บสถิติ
   dataSrc.forEach(row => {
     if (!isLocalSaleOrder(row)) return;
     
-    const dateStr = row['วันที่โอนเงิน'] || row['วันที่สร้าง'] || row['OrderDate'] || row['Date'] || row['วันที่'];
+    const dateStr = getFlexibleValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'orderdate', 'date', 'วันที่']);
     if (!dateStr) return;
     const d = parseD(dateStr);
     if (!d) return;
 
     const ch = getExec2Group(row);
     const id = getLocalCustomerId(row);
-    const revenueStr = row['ยอดโอน'] || row['ราคารวม'] || row['ยอดขาย'] || '0';
+    const revenueStr = getFlexibleValue(row, ['ยอดโอน', 'ราคารวม', 'ยอดขาย', 'revenue']);
     
-    const subChannel = row['Sub Channel'] || row['SubChannel'] || row['ชื่อคลัง'] || ch;
-    const adminVal = row['ชื่อแอดมิน'] || row['Admin'] || '';
+    const subChannel = getFlexibleValue(row, ['subchannel', 'sub channel', 'ชื่อคลัง']) || ch;
+    const adminVal = getFlexibleValue(row, ['ชื่อแอดมิน', 'admin']);
 
-    // การคัดกรองแบบยืดหยุ่นสูง
+    // การคัดกรองมิติข้อมูลด้านบนหน้าจอ
     if (currentFilters.Year !== 'All' && d.y.toString() !== currentFilters.Year.toString()) return;
     if (targetFilterMonthNum !== null && d.monthNum !== targetFilterMonthNum) return;
     if (currentFilters.Channel !== 'All' && ch !== currentFilters.Channel) return;
@@ -201,7 +221,7 @@ function renderExecutive2(filteredData, rawData) {
     if (currentFilters.Admin !== 'All' && !adminVal.toString().includes(currentFilters.Admin)) return;
 
     let targetCh = agg[ch] ? ch : 'Other';
-    const rev = parseFloat(revenueStr.toString().replace(/,/g, '').trim()) || 0;
+    const rev = parseFloat((revenueStr || '0').toString().replace(/,/g, '').trim()) || 0;
     
     agg[targetCh].revenue += rev;
     agg[targetCh].orders += 1;
@@ -221,7 +241,7 @@ function renderExecutive2(filteredData, rawData) {
     }
   });
 
-  // 4. คำนวณกลุ่มสถานะ (Vanguard, Migration, Retention, Cash Cow) เสมอไม่ว่าจะมีหรือไม่มีข้อมูล
+  // 4. คำนวณกลุ่มสถานะ (Vanguard, Migration, Retention, Cash Cow)
   const results = allowedChannels.map(ch => {
     const data = agg[ch];
     const buyers = data.uniqueBuyers.size;
@@ -235,7 +255,6 @@ function renderExecutive2(filteredData, rawData) {
     const totalNewAndMig = pctNew + pctMig;
     
     if (buyers === 0) {
-      // 🚨 เปลี่ยนจากป้าย No Data ตัวเก่า ให้แสดงเกณฑ์เงื่อนไขตามปกติ
       category = 'Retention Hub'; categoryClass = 'badge-retention'; dotClass = 'dot-retention';
     } else if (pctNew > 70) {
       category = 'Vanguard (ทัพหน้า)'; categoryClass = 'badge-vanguard'; dotClass = 'dot-vanguard';
@@ -254,7 +273,7 @@ function renderExecutive2(filteredData, rawData) {
     };
   });
 
-  // เรียงตามรายได้สุทธิ
+  // เรียงตามรายได้สุทธิจากมากไปน้อย
   results.sort((a, b) => b.revenue - a.revenue);
 
   const fmtNum = (num) => (Number(num) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
