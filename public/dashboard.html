@@ -100,8 +100,6 @@
           <button id="menuToggle" class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active');" style="background: none; border: none; font-size: 24px; cursor: pointer;">
             <i class="fas fa-bars"></i>
           </button>
-          <div class="search-container" style="background: #fff; padding: 10px 20px; border-radius: 20px; display: flex; align-items: center; width: 300px; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
-          </div>
         </div>
         
         <div class="user-actions" style="display: flex; gap: 15px; align-items: center;">
@@ -524,37 +522,45 @@
       return revenue > 0;
     }
     window.isSaleOrder = isSaleOrder;
+    // 1. จัดกลุ่ม Channel ตามที่กำหนด
     function getNormalizedChannel(rawChannel) {
       let ch = (rawChannel || '').toString().trim();
-      if (!ch) return 'Unknown';
+      if (!ch) return 'Other'; // ถ้าว่างให้ตกค้างที่ Other
       let lower = ch.toLowerCase();
+      
       if (lower.includes('facebook') || lower === 'fb') return 'Facebook';
-      if (lower.includes('line')) return 'Line';
+      if (lower.includes('line')) return 'Line'; // รวบ Line และ Line OA เข้าด้วยกัน
       if (lower.includes('tiktok')) return 'Tiktok';
       if (lower.includes('shopee')) return 'Shopee';
       if (lower.includes('lazada')) return 'Lazada';
       if (lower.includes('ig') || lower.includes('instagram')) return 'Instagram';
       if (lower.includes('call')) return 'Call';
       if (lower.includes('crm')) return 'CRM';
-      return ch;
+      
+      // ถ้ามีหลุดรอดจากเงื่อนไขด้านบน ให้เช็กว่าตรงกับกลุ่มที่เราตั้งไว้ไหม ถ้าไม่ตรงส่งไป 'Other'
+      const validChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Shopee', 'Tiktok'];
+      return validChannels.includes(ch) ? ch : 'Other';
     }
+
+    // 2. จัดกลุ่ม SubChannel ตามลิสต์ที่ระบุมาเป๊ะๆ
     function getNormalizedSubChannel(row) {
-      if (!row) return 'Unknown';
+      if (!row) return 'Other';
       
       let sub = getRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง']);
       if (!sub || sub.toString().trim() === '') {
-        sub = getRowValue(row, ['ช่องทาง', 'Channel']) || 'Unknown';
+        sub = getRowValue(row, ['ช่องทาง', 'Channel']) || 'Other';
       }
       
       let cleanSub = sub.toString().trim();
       let lower = cleanSub.toLowerCase();
       
-      if (cleanSub === '865219993' || cleanSub === '986291641') return 'Unknown';
+      // ดักเคสพิเศษพวก ID คลังสินค้าเก่าที่เคยกรองไว้
+      if (cleanSub === '865219993' || cleanSub === '986291641') return 'Other';
       
-      
+      // แปลงพวกตัวย่อ/พิมพ์เล็ก ให้ตรงตามการแสดงผล
       if (lower === 'facebook' || lower === 'fb') return 'FB';
-      if (lower === 'line' || lower === 'line_oa') return 'Line';
-      if (lower === 'tiktok') return 'TikTok';
+      if (lower.includes('line')) return 'Line'; // รวบ Line และ Line OA เข้าด้วยกัน
+      if (lower === 'tiktok') return 'Tiktok';
       if (lower === 'shopee') return 'Shopee';
       if (lower === 'lazada') return 'Lazada';
       if (lower === 'instagram' || lower === 'ig') return 'IG';
@@ -563,38 +569,18 @@
       if (lower === 'email') return 'Email';
       if (lower === 'website' || lower === 'web' || lower === 'www') return 'Website';
       
-      return cleanSub;
-    }
-    window.getNormalizedSubChannel = getNormalizedSubChannel;
-    function getNormalizedProduct(rawProd) {
-      let p = (rawProd || '').toString().trim();
-      if (!p) return 'Unknown';
-      let lower = p.toLowerCase();
-      if (lower.includes('plus')) return 'Plus';
-      if (lower.includes('gold')) return 'Gold';
-      if (lower.includes('wiss')) return 'Wiss';
-      if (lower.includes('kides') || lower.includes('kide')) return 'Kides';
-      if (lower.includes('collagen') || lower.includes('callagen')) return 'Collagen';
-      return p;
-    }
-    function getNormalizedSubProduct(rawProd) {
-      let p = (rawProd || '').toString().trim();
-      if (!p) return 'Unknown';
-      let lower = p.toLowerCase();
+      // ลิสต์ SubChannel ทั้งหมดที่คุณกำหนด
+      const validSubChannels = [
+        'Call', 'CRM', 'Email', 'FB', 'FBC', 'FBD', 'FBG', 'FBH', 'FBH-IG', 
+        'FBK', 'FBM', 'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'IG-FBH', 'IG-FBSS', 
+        'IG-FBW', 'Lazada', 'Line', 'Other', 'PC', 'Shopee', 'Telesale', 'Tiktok', 'Website'
+      ];
       
-      if (lower.includes('kides') || lower.includes('kide')) {
-        if (lower.includes('ส้ม')) return 'Kidesส้ม';
-        if (lower.includes('แตงโม')) return 'Kides แตงโม';
-        return 'Kides original';
-      }
-      
-      if (lower.includes('plus')) return 'Plus';
-      if (lower.includes('gold')) return 'Gold';
-      if (lower.includes('wiss')) return 'Wiss';
-      if (lower.includes('collagen') || lower.includes('callagen')) return 'Collagen';
-      
-      return p;
+      // ถ้าตรงกับลิสต์ให้ใช้ค่านั้นเลย ถ้าไม่ตรงหรือเป็นค่าแปลกปลอมให้ตกที่ 'Other'
+      return validSubChannels.includes(cleanSub) ? cleanSub : 'Other';
     }
+
+    // 3. กรองรายชื่อ Admin เฉพาะ 5 คนที่เลือก (ถ้าเป็นคนอื่นให้หลุดไป Unknown หรือ Other)
     function getNormalizedAdmin(row) {
       if (!row) return 'Unknown';
       let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
@@ -604,13 +590,16 @@
       let a = (val || '').toString().trim();
       if (!a) return 'Unknown';
       let lower = a.toLowerCase();
+      
       if (lower.includes('may') || lower.includes('เมย์')) return 'May';
       if (lower.includes('บี')) return 'บี';
       if (lower.includes('มิ้ว')) return 'มิ้ว';
       if (lower.includes('แอน')) return 'แอน';
       if (lower.includes('แอล')) return 'แอล';
-      return a;
+      
+      return 'Unknown'; // หรือเปลี่ยนเป็น 'Other' ก็ได้ค่ะ ถ้ามีแอดมินคนอื่นหลุดเข้ามา
     }
+    
     function populateDropdowns() {
       const options = { 
         Month: new Set(), 
