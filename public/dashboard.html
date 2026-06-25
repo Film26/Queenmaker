@@ -688,9 +688,12 @@
       document.getElementById('lbl-' + type).textContent = val;
       document.getElementById('menu-' + type).classList.remove('show');
       
+      // ⚠️ แก้สะกด ID เป็น clearFilterBtn (ไม่มี s) ให้ตรงกับหน้า HTML
       if (val !== 'All') {
         document.getElementById('btn-' + type).classList.add('active');
-        document.getElementById('clearFiltersBtn').style.display = 'inline-block';
+        if(document.getElementById('clearFilterBtn')) {
+          document.getElementById('clearFilterBtn').style.display = 'inline-block';
+        }
       } else {
         document.getElementById('btn-' + type).classList.remove('active');
       }
@@ -703,7 +706,11 @@
         document.getElementById('lbl-' + type).textContent = 'All';
         document.getElementById('btn-' + type).classList.remove('active');
       });
-      document.getElementById('clearFiltersBtn').style.display = 'none';
+      
+      // ⚠️ แก้สะกด ID เป็น clearFilterBtn (ไม่มี s) ให้ตรงกับหน้า HTML
+      if(document.getElementById('clearFilterBtn')) {
+        document.getElementById('clearFilterBtn').style.display = 'none';
+      }
       applyFilters();
     }
 
