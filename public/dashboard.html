@@ -706,7 +706,6 @@
           menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
         });
       });
-    }
     function setFilter(type, val) {
       filters[type] = val;
       document.getElementById('lbl-' + type).textContent = val;
