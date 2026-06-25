@@ -644,58 +644,56 @@
     }
     // --- Dropdowns & Filters Logic ---
     function populateDropdowns() {
-      const options = { Month: new Set(), Year: new Set(), Channel: new Set(), SubChannel: new Set(), Product: new Set(), SubProduct: new Set(), Admin: new Set() };
+      // 1. ตรวจหาปีและเดือนที่มีอยู่จริงในไฟล์ดิบก่อน (ปล่อยให้รันอัตโนมัติเพราะแต่ละปีมีไม่เหมือนกัน)
+      const yearsSet = new Set();
+      const monthsSet = new Set();
       
       rawData.forEach(row => {
         const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
         if (!dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
-        
-        options.Month.add(d.str);
-        options.Year.add(d.y.toString());
-        
-        // ดักจับข้อมูลอย่างปลอดภัย หากไฟล์ไม่มีคอลัมน์นี้ จะได้ไม่พังค้าง
-        const rawChannel = getRowValue(row, ['ช่องทาง', 'Channel']);
-        const channel = rawChannel ? getNormalizedChannel(rawChannel) : 'Other';
-        
-        const subChannel = getNormalizedSubChannel(row);
-        
-        const rawProductName = getRowValue(row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']);
-        const product = rawProductName ? getNormalizedProduct(rawProductName) : 'Unknown';
-        const subProduct = rawProductName ? getNormalizedSubProduct(rawProductName) : 'Unknown';
-        
-        const admin = getNormalizedAdmin(row);
-        
-        options.Channel.add(channel);
-        options.SubChannel.add(subChannel);
-        options.Product.add(product);
-        options.SubProduct.add(subProduct);
-        options.Admin.add(admin);
+        yearsSet.add(d.y.toString());
+        monthsSet.add(d.str);
       });
-
-      // สั่งสร้างปุ่มในเมนูเฉพาะเมื่อเซ็ตข้อมูลมีค่าจริงเท่านั้น ป้องกันเมนูเอเรอร์
-      ['Year', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].forEach(type => {
-        const menu = document.getElementById('menu-' + type);
-        if (!menu) return;
-        menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
-        
-        // ล้างค่าว่างหรือค่า undefined ออกก่อนเอาไปสร้างปุ่ม
-        const sortedOptions = Array.from(options[type]).filter(v => v && v !== 'null' && v !== 'undefined').sort();
-        sortedOptions.forEach(val => {
-          menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
+      // 2. 🚨 สร้างลิสต์ล็อกรายการเมนูหน้าฟรอนต์เอนด์ตามที่คุณกำหนดเป๊ะ ๆ
+      const fixedLists = {
+        Channel: ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'],
+        SubChannel: ['Call', 'CRM', 'Email', 'FB', 'FBC', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'IG-FBH', 'IG-FBSS', 'IG-FBW', 'Lazada', 'Line', 'Other', 'PC', 'Shopee', 'Telesale', 'Tiktok', 'Website'],
+        Admin: ['May', 'บี', 'มิ้ว', 'แอน', 'แอล']
+      };
+     // 3. สร้างปุ่มตัวเลือกสำหรับ Year
+      const yearMenu = document.getElementById('menu-Year');
+      if (yearMenu) {
+        yearMenu.innerHTML = `<div onclick="setFilter('Year', 'All')">All</div>`;
+        Array.from(yearsSet).sort().forEach(val => {
+          yearMenu.innerHTML += `<div onclick="setFilter('Year', '${val}')">${val}</div>`;
         });
-      });
-      
+      }
+
+      // 4. สร้างปุ่มตัวเลือกสำหรับ Month
       const monthMenu = document.getElementById('menu-Month');
       if (monthMenu) {
         monthMenu.innerHTML = `<div onclick="setFilter('Month', 'All')">All</div>`;
-        Array.from(options.Month).sort().reverse().forEach(val => {
+        Array.from(monthsSet).sort().reverse().forEach(val => {
           monthMenu.innerHTML += `<div onclick="setFilter('Month', '${val}')">${val}</div>`;
         });
       }
-    }
 
+      // 5. วนลูปสร้างปุ่มให้กับ Channel, SubChannel, Admin ตามลิสต์ที่เราฟิกไว้ด้านบน
+      ['Channel', 'SubChannel', 'Admin'].forEach(type => {
+        const menu = document.getElementById('menu-' + type);
+        if (!menu) return;
+        
+        // ใส่ปุ่ม All ก่อนเสมอ
+        menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
+        
+        // ดึงรายชื่อจาก fixedLists มาสร้างปุ่มทีละตัวแบบเรียงลำดับสวยงาม
+        fixedLists[type].forEach(val => {
+          menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
+        });
+      });
+    }
     function setFilter(type, val) {
       filters[type] = val;
       document.getElementById('lbl-' + type).textContent = val;
