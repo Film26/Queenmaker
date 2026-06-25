@@ -674,7 +674,6 @@
         Product: ['Plus', 'Gold', 'Wiss', 'Kides', 'Collagen'],
         SubProduct: ['Plus', 'Gold', 'Wiss', 'Kides original', 'Kidesส้ม', 'Kides แตงโม', 'Callagen']
       };
-      
      // 3. สร้างปุ่มตัวเลือกสำหรับ Year
       const yearMenu = document.getElementById('menu-Year');
       if (yearMenu) {
@@ -694,7 +693,7 @@
       }
 
       // 5. วนลูปสร้างปุ่มให้กับ Channel, SubChannel, Admin ตามลิสต์ที่เราฟิกไว้ด้านบน
-      ['Channel', 'SubChannel', 'Admin', 'Product', 'Subproduct'].forEach(type => {
+      ['Channel', 'SubChannel', 'Admin', 'Product', 'SubProduct'].forEach(type => {
         const menu = document.getElementById('menu-' + type);
         if (!menu) return;
         
@@ -706,6 +705,7 @@
           menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
         });
       });
+    }
     function setFilter(type, val) {
       filters[type] = val;
       document.getElementById('lbl-' + type).textContent = val;
