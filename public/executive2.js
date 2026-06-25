@@ -2,7 +2,7 @@
 function renderExecutive2(filteredData, rawData) {
   const container = document.getElementById('view-executive2');
   
-  // เลือกแหล่งข้อมูลที่สมบูรณ์ที่สุด
+  // เลือกแหล่งข้อมูลที่ส่งมาจากหน้าหลัก (ลำดับความสำคัญสูงสุดคือข้อมูลดิบที่อัปโหลด)
   const dataSrc = (rawData && rawData.length > 0) ? rawData : (filteredData || []);
 
   if (!dataSrc || dataSrc.length === 0) {
@@ -10,7 +10,7 @@ function renderExecutive2(filteredData, rawData) {
     return;
   }
 
-  // Inject CSS if not exists
+  // Inject CSS ตกแต่งตามแบรนด์
   if (!document.getElementById('exec2-styles')) {
     const style = document.createElement('style');
     style.id = 'exec2-styles';
@@ -24,15 +24,14 @@ function renderExecutive2(filteredData, rawData) {
       .exec2-card.migration { border-left: 4px solid #13ce66; }
       .exec2-card.retention { border-left: 4px solid #ff9900; }
       .exec2-card.cashcow { border-left: 4px solid #ff4949; }
+      .exec2-card.inactive { border-left: 4px solid #ccc; }
 
-      .exec2-card-dot {
-        width: 18px; height: 18px; border-radius: 50%; margin-right: 15px; flex-shrink: 0;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.1);
-      }
-      .dot-vanguard { background: linear-gradient(135deg, #4ea3ff, #2684ff); }
-      .dot-migration { background: linear-gradient(135deg, #42e88a, #13ce66); }
-      .dot-retention { background: linear-gradient(135deg, #ffb732, #ff9900); }
-      .dot-cashcow { background: linear-gradient(135deg, #ff7272, #ff4949); }
+      .exec2-card-dot { width: 18px; height: 18px; border-radius: 50%; margin-right: 15px; flex-shrink: 0; }
+      .dot-vanguard { background: #2684ff; }
+      .dot-migration { background: #13ce66; }
+      .dot-retention { background: #ff9900; }
+      .dot-cashcow { background: #ff4949; }
+      .dot-inactive { background: #ccc; }
 
       .exec2-card-text { display: flex; flex-direction: column; }
       .exec2-card-title { font-weight: 700; font-size: 14px; color: #333; }
@@ -42,32 +41,24 @@ function renderExecutive2(filteredData, rawData) {
       .exec2-table-header h3 { margin: 0; font-size: 16px; color: #222; }
       .month-label { font-size: 14px; font-weight: 700; color: #d95f1d; }
 
-      .exec2-table-wrapper {
-        background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow-x: auto;
-      }
-      .exec2-table {
-        width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif;
-      }
+      .exec2-table-wrapper { background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow-x: auto; }
+      .exec2-table { width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif; }
       .exec2-table th, .exec2-table td { padding: 15px 20px; text-align: left; border-bottom: 1px solid #f2f2f2; }
       .exec2-table th { color: #777; font-weight: 600; font-size: 13px; background: #fff; white-space: nowrap; }
       .exec2-table td { color: #333; font-size: 14px; font-weight: 500; }
-      .exec2-table tr:hover td { background-color: #fafafa; }
-      .exec2-table tr:last-child td { border-bottom: none; }
 
-      .exec2-badge {
-        display: inline-flex; align-items: center; padding: 6px 12px;
-        border-radius: 20px; font-size: 12px; font-weight: 700; border: 1px solid transparent;
-      }
-      .badge-vanguard { color: #2684ff; background: #ebf3ff; border-color: #b3d4ff; }
-      .badge-migration { color: #13ce66; background: #e7fbf0; border-color: #a3f3c9; }
-      .badge-retention { color: #ff9900; background: #fff8eb; border-color: #ffd699; }
-      .badge-cashcow { color: #ff4949; background: #ffebeb; border-color: #ffb3b3; }
-      .badge-dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1); }
+      .exec2-badge { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+      .badge-vanguard { color: #2684ff; background: #ebf3ff; }
+      .badge-migration { color: #13ce66; background: #e7fbf0; }
+      .badge-retention { color: #ff9900; background: #fff8eb; }
+      .badge-cashcow { color: #ff4949; background: #ffebeb; }
+      .badge-inactive { color: #777; background: #f5f5f5; }
+      .badge-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; display: inline-block; }
     `;
     document.head.appendChild(style);
   }
 
-  // ฟังก์ชันสแกนหาคีย์หัวคอลัมน์
+  // ค้นหา Property ใน Object แบบยืดหยุ่นตัวพิมพ์เล็ก-ใหญ่
   function extractValueByKeys(row, possibleKeys) {
     if (!row) return '';
     const keys = Object.keys(row);
@@ -80,7 +71,7 @@ function renderExecutive2(filteredData, rawData) {
     return '';
   }
 
-  // ฟังก์ชันแกะเงินจากในไฟล์จริง 100%
+  // ดึงมูลค่าเงินจริงจากไฟล์ Excel
   function extractRevenue(row) {
     let rawVal = extractValueByKeys(row, ['ยอดโอน', 'ยอดขาย', 'ราคารวม', 'ราคาสุทธิ', 'revenue']);
     if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
@@ -90,7 +81,7 @@ function renderExecutive2(filteredData, rawData) {
     return 0;
   }
 
-  // ฟังก์ชันจัดกลุ่มแชนเนลตามคำจริงในไฟล์
+  // แยกกลุ่มแชนเนลหลัก
   function getExec2Group(row) {
     let rawCh = extractValueByKeys(row, ['ช่องทาง', 'channel', 'platform']);
     let chStr = (rawCh || '').toString().trim().toLowerCase();
@@ -107,17 +98,16 @@ function renderExecutive2(filteredData, rawData) {
     return 'Other';
   }
 
-  // ฟังก์ชันแกะหา ID ลูกค้าจริงในไฟล์เพื่อเช็กว่าเคยซื้อซ้ำไหม
+  // ดึงข้อมูลระบุตัวตนลูกค้า
   function getLocalCustomerId(row) {
     let cid = extractValueByKeys(row, ['customer id', 'customerid', 'รหัสลูกค้า', 'รหัสลูกค้า (ลูกค้า) ไม่ใช้']);
     if (cid) return cid.toString().trim();
     let phone = extractValueByKeys(row, ['phone', 'เบอร์โทร']);
     if (phone) return phone.toString().trim();
-    let addr = extractValueByKeys(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่']);
-    return addr ? addr.toString().toLowerCase().replace(/[\s\r\n\t\-,\.\/\\_]+/g, '') : '';
+    return '';
   }
 
-  // แปลงวันที่
+  // แปลง Format วันที่เพื่อหาการสั่งซื้อครั้งแรก
   const parseD = (dateStr) => {
     if (!dateStr) return null;
     const datePart = dateStr.toString().trim().split(' ')[0];
@@ -132,12 +122,12 @@ function renderExecutive2(filteredData, rawData) {
       if (p0 > 1000) { y = p0; m = p1; d = p2; } 
       else { d = p0; m = p1; y = p2; if (y < 2000) y += 2000; }
       if (y > 2500) y -= 543;
-      return { y, m, d, val: y * 10000 + m * 100 + d };
+      return { val: y * 10000 + m * 100 + d };
     }
     return null;
   };
 
-  // 1. ตรวจสอบพฤติกรรมประวัติซื้อครั้งแรกจากไฟล์จริงแบบร้อยเปอร์เซ็นต์
+  // 1. วิเคราะห์หา First Purchase Date ของแต่ละลูกค้าจากข้อมูลจริงทั้งหมด
   const customerFirstDates = {};
   const customerChannelFirstDates = {};
 
@@ -151,7 +141,6 @@ function renderExecutive2(filteredData, rawData) {
     if (!customerFirstDates[id] || d.val < customerFirstDates[id]) {
       customerFirstDates[id] = d.val;
     }
-
     const ch = getExec2Group(row);
     const chKey = `${id}_${ch}`;
     if (!customerChannelFirstDates[chKey] || d.val < customerChannelFirstDates[chKey]) {
@@ -159,14 +148,14 @@ function renderExecutive2(filteredData, rawData) {
     }
   });
 
-  // 2. จัดโครงสร้าง 9 ช่องทางหลัก
+  // 2. เตรียมโครงสร้างช่องทางหลัก 9 ช่องทาง
   const allowedChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'];
   const agg = {};
   allowedChannels.forEach(ch => {
     agg[ch] = { revenue: 0, buyers: new Set(), newCustBuyers: new Set(), migrationBuyers: new Set() };
   });
 
-  // 3. กวาดข้อมูลและนับตามข้อมูลดิบจริง
+  // 3. วิ่งประมวลผลแยกแชนเนลตามความจริง 100%
   dataSrc.forEach(row => {
     const rev = extractRevenue(row);
     const ch = getExec2Group(row);
@@ -175,22 +164,25 @@ function renderExecutive2(filteredData, rawData) {
     const d = parseD(dateStr);
 
     let targetCh = agg[ch] ? ch : 'Other';
-    agg[targetCh].revenue += rev;
-    if (id) agg[targetCh].buyers.add(id);
+    
+    if (rev > 0) {
+      agg[targetCh].revenue += rev;
+      if (id) agg[targetCh].buyers.add(id);
 
-    if (id && d) {
-      const globalFirst = customerFirstDates[id];
-      const chFirst = customerChannelFirstDates[`${id}_${targetCh}`];
+      if (id && d) {
+        const globalFirst = customerFirstDates[id];
+        const chFirst = customerChannelFirstDates[`${id}_${targetCh}`];
 
-      if (globalFirst === d.val) {
-        agg[targetCh].newCustBuyers.add(id);
-      } else if (chFirst === d.val) {
-        agg[targetCh].migrationBuyers.add(id);
+        if (globalFirst === d.val) {
+          agg[targetCh].newCustBuyers.add(id); // ลูกค้าใหม่เอี่ยมแกะกล่อง (Pure New)
+        } else if (chFirst === d.val) {
+          agg[targetCh].migrationBuyers.add(id); // ลูกค้าเดิมแต่ย้ายมาสั่งช่องทางนี้ครั้งแรก (Migration)
+        }
       }
     }
   });
 
-  // 4. คำนวณตัดกลุ่มตามเปอร์เซ็นต์แท้จริงจาก Raw Data
+  // 4. คำนวณอัตราส่วนเปอร์เซ็นต์และจัดกลุ่มเชิงกลยุทธ์ตามเกณฑ์ใหม่ที่ถูกต้องเด็ดขาด
   const results = allowedChannels.map(ch => {
     const data = agg[ch];
     const buyersCount = data.buyers.size;
@@ -199,20 +191,22 @@ function renderExecutive2(filteredData, rawData) {
 
     const pctNew = buyersCount === 0 ? 0 : (newCustCount / buyersCount) * 100;
     const pctMig = buyersCount === 0 ? 0 : (migrationCount / buyersCount) * 100;
-    const totalShare = pctNew + pctMig;
 
     let category = ''; let categoryClass = ''; let dotClass = '';
     
+    // ดักจับข้อมูลศูนย์: ถ้าไม่มีคนซื้อหรือยอดขายเป็น 0 ห้ามจัดเข้า Retention Hub ให้เป็น Inactive
     if (buyersCount === 0 || data.revenue === 0) {
-      category = 'Retention Hub'; categoryClass = 'badge-retention'; dotClass = 'dot-retention';
-    } else if (pctNew > 60) {
+      category = 'Inactive / No Data'; categoryClass = 'badge-inactive'; dotClass = 'dot-inactive';
+    } else if (pctNew > 70) {
       category = 'Vanguard (ทัพหน้า)'; categoryClass = 'badge-vanguard'; dotClass = 'dot-vanguard';
-    } else if (pctMig > 60) {
+    } else if (pctMig > 70) {
       category = 'Migration Hub'; categoryClass = 'badge-migration'; dotClass = 'dot-migration';
-    } else if (totalShare < 30) {
+    } else if (pctNew < 30) {
       category = 'Cash Cow (เสือนอนกิน)'; categoryClass = 'badge-cashcow'; dotClass = 'dot-cashcow';
-    } else {
+    } else if (pctNew > 30) {
       category = 'Retention Hub'; categoryClass = 'badge-retention'; dotClass = 'dot-retention';
+    } else {
+      category = 'Inactive / No Data'; categoryClass = 'badge-inactive'; dotClass = 'dot-inactive';
     }
 
     return {
@@ -223,33 +217,34 @@ function renderExecutive2(filteredData, rawData) {
     };
   });
 
+  // เรียงลำดับแชนเนลที่สร้างรายได้สูงสุดขึ้นก่อน
   results.sort((a, b) => b.revenue - a.revenue);
 
   const fmtNum = (num) => (Number(num) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
   const fmtPct = (num) => (Number(num) || 0).toFixed(0) + '%';
 
-  // 5. พ่นโค้ดและเปลี่ยนหัวข้อกลับเป็น All Months Data
+  // 5. พ่นเนื้อหาโครงสร้าง HTML ออกหน้าจอแดชบอร์ดหลัก
   let html = `
     <div class="exec2-cards">
       <div class="exec2-card vanguard">
         <div class="exec2-card-dot dot-vanguard"></div>
         <div class="exec2-card-text">
           <span class="exec2-card-title">Vanguard (ทัพหน้า)</span>
-          <span class="exec2-card-sub">หาคนใหม่เก่งมาก (>60%)</span>
+          <span class="exec2-card-sub">หาคนใหม่เก่งมาก (>70%)</span>
         </div>
       </div>
       <div class="exec2-card migration">
         <div class="exec2-card-dot dot-migration"></div>
         <div class="exec2-card-text">
           <span class="exec2-card-title">Migration Hub</span>
-          <span class="exec2-card-sub">จุดรับแขกเก่า (>60%)</span>
+          <span class="exec2-card-sub">จุดรับแขกเก่า (>70%)</span>
         </div>
       </div>
       <div class="exec2-card retention">
         <div class="exec2-card-dot dot-retention"></div>
         <div class="exec2-card-text">
           <span class="exec2-card-title">Retention Hub</span>
-          <span class="exec2-card-sub">ถังเก็บลูกค้า</span>
+          <span class="exec2-card-sub">ถังเก็บลูกค้า (>30%)</span>
         </div>
       </div>
       <div class="exec2-card cashcow">
@@ -291,8 +286,8 @@ function renderExecutive2(filteredData, rawData) {
         <td>${fmtNum(r.buyers)}</td>
         <td>${fmtNum(r.newCust)}</td>
         <td>${fmtNum(r.newToSub)}</td>
-        <td>${fmtPct(r.pctMig)}</td>
-        <td>${fmtPct(r.pctNew)}</td>
+        <td>${r.revenue === 0 ? '-' : fmtPct(r.pctMig)}</td>
+        <td>${r.revenue === 0 ? '-' : fmtPct(r.pctNew)}</td>
         <td>
           <span class="exec2-badge ${r.categoryClass}">
             <span class="badge-dot ${r.dotClass}"></span>
