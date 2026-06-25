@@ -480,48 +480,57 @@
     }
     window.getCustomerUniqueId = getCustomerUniqueId;
 
+    // 3. ปรับปรุงฟังก์ชันแปลงวันที่ให้รองรับทุกรูปแบบอย่างเสถียร
     function parseDate(dateStr) {
       if (!dateStr) return null;
-      const datePart = dateStr.toString().split(' ')[0];
+      // ตัดส่วนที่เป็นเวลาออก (ถ้ามี) เอาเฉพาะวันที่
+      const datePart = dateStr.toString().trim().split(' ')[0];
       let parts = datePart.split('/');
       if (parts.length < 3) parts = datePart.split('-');
+      
       if (parts.length >= 3) {
-        let p0 = parseInt(parts[0]);
-        let p1 = parseInt(parts[1]);
-        let p2 = parseInt(parts[2]);
+        let p0 = parseInt(parts[0], 10);
+        let p1 = parseInt(parts[1], 10);
+        let p2 = parseInt(parts[2], 10);
+        if (isNaN(p0) || isNaN(p1) || isNaN(p2)) return null;
+        
         let y, m, d;
-        if (p0 > 1000) {
-           y = p0; m = p1; d = p2;
-        } else if (p2 > 1000) {
-           d = p0; m = p1; y = p2;
+        if (p0 > 1000) { // ฟอร์แมต YTD เช่น 2025/01/25
+          y = p0; m = p1; d = p2;
+        } else if (p2 > 1000) { // ฟอร์แมตดั้งเดิม เช่น 25/01/2025
+          d = p0; m = p1; y = p2;
         } else {
-           d = p0; m = p1; y = p2;
-           if (y < 2000) y += 2000;
+          d = p0; m = p1; y = p2;
+          if (y < 2000) y += 2000;
         }
+        
+        // ดักเคสปี พ.ศ. (ถ้าในไฟล์บันทึกเป็นปีไทย เช่น 2568 ให้แปลงเป็น ค.ศ. 2025)
+        if (y > 2500) y -= 543; 
+        
         return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
       }
       return null;
     }
-    window.parseDate = parseDate;
-
     function isSaleOrder(row) {
+      if (!row) return false;
       const remark = getRowValue(row, ['หมายเหตุ', 'Remark']);
-      const revenueStr = getRowValue(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-      const revenue = parseFloat(revenueStr.toString().replace(/,/g, ''));
-      if (isNaN(revenue)) return false;
-      const nonSaleKeywords = [
-        'ของขวัญวันเกิด', 'ของขวัญปีใหม่', 'เคลม', 'ของแถม', 'แจก',
-        'sample', 'replace', 'คืนเงิน', 'rerund', 'refund'
-      ];
+      
+      // เพิ่มคำว่า 'ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ' เพื่อให้ตรงกับไฟล์ CSV จริง
+      const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+      
+      // คลีนตัวเลข ตัด comma และช่องว่างออก
+      const cleanRevenueStr = revenueStr.toString().replace(/,/g, '').trim();
+      const revenue = parseFloat(cleanRevenueStr);
+      
+      if (isNaN(revenue) || revenue <= 0) return false;
+      
+      const nonSaleKeywords = ['ของขวัญวันเกิด', 'ของขวัญปีใหม่', 'เคลม', 'ของแถม', 'แจก', 'sample', 'replace', 'คืนเงิน', 'rerund', 'refund'];
       const upperRemark = remark.toUpperCase();
       for (let kw of nonSaleKeywords) {
-        if (upperRemark.includes(kw.toUpperCase())) {
-          return false;
-        }
+        if (upperRemark.includes(kw.toUpperCase())) return false;
       }
-      return revenue > 0;
+      return true;
     }
-    window.isSaleOrder = isSaleOrder;
     // 1. จัดกลุ่ม Channel (เพิ่มความยืดหยุ่นในการดักคำ)
     function getNormalizedChannel(rawChannel) {
       let ch = (rawChannel || '').toString().trim();
@@ -730,41 +739,48 @@
       }
     }
     
+    // 2. ปรับปรุงระบบประมวลผลข้อมูลหลักให้ปลอดภัย 100%
     function processData(data) {
       monthlyData = {};
-      if (data.length === 0) { renderEmpty(); return; }
+      if (!data || data.length === 0) { renderEmpty(); return; }
+      
       data.forEach(row => {
         if (!isSaleOrder(row)) return;
         const id = getCustomerUniqueId(row);
         const dateStr = getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-        const revenueStr = getRowValue(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+        
+        // ดึงราคาขายอีกครั้งแบบปลอดภัย
+        const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+        const revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim());
+        
         const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
         const admin = getNormalizedAdmin(row);
-        if (!id || !dateStr) return;
+        
+        if (!id || !dateStr || isNaN(revenue)) return; // ถ้าข้อมูลสำคัญพัง ให้ข้ามแถวนี้ไปเลย ระบบจะไม่ค้าง
+        
         const d = parseDate(dateStr);
-        if (!d) return;
-        const revenue = parseFloat(revenueStr?.toString().replace(/,/g, '') || 0);
+        if (!d) return; 
+        
         const mStr = d.str;
         if (!monthlyData[mStr]) {
           monthlyData[mStr] = { sales: 0, orders: 0, buyers: new Set(), channels: {}, admins: {}, year: d.y };
         }
+        
         let m = monthlyData[mStr];
         m.sales += revenue;
         m.orders++;
         m.buyers.add(id);
+        
         if (!m.channels[channel]) m.channels[channel] = 0;
         m.channels[channel] += revenue;
+        
         if (!m.admins[admin]) m.admins[admin] = 0;
         m.admins[admin] += revenue;
       });
+      
       availableMonths = Object.keys(monthlyData).sort();
       renderDashboard();
     }
-    const thaiMonths = {
-      '01': 'มกราคม', '02': 'กุมภาพันธ์', '03': 'มีนาคม', '04': 'เมษายน',
-      '05': 'พฤษภาคม', '06': 'มิถุนายน', '07': 'กรกฎาคม', '08': 'สิงหาคม',
-      '09': 'กันยายน', '10': 'ตุลาคม', '11': 'พฤศจิกายน', '12': 'ธันวาคม'
-    };
     function renderEmpty() {
       const titleSalesEl = document.getElementById('title-sales');
       if (titleSalesEl) titleSalesEl.textContent = 'ยอดขายประจำเดือน';
