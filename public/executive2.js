@@ -2,7 +2,7 @@
 function renderExecutive2(filteredData, rawData) {
   const container = document.getElementById('view-executive2');
   
-  // เลือกแหล่งข้อมูลที่ส่งมาจากหน้าหลัก (ลำดับความสำคัญสูงสุดคือข้อมูลดิบที่อัปโหลด)
+  // ใช้ข้อมูลดิบที่อัปโหลดเข้ามาก่อน (ดึงสดจากไฟล์ RAW 2025)
   const dataSrc = (rawData && rawData.length > 0) ? rawData : (filteredData || []);
 
   if (!dataSrc || dataSrc.length === 0) {
@@ -10,7 +10,7 @@ function renderExecutive2(filteredData, rawData) {
     return;
   }
 
-  // Inject CSS ตกแต่งตามแบรนด์
+  // Inject CSS ตกแต่ง
   if (!document.getElementById('exec2-styles')) {
     const style = document.createElement('style');
     style.id = 'exec2-styles';
@@ -58,22 +58,21 @@ function renderExecutive2(filteredData, rawData) {
     document.head.appendChild(style);
   }
 
-  // ค้นหา Property ใน Object แบบยืดหยุ่นตัวพิมพ์เล็ก-ใหญ่
-  function extractValueByKeys(row, possibleKeys) {
+  // ฟังก์ชันคุ้ยหาค่าตามชื่อหัวคอลัมน์จริงในไฟล์ RAW 2025 (รองรับการตัดช่องว่าง)
+  function getValue(row, keyName) {
     if (!row) return '';
+    if (row[keyName] !== undefined && row[keyName] !== null) return row[keyName];
+    // กรณีหัวตารางมีช่องว่างแฝง เช่น "Customer ID "
     const keys = Object.keys(row);
-    for (let pKey of possibleKeys) {
-      const cleanPKey = pKey.toLowerCase().replace(/[\s_\-]+/g, '');
-      for (let k of keys) {
-        if (k.toLowerCase().replace(/[\s_\-]+/g, '') === cleanPKey) return row[k];
-      }
+    for (let k of keys) {
+      if (k.trim() === keyName.trim()) return row[k];
     }
     return '';
   }
 
-  // ดึงมูลค่าเงินจริงจากไฟล์ Excel
+  // แกะจำนวนเงินโอนหรือยอดขายจริงจากไฟล์
   function extractRevenue(row) {
-    let rawVal = extractValueByKeys(row, ['ยอดโอน', 'ยอดขาย', 'ราคารวม', 'ราคาสุทธิ', 'revenue']);
+    let rawVal = getValue(row, 'ยอดโอน') || getValue(row, 'ยอดขาย') || getValue(row, 'ราคาสินค้ายังไม่รวมภาษี');
     if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
       let parsed = parseFloat(rawVal.toString().replace(/,/g, '').trim());
       if (!isNaN(parsed)) return parsed;
@@ -81,33 +80,34 @@ function renderExecutive2(filteredData, rawData) {
     return 0;
   }
 
-  // แยกกลุ่มแชนเนลหลัก
+  // คัดแยกกลุ่มแชนเนลให้ตรงกับคำจริงในคอลัมน์ "ช่องทาง" ของไฟล์ RAW 2025
   function getExec2Group(row) {
-    let rawCh = extractValueByKeys(row, ['ช่องทาง', 'channel', 'platform']);
-    let chStr = (rawCh || '').toString().trim().toLowerCase();
+    let rawCh = getValue(row, 'ช่องทาง');
+    let chStr = (rawCh || '').toString().trim().toUpperCase(); // แปลงเป็นตัวพิมพ์ใหญ่ทั้งหมดเพื่อความแม่นยำ
     
-    if (chStr.includes('line') || chStr.includes('ไลน์')) return 'Line';
-    if (chStr.includes('phone') || chStr.includes('call') || chStr.includes('โทร')) return 'Call';
-    if (chStr.includes('tiktok') || chStr.includes('tt')) return 'Tiktok';
-    if (chStr.includes('lazada')) return 'Lazada';
-    if (chStr.includes('shopee')) return 'Shopee';
-    if (chStr.includes('facebook') || chStr === 'fb') return 'Facebook';
-    if (chStr.includes('crm')) return 'CRM';
-    if (chStr.includes('instagram') || chStr === 'ig') return 'Instagram';
+    if (chStr.includes('LINE')) return 'Line';
+    if (chStr.includes('PHONE') || chStr.includes('CALL')) return 'Call';
+    styleCh = chStr.toLowerCase();
+    if (styleCh.includes('tiktok') || styleCh.includes('tt')) return 'Tiktok';
+    if (styleCh.includes('lazada')) return 'Lazada';
+    if (styleCh.includes('shopee')) return 'Shopee';
+    if (styleCh.includes('facebook') || chStr === 'FB') return 'Facebook';
+    if (styleCh.includes('crm')) return 'CRM';
+    if (styleCh.includes('instagram') || chStr === 'IG') return 'Instagram';
     
     return 'Other';
   }
 
-  // ดึงข้อมูลระบุตัวตนลูกค้า
+  // ดึงคีย์ลูกค้าจากคอลัมน์ Customer ID หรือ Phone ในไฟล์จริง
   function getLocalCustomerId(row) {
-    let cid = extractValueByKeys(row, ['customer id', 'customerid', 'รหัสลูกค้า', 'รหัสลูกค้า (ลูกค้า) ไม่ใช้']);
+    let cid = getValue(row, 'Customer ID') || getValue(row, 'Customer ID ');
     if (cid) return cid.toString().trim();
-    let phone = extractValueByKeys(row, ['phone', 'เบอร์โทร']);
+    let phone = getValue(row, 'Phone') || getValue(row, 'phone');
     if (phone) return phone.toString().trim();
     return '';
   }
 
-  // แปลง Format วันที่เพื่อหาการสั่งซื้อครั้งแรก
+  // แปลงค่าวันที่ "วันที่สร้าง" หรือ "วันที่โอนเงิน"
   const parseD = (dateStr) => {
     if (!dateStr) return null;
     const datePart = dateStr.toString().trim().split(' ')[0];
@@ -127,14 +127,14 @@ function renderExecutive2(filteredData, rawData) {
     return null;
   };
 
-  // 1. วิเคราะห์หา First Purchase Date ของแต่ละลูกค้าจากข้อมูลจริงทั้งหมด
+  // 1. ค้นหาประวัติการซื้อครั้งแรกของลูกค้าแต่ละรายในไฟล์จริง
   const customerFirstDates = {};
   const customerChannelFirstDates = {};
 
   dataSrc.forEach(row => {
     const id = getLocalCustomerId(row);
     if (!id) return;
-    const dateStr = extractValueByKeys(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'orderdate', 'date', 'วันที่']);
+    const dateStr = getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง');
     const d = parseD(dateStr);
     if (!d) return;
 
@@ -148,24 +148,25 @@ function renderExecutive2(filteredData, rawData) {
     }
   });
 
-  // 2. เตรียมโครงสร้างช่องทางหลัก 9 ช่องทาง
+  // 2. ล็อคเป้าหมายช่องทาง
   const allowedChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'];
   const agg = {};
   allowedChannels.forEach(ch => {
     agg[ch] = { revenue: 0, buyers: new Set(), newCustBuyers: new Set(), migrationBuyers: new Set() };
   });
 
-  // 3. วิ่งประมวลผลแยกแชนเนลตามความจริง 100%
+  // 3. กวาดข้อมูลและนับคะแนนจริง
   dataSrc.forEach(row => {
     const rev = extractRevenue(row);
     const ch = getExec2Group(row);
     const id = getLocalCustomerId(row);
-    const dateStr = extractValueByKeys(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'orderdate', 'date', 'วันที่']);
+    const dateStr = getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง');
     const d = parseD(dateStr);
 
     let targetCh = agg[ch] ? ch : 'Other';
     
-    if (rev > 0) {
+    // ยอมให้แถวข้อมูลที่มียอดเงิน หรือมี ID ลูกค้าวิ่งเข้าสู่ระบบคำนวณ
+    if (rev > 0 || id) {
       agg[targetCh].revenue += rev;
       if (id) agg[targetCh].buyers.add(id);
 
@@ -174,15 +175,15 @@ function renderExecutive2(filteredData, rawData) {
         const chFirst = customerChannelFirstDates[`${id}_${targetCh}`];
 
         if (globalFirst === d.val) {
-          agg[targetCh].newCustBuyers.add(id); // ลูกค้าใหม่เอี่ยมแกะกล่อง (Pure New)
+          agg[targetCh].newCustBuyers.add(id);
         } else if (chFirst === d.val) {
-          agg[targetCh].migrationBuyers.add(id); // ลูกค้าเดิมแต่ย้ายมาสั่งช่องทางนี้ครั้งแรก (Migration)
+          agg[targetCh].migrationBuyers.add(id);
         }
       }
     }
   });
 
-  // 4. คำนวณอัตราส่วนเปอร์เซ็นต์และจัดกลุ่มเชิงกลยุทธ์ตามเกณฑ์ใหม่ที่ถูกต้องเด็ดขาด
+  // 4. คำนวณตัดเกรดกลุ่มเชิงกลยุทธ์ตามเกณฑ์จริง 100%
   const results = allowedChannels.map(ch => {
     const data = agg[ch];
     const buyersCount = data.buyers.size;
@@ -194,8 +195,7 @@ function renderExecutive2(filteredData, rawData) {
 
     let category = ''; let categoryClass = ''; let dotClass = '';
     
-    // ดักจับข้อมูลศูนย์: ถ้าไม่มีคนซื้อหรือยอดขายเป็น 0 ห้ามจัดเข้า Retention Hub ให้เป็น Inactive
-    if (buyersCount === 0 || data.revenue === 0) {
+    if (buyersCount === 0 && data.revenue === 0) {
       category = 'Inactive / No Data'; categoryClass = 'badge-inactive'; dotClass = 'dot-inactive';
     } else if (pctNew > 70) {
       category = 'Vanguard (ทัพหน้า)'; categoryClass = 'badge-vanguard'; dotClass = 'dot-vanguard';
@@ -203,10 +203,8 @@ function renderExecutive2(filteredData, rawData) {
       category = 'Migration Hub'; categoryClass = 'badge-migration'; dotClass = 'dot-migration';
     } else if (pctNew < 30) {
       category = 'Cash Cow (เสือนอนกิน)'; categoryClass = 'badge-cashcow'; dotClass = 'dot-cashcow';
-    } else if (pctNew > 30) {
-      category = 'Retention Hub'; categoryClass = 'badge-retention'; dotClass = 'dot-retention';
     } else {
-      category = 'Inactive / No Data'; categoryClass = 'badge-inactive'; dotClass = 'dot-inactive';
+      category = 'Retention Hub'; categoryClass = 'badge-retention'; dotClass = 'dot-retention';
     }
 
     return {
@@ -217,13 +215,12 @@ function renderExecutive2(filteredData, rawData) {
     };
   });
 
-  // เรียงลำดับแชนเนลที่สร้างรายได้สูงสุดขึ้นก่อน
   results.sort((a, b) => b.revenue - a.revenue);
 
   const fmtNum = (num) => (Number(num) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
   const fmtPct = (num) => (Number(num) || 0).toFixed(0) + '%';
 
-  // 5. พ่นเนื้อหาโครงสร้าง HTML ออกหน้าจอแดชบอร์ดหลัก
+  // 5. แสดงตารางข้อมูลจริง All Months Data
   let html = `
     <div class="exec2-cards">
       <div class="exec2-card vanguard">
@@ -286,8 +283,8 @@ function renderExecutive2(filteredData, rawData) {
         <td>${fmtNum(r.buyers)}</td>
         <td>${fmtNum(r.newCust)}</td>
         <td>${fmtNum(r.newToSub)}</td>
-        <td>${r.revenue === 0 ? '-' : fmtPct(r.pctMig)}</td>
-        <td>${r.revenue === 0 ? '-' : fmtPct(r.pctNew)}</td>
+        <td>${r.buyers === 0 ? '-' : fmtPct(r.pctMig)}</td>
+        <td>${r.buyers === 0 ? '-' : fmtPct(r.pctNew)}</td>
         <td>
           <span class="exec2-badge ${r.categoryClass}">
             <span class="badge-dot ${r.dotClass}"></span>
