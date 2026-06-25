@@ -86,16 +86,28 @@ function renderExecutive2(filteredData, rawData) {
   const allowedChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'];
 
   function getExec2Group(row) {
-    // ดึงค่าช่องทางหลักผ่านฟังก์ชันกลาง getNormalizedChannel
     const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-    let rawCh = getVal(row, ['ช่องทาง', 'Channel']);
-    let ch = window.getNormalizedChannel ? window.getNormalizedChannel(rawCh) : 'Other';
+    // ขยายการค้นหาหัวคอลัมน์ให้ครอบคลุมมากขึ้นเพื่อกันพลาด
+    let rawCh = getVal(row, ['ช่องทาง', 'Channel', 'Platform', 'Marketplace', 'ช่องทางการขาย']);
     
-    // หากค่าที่ได้ไม่อยู่ใน 9 กลุ่มหลักนี้ ให้ดีดไปที่ Other ทันที
-    if (!allowedChannels.includes(ch)) {
-      return 'Other';
-    }
-    return ch;
+    // ส่งเข้าฟังก์ชันกลางก่อน
+    let ch = window.getNormalizedChannel ? window.getNormalizedChannel(rawCh) : '';
+    if (!ch) ch = (rawCh || '').toString().trim();
+    
+    let lower = ch.toLowerCase();
+    
+    // ดักจับจับกลุ่มคำพ้องความหมายโดยไม่สนใจตัวพิมพ์เล็ก-ใหญ่ และรองรับภาษาไทย
+    if (lower.includes('facebook') || lower.includes('fb') || lower.includes('เพจ')) return 'Facebook';
+    if (lower.includes('line') || lower.includes('ไลน์')) return 'Line';
+    if (lower.includes('call') || lower.includes('โทร') || lower.includes('tele')) return 'Call';
+    if (lower.includes('crm')) return 'CRM';
+    if (lower.includes('lazada') || lower.includes('ลาซาด้า')) return 'Lazada';
+    if (lower.includes('shopee') || lower.includes('ช้อปปี้')) return 'Shopee';
+    if (lower.includes('tiktok') || lower.includes('ติ๊กต๊อก') || lower.includes('tt')) return 'Tiktok';
+    if (lower.includes('instagram') || lower.includes('ig')) return 'Instagram';
+    if (lower.includes('website') || lower.includes('เว็บ')) return 'Website';
+    
+    return 'Other';
   }
 
   // Determine Channel first purchase dates globally (using ALL raw data)
