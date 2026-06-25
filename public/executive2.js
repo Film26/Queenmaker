@@ -1,6 +1,8 @@
 // public/executive2.js
 function renderExecutive2(filteredData, rawData) {
   const container = document.getElementById('view-executive2');
+  
+  // เลือกแหล่งข้อมูลที่สมบูรณ์ที่สุด
   const dataSrc = (rawData && rawData.length > 0) ? rawData : (filteredData || []);
 
   if (!dataSrc || dataSrc.length === 0) {
@@ -65,6 +67,7 @@ function renderExecutive2(filteredData, rawData) {
     document.head.appendChild(style);
   }
 
+  // ฟังก์ชันสแกนหาคีย์หัวคอลัมน์
   function extractValueByKeys(row, possibleKeys) {
     if (!row) return '';
     const keys = Object.keys(row);
@@ -77,6 +80,7 @@ function renderExecutive2(filteredData, rawData) {
     return '';
   }
 
+  // ฟังก์ชันแกะเงินจากในไฟล์จริง 100%
   function extractRevenue(row) {
     let rawVal = extractValueByKeys(row, ['ยอดโอน', 'ยอดขาย', 'ราคารวม', 'ราคาสุทธิ', 'revenue']);
     if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
@@ -86,6 +90,7 @@ function renderExecutive2(filteredData, rawData) {
     return 0;
   }
 
+  // ฟังก์ชันจัดกลุ่มแชนเนลตามคำจริงในไฟล์
   function getExec2Group(row) {
     let rawCh = extractValueByKeys(row, ['ช่องทาง', 'channel', 'platform']);
     let chStr = (rawCh || '').toString().trim().toLowerCase();
@@ -102,8 +107,9 @@ function renderExecutive2(filteredData, rawData) {
     return 'Other';
   }
 
+  // ฟังก์ชันแกะหา ID ลูกค้าจริงในไฟล์เพื่อเช็กว่าเคยซื้อซ้ำไหม
   function getLocalCustomerId(row) {
-    let cid = extractValueByKeys(row, ['รหัสลูกค้า', 'customerid', 'customer id', 'รหัสลูกค้า (ลูกค้า) ไม่ใช้']);
+    let cid = extractValueByKeys(row, ['customer id', 'customerid', 'รหัสลูกค้า', 'รหัสลูกค้า (ลูกค้า) ไม่ใช้']);
     if (cid) return cid.toString().trim();
     let phone = extractValueByKeys(row, ['phone', 'เบอร์โทร']);
     if (phone) return phone.toString().trim();
@@ -111,6 +117,7 @@ function renderExecutive2(filteredData, rawData) {
     return addr ? addr.toString().toLowerCase().replace(/[\s\r\n\t\-,\.\/\\_]+/g, '') : '';
   }
 
+  // แปลงวันที่
   const parseD = (dateStr) => {
     if (!dateStr) return null;
     const datePart = dateStr.toString().trim().split(' ')[0];
@@ -125,14 +132,14 @@ function renderExecutive2(filteredData, rawData) {
       if (p0 > 1000) { y = p0; m = p1; d = p2; } 
       else { d = p0; m = p1; y = p2; if (y < 2000) y += 2000; }
       if (y > 2500) y -= 543;
-      return { y, m, d, val: y * 10000 + m * 100 + d, monthNum: m };
+      return { y, m, d, val: y * 10000 + m * 100 + d };
     }
     return null;
   };
 
-  // 1. คำนวณหา วันที่ซื้อครั้งแรก ของลูกค้าแต่ละรายในไฟล์จริง
-  const customerFirstDates = {};      // วันแรกสุดที่ลูกค้าเคยซื้อในชีวิต
-  const customerChannelFirstDates = {}; // วันแรกสุดที่ลูกค้าเคยซื้อในช่องทางนั้น ๆ
+  // 1. ตรวจสอบพฤติกรรมประวัติซื้อครั้งแรกจากไฟล์จริงแบบร้อยเปอร์เซ็นต์
+  const customerFirstDates = {};
+  const customerChannelFirstDates = {};
 
   dataSrc.forEach(row => {
     const id = getLocalCustomerId(row);
@@ -141,12 +148,10 @@ function renderExecutive2(filteredData, rawData) {
     const d = parseD(dateStr);
     if (!d) return;
 
-    // หาประวัติวันแรกของระดับแบรนด์
     if (!customerFirstDates[id] || d.val < customerFirstDates[id]) {
       customerFirstDates[id] = d.val;
     }
 
-    // หาประวัติวันแรกของระดับแชนเนล
     const ch = getExec2Group(row);
     const chKey = `${id}_${ch}`;
     if (!customerChannelFirstDates[chKey] || d.val < customerChannelFirstDates[chKey]) {
@@ -154,14 +159,14 @@ function renderExecutive2(filteredData, rawData) {
     }
   });
 
-  // 2. ตั้งถังเก็บสถิติแยกแชนเนล
+  // 2. จัดโครงสร้าง 9 ช่องทางหลัก
   const allowedChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'];
   const agg = {};
   allowedChannels.forEach(ch => {
-    agg[ch] = { revenue: 0, buyers: new Set(), newCustCount: 0, migrationCount: 0 };
+    agg[ch] = { revenue: 0, buyers: new Set(), newCustBuyers: new Set(), migrationBuyers: new Set() };
   });
 
-  // 3. เริ่มสแกนจริงเพื่อหาว่าพฤติกรรมลูกค้าเป็นแบบไหน
+  // 3. กวาดข้อมูลและนับตามข้อมูลดิบจริง
   dataSrc.forEach(row => {
     const rev = extractRevenue(row);
     const ch = getExec2Group(row);
@@ -177,36 +182,34 @@ function renderExecutive2(filteredData, rawData) {
       const globalFirst = customerFirstDates[id];
       const chFirst = customerChannelFirstDates[`${id}_${targetCh}`];
 
-      // ลูกค้าใหม่แท้ (วันแรกที่ซื้อตรงกับวันในบิลนี้พอดี)
       if (globalFirst === d.val) {
-        agg[targetCh].newCustCount += 1;
-      } 
-      // ลูกค้าเก่า แต่พึ่งย้ายค่ายมาซื้อช่องทางนี้ครั้งแรก (Migration)
-      else if (chFirst === d.val) {
-        agg[targetCh].migrationCount += 1;
+        agg[targetCh].newCustBuyers.add(id);
+      } else if (chFirst === d.val) {
+        agg[targetCh].migrationBuyers.add(id);
       }
     }
   });
 
-  // 4. แปลงผลลัพธ์เข้า Matrix ตัดเกรดกลยุทธ์ตามสัดส่วนจริง
+  // 4. คำนวณตัดกลุ่มตามเปอร์เซ็นต์แท้จริงจาก Raw Data
   const results = allowedChannels.map(ch => {
     const data = agg[ch];
     const buyersCount = data.buyers.size;
-    
-    // คำนวณ % จริงจากพฤติกรรมในฐานข้อมูล
-    const pctNew = buyersCount === 0 ? 0 : (data.newCustCount / buyersCount) * 100;
-    const pctMig = buyersCount === 0 ? 0 : (data.migrationCount / buyersCount) * 100;
+    const newCustCount = data.newCustBuyers.size;
+    const migrationCount = data.migrationBuyers.size;
+
+    const pctNew = buyersCount === 0 ? 0 : (newCustCount / buyersCount) * 100;
+    const pctMig = buyersCount === 0 ? 0 : (migrationCount / buyersCount) * 100;
     const totalShare = pctNew + pctMig;
 
     let category = ''; let categoryClass = ''; let dotClass = '';
     
     if (buyersCount === 0 || data.revenue === 0) {
       category = 'Retention Hub'; categoryClass = 'badge-retention'; dotClass = 'dot-retention';
-    } else if (pctNew > 50) { // ปรับเกณฑ์ทัพหน้าให้ไวขึ้นเล็กน้อยตามธรรมชาติไฟล์จริง
+    } else if (pctNew > 60) {
       category = 'Vanguard (ทัพหน้า)'; categoryClass = 'badge-vanguard'; dotClass = 'dot-vanguard';
-    } else if (pctMig > 40) {
+    } else if (pctMig > 60) {
       category = 'Migration Hub'; categoryClass = 'badge-migration'; dotClass = 'dot-migration';
-    } else if (totalShare < 25) {
+    } else if (totalShare < 30) {
       category = 'Cash Cow (เสือนอนกิน)'; categoryClass = 'badge-cashcow'; dotClass = 'dot-cashcow';
     } else {
       category = 'Retention Hub'; categoryClass = 'badge-retention'; dotClass = 'dot-retention';
@@ -214,7 +217,7 @@ function renderExecutive2(filteredData, rawData) {
 
     return {
       channel: ch, revenue: data.revenue, buyers: buyersCount, 
-      newCust: data.newCustCount, newToSub: data.migrationCount, 
+      newCust: newCustCount, newToSub: migrationCount, 
       pctMig: pctMig, pctNew: pctNew,
       category: category, categoryClass: categoryClass, dotClass: dotClass
     };
@@ -225,20 +228,21 @@ function renderExecutive2(filteredData, rawData) {
   const fmtNum = (num) => (Number(num) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
   const fmtPct = (num) => (Number(num) || 0).toFixed(0) + '%';
 
+  // 5. พ่นโค้ดและเปลี่ยนหัวข้อกลับเป็น All Months Data
   let html = `
     <div class="exec2-cards">
       <div class="exec2-card vanguard">
         <div class="exec2-card-dot dot-vanguard"></div>
         <div class="exec2-card-text">
           <span class="exec2-card-title">Vanguard (ทัพหน้า)</span>
-          <span class="exec2-card-sub">หาคนใหม่เก่งมาก (>50%)</span>
+          <span class="exec2-card-sub">หาคนใหม่เก่งมาก (>60%)</span>
         </div>
       </div>
       <div class="exec2-card migration">
         <div class="exec2-card-dot dot-migration"></div>
         <div class="exec2-card-text">
           <span class="exec2-card-title">Migration Hub</span>
-          <span class="exec2-card-sub">จุดรับแขกเก่า (>40%)</span>
+          <span class="exec2-card-sub">จุดรับแขกเก่า (>60%)</span>
         </div>
       </div>
       <div class="exec2-card retention">
@@ -252,14 +256,14 @@ function renderExecutive2(filteredData, rawData) {
         <div class="exec2-card-dot dot-cashcow"></div>
         <div class="exec2-card-text">
           <span class="exec2-card-title">Cash Cow</span>
-          <span class="exec2-card-sub">เสือนอนกิน (<25%)</span>
+          <span class="exec2-card-sub">เสือนอนกิน (<30%)</span>
         </div>
       </div>
     </div>
 
     <div class="exec2-table-header">
       <h3>ความหมายเชิงกลยุทธ์ (Strategic Meaning)</h3>
-      <span class="month-label">Real-time Data Assessment</span>
+      <span class="month-label">All Months Data</span>
     </div>
 
     <div class="exec2-table-wrapper">
