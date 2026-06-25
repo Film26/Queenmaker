@@ -2,12 +2,13 @@
 function renderExecutive2(filteredData, rawData) {
   const container = document.getElementById('view-executive2');
   
-  if (!filteredData || filteredData.length === 0) {
+  // 🚨 แก้ไขเพื่อความปลอดภัย: ถ้าไม่มีข้อมูลดิบส่งมาเลย ค่อยขึ้น No Data
+  if (!rawData || rawData.length === 0) {
     container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">No data available. Please adjust filters or load data.</div>';
     return;
   }
 
-  // Inject CSS if not exists to bypass browser cache issues for styles.css
+  // Inject CSS if not exists เพื่อความสวยงามของหน้าจอ
   if (!document.getElementById('exec2-styles')) {
     const style = document.createElement('style');
     style.id = 'exec2-styles';
@@ -64,43 +65,34 @@ function renderExecutive2(filteredData, rawData) {
     document.head.appendChild(style);
   }
 
-  // Helper to parse date from string
+  // ฟังก์ชันแกะและแปลงวันที่สำหรับหน้านี้โดยเฉพาะ
   const parseD = (dateStr) => {
     if (!dateStr) return null;
-    if (window.parseDate) {
-      const parsed = window.parseDate(dateStr);
-      if (parsed) {
-        return { y: parsed.y, m: parsed.m, d: parsed.d, val: parsed.y * 10000 + parsed.m * 100 + parsed.d };
-      }
+    const datePart = dateStr.toString().trim().split(' ')[0];
+    let parts = datePart.split('/');
+    if (parts.length < 3) parts = datePart.split('-');
+    if (parts.length >= 3) {
+      let p0 = parseInt(parts[0], 10);
+      let p1 = parseInt(parts[1], 10);
+      let p2 = parseInt(parts[2], 10);
+      if (isNaN(p0) || isNaN(p1) || isNaN(p2)) return null;
+      let y, m, d;
+      if (p0 > 1000) { y = p0; m = p1; d = p2; } 
+      else if (p2 > 1000) { d = p0; m = p1; y = p2; } 
+      else { d = p0; m = p1; y = p2; if (y < 2000) y += 2000; }
+      if (y > 2500) y -= 543; // แปลง พ.ศ. เป็น ค.ศ.
+      return { y, m, d, val: y * 10000 + m * 100 + d, str: `${y}-${m.toString().padStart(2, '0')}` };
     }
-    const parts = dateStr.split(' ')[0].split('/');
-    if (parts.length < 3) return null;
-    let y = parseInt(parts[2]);
-    let m = parseInt(parts[1]);
-    let d = parseInt(parts[0]);
-    if (y < 2000) y += 2000;
-    return { y, m, d, val: y * 10000 + m * 100 + d };
+    return null;
   };
 
-  // รายการ 9 ช่องทางหลักมาตรฐาน
-  const allowedChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'];
-
-  // ฟังก์ชันดึงค่าที่ฉลาดขึ้นและแมปปิ้งคำตรงจากในไฟล์ Excel ของคุณงับ
+  // ฟังก์ชันแกะช่องทางขายอย่างละเอียดแบบพิมพ์เล็ก-ใหญ่ ไม่ให้พลาด
   function getExec2Group(row) {
     if (!row) return 'Other';
-    
-    // ดึงค่าแบบยืดหยุ่นจากคีย์ภาษาไทยและอังกฤษที่เป็นไปได้ทั้งหมดใน Row
     let rawCh = row['ช่องทาง'] || row['channel'] || row['Channel'] || row['Platform'] || '';
     let chStr = rawCh.toString().trim();
-    
-    // ถ้าหน้าระบบมีฟังก์ชันเกลี่ยช่องทางอยู่แล้วให้ลองเรียกใช้ดูก่อน
-    if (!chStr && window.getNormalizedChannel) {
-      chStr = window.getNormalizedChannel(row);
-    }
-    
     let lower = chStr.toLowerCase();
     
-    // ดักคำพ้องความหมายตามคำที่เจอในไฟล์จริง
     if (lower.includes('facebook') || lower === 'fb' || lower.includes('เพจ')) return 'Facebook';
     if (lower.includes('line') || lower.includes('ไลน์')) return 'Line';
     if (lower.includes('tiktok') || lower.includes('tt')) return 'Tiktok';
@@ -109,150 +101,172 @@ function renderExecutive2(filteredData, rawData) {
     if (lower.includes('call') || lower.includes('โทร') || lower.includes('tele')) return 'Call';
     if (lower.includes('crm')) return 'CRM';
     if (lower.includes('instagram') || lower === 'ig') return 'Instagram';
-    if (lower.includes('website') || lower.includes('เว็บ')) return 'Website';
     
     return 'Other';
   }
 
-  // Determine Channel first purchase dates globally (using ALL raw data)
-  if (!window.chFirstPurchase) {
-    window.chFirstPurchase = {};
-    if (rawData && rawData.length > 0) {
-      rawData.forEach(row => {
-        if (window.isSaleOrder && !window.isSaleOrder(row)) return;
-        
-        // ดึง Unique ID ของลูกค้า
-        let id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : (row['รหัสลูกค้า'] || row['Customer ID'] || row['Phone'] || row['phone']);
-        const ch = getExec2Group(row);
-        
-        // ดึงวันที่สร้างออเดอร์
-        let dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
-        
-        if (!id || !dateStr) return;
-        const d = parseD(dateStr.toString());
-        if (!d) return;
-        const key = id.toString().trim() + '_' + ch;
-        if (!window.chFirstPurchase[key] || d.val < window.chFirstPurchase[key]) {
-          window.chFirstPurchase[key] = d.val;
-        }
-      });
-    }
-  }
-  const chFirstPurchase = window.chFirstPurchase;
+  // ฟังก์ชันตรวจเช็กออเดอร์ของหน้า Executive2 เอง (ไม่พึ่งพาระบบหลักที่ติดขัดเรื่องคอลัมน์เงิน)
+  function isLocalSaleOrder(row) {
+    if (!row) return false;
+    // ดึงเงินจากคอลัมน์ที่มีค่าจริงในไฟล์ Excel ของคุณก่อนเป็นอันดับแรก
+    let revenueStr = row['ยอดโอน'] || row['ราคารวม'] || row['ยอดขาย'] || row['ราคาสุทธิ'] || '0';
+    let revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim());
+    if (isNaN(revenue) || revenue <= 0) return false;
 
-  // Aggregate data by Channel for the CURRENTLY FILTERED data
+    // คัดกรองของแถมของแจกออกตามเงื่อนไขเดิม
+    const remark = (row['หมายเหตุ'] || row['Remark'] || '').toString().toUpperCase();
+    const nonSaleKeywords = ['ของขวัญวันเกิด', 'ของขวัญปีใหม่', 'เคลม', 'ของแถม', 'แจก', 'SAMPLE', 'REPLACE', 'คืนเงิน', 'REFUND', 'RERUND'];
+    for (let kw of nonSaleKeywords) {
+      if (remark.includes(kw)) return false;
+    }
+    return true;
+  }
+
+  // ค้นหา Unique ID ลูกค้า
+  function getLocalCustomerId(row) {
+    let addr = row['ที่อยู่ (ลูกค้า)'] || row['ที่อยู่'] || row['Address'] || row['address'] || '';
+    if (addr) {
+      return addr.toString().toLowerCase().replace(/[\s\r\n\t\-,\.\/\\_]+/g, '');
+    }
+    return (row['รหัสลูกค้า'] || row['Customer ID'] || row['Phone'] || row['phone'] || '').toString().trim();
+  }
+
+  // 1. ค้นหาประวัติการซื้อครั้งแรกของลูกค้าทุกคนบนฐานข้อมูลดิบทั้งหมด (rawData) เพื่อทำ New vs Retained
+  const localGlobalFirstPurchase = {};
+  const localChFirstPurchase = {};
+
+  rawData.forEach(row => {
+    if (!isLocalSaleOrder(row)) return;
+    const id = getLocalCustomerId(row);
+    const dateStr = row['วันที่โอนเงิน'] || row['วันที่สร้าง'] || row['OrderDate'] || row['Date'] || row['วันที่'];
+    if (!id || !dateStr) return;
+    const d = parseD(dateStr);
+    if (!d) return;
+
+    // สำหรับ Global First Purchase
+    if (!localGlobalFirstPurchase[id] || d.val < localGlobalFirstPurchase[id]) {
+      localGlobalFirstPurchase[id] = d.val;
+    }
+
+    // สำหรับ New-to-Channel First Purchase
+    const ch = getExec2Group(row);
+    const chKey = id + '_' + ch;
+    if (!localChFirstPurchase[chKey] || d.val < localChFirstPurchase[chKey]) {
+      localChFirstPurchase[chKey] = d.val;
+    }
+  });
+
+  // 2. จัดเตรียมถังโครงสร้างข้อมูลสำหรับ 9 ช่องทางหลัก
+  const allowedChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'];
   const agg = {};
-  
   allowedChannels.forEach(ch => {
     agg[ch] = { revenue: 0, orders: 0, uniqueBuyers: new Set(), retainedBuyers: new Set(), newGlobalBuyers: new Set(), newToSubBuyers: new Set() };
   });
-  
-  filteredData.forEach(row => {
-    let ch = getExec2Group(row);
-    if (!agg[ch]) ch = 'Other';
-    
-    let id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : (row['รหัสลูกค้า'] || row['Customer ID'] || row['Phone'] || row['phone']);
-    let dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
-    
-    // ดึงยอดเงินโดยเน้นไปที่ 'ยอดโอน' และ 'ราคารวม' ก่อนตามหัวตารางจริงในไฟล์ของคุณ
-    let revenueStr = row['ยอดโอน'] || row['ราคารวม'] || row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'] || row['Net Sales'] || '0';
-    
-    if (!id || !dateStr) return;
-    const d = parseD(dateStr.toString());
-    if (!d) return;
-    
-    const rev = parseFloat(revenueStr.toString().replace(/,/g, '').trim());
-    agg[ch].revenue += isNaN(rev) ? 0 : rev;
-    agg[ch].orders += 1;
-    agg[ch].uniqueBuyers.add(id.toString().trim());
 
-    // Global New vs Retained
-    let buyerId = id.toString().trim();
-    if (window.globalFirstPurchase && window.globalFirstPurchase[buyerId]) {
-      const firstDate = window.globalFirstPurchase[buyerId];
-      if (firstDate.val < d.val) {
-        agg[ch].retainedBuyers.add(buyerId);
-      } else {
-        agg[ch].newGlobalBuyers.add(buyerId);
-      }
+  // 3. หยิบข้อมูลดิบทั้งหมด (rawData) มาคัดกรองตาม Dropdown Filters ที่กดเลือกอยู่บนหน้าเว็บจริง ๆ 
+  const currentFilters = window.filters || { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Admin: 'All' };
+
+  rawData.forEach(row => {
+    if (!isLocalSaleOrder(row)) return;
+    
+    const dateStr = row['วันที่โอนเงิน'] || row['วันที่สร้าง'] || row['OrderDate'] || row['Date'] || row['วันที่'];
+    if (!dateStr) return;
+    const d = parseD(dateStr);
+    if (!d) return;
+
+    // ดึงค่ามิติข้อมูลเพื่อนำมา Match กับ Filters ตัวบนของหน้าเว็บ
+    const ch = getExec2Group(row);
+    const id = getLocalCustomerId(row);
+    const revenueStr = row['ยอดโอน'] || row['ราคารวม'] || row['ยอดขาย'] || row['ราคาสุทธิ'] || '0';
+    
+    // ดึงค่าเสริมสำหรับใช้กรองกับระบบหลัก (ถ้ามีคนกดยืดหยุ่นตัวกรองด้านบน)
+    const subChannel = row['Sub Channel'] || row['SubChannel'] || row['ชื่อคลัง'] || ch;
+    const rawProd = row['ชื่อสินค้า'] || row['Product'] || row['รายการขาย'] || row['Product Set'] || '';
+    const adminVal = row['ชื่อแอดมิน'] || row['Admin'] || row['Admin Name'] || '';
+
+    // ตรวจสอบกับ Global Filters ด้านบนของหน้าจอ
+    if (currentFilters.Year !== 'All' && d.y.toString() !== currentFilters.Year) return;
+    if (currentFilters.Month !== 'All' && d.str !== currentFilters.Month) return;
+    if (currentFilters.Channel !== 'All' && ch !== currentFilters.Channel) return;
+    if (currentFilters.SubChannel !== 'All' && subChannel.toString().trim() !== currentFilters.SubChannel) return;
+    if (currentFilters.Admin !== 'All' && !adminVal.toString().includes(currentFilters.Admin)) return;
+
+    // ผ่านทุกด่านตัวกรอง -> นำมาบวกแต้มคำนวณเงินในตารางนี้
+    let targetCh = agg[ch] ? ch : 'Other';
+    const rev = parseFloat(revenueStr.toString().replace(/,/g, '').trim()) || 0;
+    
+    agg[targetCh].revenue += rev;
+    agg[targetCh].orders += 1;
+    agg[targetCh].uniqueBuyers.add(id);
+
+    // คำนวณ Global New vs Retained
+    if (localGlobalFirstPurchase[id] && localGlobalFirstPurchase[id] < d.val) {
+      agg[targetCh].retainedBuyers.add(id);
     } else {
-      agg[ch].newGlobalBuyers.add(buyerId);
+      agg[targetCh].newGlobalBuyers.add(id);
     }
 
-    // New-to-Channel (Migration) logic
-    const key = buyerId + '_' + ch;
-    if (chFirstPurchase[key]) {
-      if (chFirstPurchase[key] === d.val) {
-        if (!agg[ch].newGlobalBuyers.has(buyerId)) {
-          agg[ch].newToSubBuyers.add(buyerId);
-        }
+    // คำนวณ New-to-Channel (Migration)
+    const chKey = id + '_' + targetCh;
+    if (localChFirstPurchase[chKey] === d.val) {
+      if (!agg[targetCh].newGlobalBuyers.has(id)) {
+        agg[targetCh].newToSubBuyers.add(id);
       }
     }
   });
 
-  // Convert to array and calculate metrics
+  // 4. แปลงผลลัพธ์เป็น Array เพื่อนำไปประกอบ HTML มิติ Metric ต่าง ๆ
+  let hasAnyCalculatedData = false;
   const results = allowedChannels.map(ch => {
     const data = agg[ch];
     const buyers = data.uniqueBuyers.size;
     const newCust = data.newGlobalBuyers.size;
     const newToChannel = data.newToSubBuyers.size;
     
+    if (buyers > 0) hasAnyCalculatedData = true;
+
     const pctNew = buyers === 0 ? 0 : (newCust / buyers) * 100;
     const pctMig = buyers === 0 ? 0 : (newToChannel / buyers) * 100;
     
     let category = '';
     let categoryClass = '';
     let dotClass = '';
-    
     const totalNewAndMig = pctNew + pctMig;
     
     if (buyers === 0) {
-      category = 'No Data';
-      categoryClass = 'badge-retention';
-      dotClass = 'dot-retention';
+      category = 'No Data'; categoryClass = 'badge-retention'; dotClass = 'dot-retention';
     } else if (pctNew > 70) {
-      category = 'Vanguard (ทัพหน้า)';
-      categoryClass = 'badge-vanguard';
-      dotClass = 'dot-vanguard';
+      category = 'Vanguard (ทัพหน้า)'; categoryClass = 'badge-vanguard'; dotClass = 'dot-vanguard';
     } else if (pctMig > 70) {
-      category = 'Migration Hub';
-      categoryClass = 'badge-migration';
-      dotClass = 'dot-migration';
+      category = 'Migration Hub'; categoryClass = 'badge-migration'; dotClass = 'dot-migration';
     } else if (totalNewAndMig < 30) {
-      category = 'Cash Cow (เสือนอนกิน)';
-      categoryClass = 'badge-cashcow';
-      dotClass = 'dot-cashcow';
+      category = 'Cash Cow (เสือนอนกิน)'; categoryClass = 'badge-cashcow'; dotClass = 'dot-cashcow';
     } else {
-      category = 'Retention Hub';
-      categoryClass = 'badge-retention';
-      dotClass = 'dot-retention';
+      category = 'Retention Hub'; categoryClass = 'badge-retention'; dotClass = 'dot-retention';
     }
 
     return {
-      channel: ch,
-      revenue: data.revenue,
-      buyers: buyers,
-      newCust: newCust,
-      newToSub: newToChannel,
-      pctMig: pctMig,
-      pctNew: pctNew,
-      category: category,
-      categoryClass: categoryClass,
-      dotClass: dotClass
+      channel: ch, revenue: data.revenue, buyers: buyers, newCust: newCust,
+      newToSub: newToChannel, pctMig: pctMig, pctNew: pctNew,
+      category: category, categoryClass: categoryClass, dotClass: dotClass
     };
   });
 
-  // เรียงลำดับตารางตามยอดรายได้จากมากไปน้อย
+  // ถ้าเช็กข้อมูลดิบลึกสุดใจแล้วยังไม่มีใครซื้อเลยจริง ๆ ค่อยขึ้นตัวแจ้ง No data
+  if (!hasAnyCalculatedData) {
+    container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">No data matches the current filter criteria.</div>';
+    return;
+  }
+
+  // เรียงลำดับแชนเนลตามยอดรายได้ชอปปิงจากมากไปน้อย
   results.sort((a, b) => b.revenue - a.revenue);
 
-  // Formatting helpers
+  // สเปคฟอร์แมตตัวเลขและเปอร์เซ็นต์
   const fmtNum = (num) => (Number(num) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
   const fmtPct = (num) => (Number(num) || 0).toFixed(0) + '%';
-  
-  const currentMonthLabel = (window.filters && window.filters.Month !== 'All') 
-    ? window.filters.Month 
-    : 'All Months';
+  const currentMonthLabel = (currentFilters.Month !== 'All') ? currentFilters.Month : 'All Months';
 
+  // 5. ประกอบโครงสร้าง HTML เพื่อพ่นขึ้น UI หน้าเว็บ
   let html = `
     <div class="exec2-cards">
       <div class="exec2-card vanguard">
@@ -286,7 +300,7 @@ function renderExecutive2(filteredData, rawData) {
     </div>
 
     <div class="exec2-table-header">
-      <h3>ความหมายเชิงกลยุทธ์ (Strategic Meaning)</h3>
+      <h3>ความหมายเชิงกลยุทธ์ (Strategic Meaning) — บังคับดึงคอลัมน์เงินตรงจุด</h3>
       <span class="month-label">${currentMonthLabel}</span>
     </div>
 
@@ -311,7 +325,7 @@ function renderExecutive2(filteredData, rawData) {
     html += `
       <tr>
         <td style="font-weight: 700;">${r.channel}</td>
-        <td>${fmtNum(r.revenue)}</td>
+        <td style="color: #2c3e50; font-weight: bold;">฿${fmtNum(r.revenue)}</td>
         <td>${fmtNum(r.buyers)}</td>
         <td>${fmtNum(r.newCust)}</td>
         <td>${fmtNum(r.newToSub)}</td>
