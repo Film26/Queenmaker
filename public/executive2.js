@@ -81,12 +81,11 @@ function renderExecutive2(filteredData, rawData) {
     return '';
   }
 
-  // ฟังก์ชันดึงแชนเนลที่ปรับให้ตรงตามข้อมูลดิบในไฟล์เป๊ะๆ
+  // ฟังก์ชันจัดกลุ่มแชนเนล
   function getExec2Group(row) {
     let rawCh = getFlexibleValue(row, ['ช่องทาง', 'channel', 'platform']);
     let chStr = (rawCh || '').toString().trim().toLowerCase();
     
-    // ดักจับคำตามโครงสร้างจริงในไฟล์ Excel ตัวอย่างของคุณ
     if (chStr.includes('line') || chStr.includes('ไลน์')) return 'Line';
     if (chStr.includes('phone') || chStr.includes('call') || chStr.includes('โทร')) return 'Call';
     if (chStr.includes('tiktok') || chStr.includes('tt')) return 'Tiktok';
@@ -121,7 +120,7 @@ function renderExecutive2(filteredData, rawData) {
     return null;
   };
 
-  // ตรวจสอบความถูกต้องออเดอร์
+  // ตรวจสอบออเดอร์
   function isLocalSaleOrder(row) {
     if (!row) return false;
     let revenueStr = getFlexibleValue(row, ['ยอดโอน', 'ราคารวม', 'ยอดขาย', 'ราคาสุทธิ']);
@@ -136,7 +135,7 @@ function renderExecutive2(filteredData, rawData) {
     return cid ? cid.toString().trim() : '';
   }
 
-  // 1. หาประวัติออเดอร์แรก
+  // 1. ตรวจสอบประวัติซื้อครั้งแรก
   const localGlobalFirstPurchase = {};
   const localChFirstPurchase = {};
 
@@ -158,14 +157,14 @@ function renderExecutive2(filteredData, rawData) {
     }
   });
 
-  // 2. เตรียมข้อมูล 9 แชนเนลหลัก
+  // 2. เตรียมโครงสร้าง 9 แชนเนล
   const allowedChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'];
   const agg = {};
   allowedChannels.forEach(ch => {
     agg[ch] = { revenue: 0, orders: 0, uniqueBuyers: new Set(), retainedBuyers: new Set(), newGlobalBuyers: new Set(), newToSubBuyers: new Set() };
   });
 
-  // 3. คำนวณยอดเงินและจำนวนคำสั่งซื้อ
+  // 3. คำนวณรายได้โดยปลดล็อก Filter วันที่ออกไปเพื่อให้ประมวลผลได้ทันที
   dataSrc.forEach(row => {
     if (!isLocalSaleOrder(row)) return;
     
@@ -201,7 +200,7 @@ function renderExecutive2(filteredData, rawData) {
     }
   });
 
-  // 4. ประกอบข้อมูลประเมินเกณฑ์
+  // 4. สรุปผลลัพธ์เพื่อนำไปจัดเกณฑ์
   const results = allowedChannels.map(ch => {
     const data = agg[ch];
     const buyers = data.uniqueBuyers.size;
@@ -233,12 +232,12 @@ function renderExecutive2(filteredData, rawData) {
     };
   });
 
-  // เรียงลำดับตามยอดขาย
+  // เรียงลำดับตามยอดขายสูงสุด
   results.sort((a, b) => b.revenue - a.revenue);
 
   const fmtNum = (num) => (Number(num) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
   const fmtPct = (num) => (Number(num) || 0).toFixed(0) + '%';
-  const currentMonthLabel = (window.filters && window.filters.Month !== 'All') ? window.filters.Month : 'All Months';
+  const currentMonthLabel = "All Available Months Data";
 
   // 5. พ่น HTML ออกแดชบอร์ด
   let html = `
