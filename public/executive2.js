@@ -1,5 +1,4 @@
 // public/executive2.js
-
 function renderExecutive2(filteredData, rawData) {
   const container = document.getElementById('view-executive2');
   
@@ -83,8 +82,16 @@ function renderExecutive2(filteredData, rawData) {
     return { y, m, d, val: y * 10000 + m * 100 + d };
   };
 
+  // ลิสต์รายการมาตรฐานที่คุณกำหนดสำหรับ SubChannel
+  const allowedSubChannels = ['Call', 'CRM', 'Email', 'FB', 'FBC', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'IG-FBH', 'IG-FBSS', 'IG-FBW', 'Lazada', 'Line', 'Other', 'PC', 'Shopee', 'Telesale', 'Tiktok', 'Website'];
+
   function getExec2Group(row) {
-    return window.getNormalizedSubChannel ? window.getNormalizedSubChannel(row) : 'Other';
+    const rawGroup = window.getNormalizedSubChannel ? window.getNormalizedSubChannel(row) : 'Other';
+    // 🚨 จุดแก้ไขสำคัญ 1: ถ้าค่าที่ได้เป็น Main หรือไม่อยู่ในกลุ่มรายชื่อที่ตกลงไว้ ให้ดีดไปที่ Other ทันที
+    if (rawGroup === 'Main' || !allowedSubChannels.includes(rawGroup)) {
+      return 'Other';
+    }
+    return rawGroup;
   }
 
   // Determine SubChannel first purchase dates globally (using ALL raw data)
@@ -112,18 +119,24 @@ function renderExecutive2(filteredData, rawData) {
   // Aggregate data by SubChannel for the CURRENTLY FILTERED data
   const agg = {};
   
+  // 🚨 จุดแก้ไขสำคัญ 2: ประกาศเตรียมพื้นที่ให้กับช่องทางย่อยในลิสต์มาตรฐานล่วงหน้า เพื่อให้ดึงข้อมูลได้นิ่งและเรียงสวยงาม
+  allowedSubChannels.forEach(sc => {
+    agg[sc] = { 
+      revenue: 0, 
+      orders: 0, 
+      uniqueBuyers: new Set(), 
+      retainedBuyers: new Set(), 
+      newGlobalBuyers: new Set(), 
+      newToSubBuyers: new Set() 
+    };
+  });
+  
   filteredData.forEach(row => {
     let sc = getExec2Group(row);
 
+    // ป้องกันเคสตกหล่นฉุกเฉิน
     if (!agg[sc]) {
-      agg[sc] = { 
-        revenue: 0, 
-        orders: 0, 
-        uniqueBuyers: new Set(), 
-        retainedBuyers: new Set(), 
-        newGlobalBuyers: new Set(), 
-        newToSubBuyers: new Set() 
-      };
+      agg[sc] = { revenue: 0, orders: 0, uniqueBuyers: new Set(), retainedBuyers: new Set(), newGlobalBuyers: new Set(), newToSubBuyers: new Set() };
     }
     
     const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
@@ -143,11 +156,9 @@ function renderExecutive2(filteredData, rawData) {
     // Global New vs Retained
     if (globalFirstPurchase && globalFirstPurchase[id]) {
       const firstDate = globalFirstPurchase[id];
-      // Compare dates strictly
       if (firstDate.val < d.val) {
         agg[sc].retainedBuyers.add(id);
       } else {
-        // Must be the first purchase
         agg[sc].newGlobalBuyers.add(id);
       }
     }
@@ -156,8 +167,6 @@ function renderExecutive2(filteredData, rawData) {
     const key = id + '_' + sc;
     if (scFirstPurchase[key]) {
       if (scFirstPurchase[key] === d.val) {
-        // This is their very first purchase on THIS subchannel
-        // If they are not globally new, they are migrating to this subchannel!
         if (!agg[sc].newGlobalBuyers.has(id)) {
           agg[sc].newToSubBuyers.add(id);
         }
@@ -166,7 +175,8 @@ function renderExecutive2(filteredData, rawData) {
   });
 
   // Convert to array and calculate metrics
-  const results = Object.keys(agg).map(sc => {
+  // 🚨 จุดแก้ไขสำคัญ 3: วนลูปสร้างอาเรย์ผลลัพธ์ตามลำดับ allowedSubChannels จะได้ตัดพวกค่าขยะหรือ Main ออกทั้งหมด
+  const results = allowedSubChannels.map(sc => {
     const data = agg[sc];
     const buyers = data.uniqueBuyers.size;
     const newCust = data.newGlobalBuyers.size;
@@ -182,7 +192,11 @@ function renderExecutive2(filteredData, rawData) {
     
     const totalNewAndMig = pctNew + pctMig;
     
-    if (pctNew > 70) {
+    if (buyers === 0) {
+      category = 'No Data';
+      categoryClass = 'badge-retention';
+      dotClass = 'dot-retention';
+    } else if (pctNew > 70) {
       category = 'Vanguard (ทัพหน้า)';
       categoryClass = 'badge-vanguard';
       dotClass = 'dot-vanguard';
@@ -214,7 +228,7 @@ function renderExecutive2(filteredData, rawData) {
     };
   });
 
-  // Sort by revenue descending
+  // สั่งเรียงลำดับตารางตามรายได้ที่มากที่สุดไปน้อยที่สุด (ยอดที่มีข้อมูลจะดันขึ้นด้านบนสุด)
   results.sort((a, b) => b.revenue - a.revenue);
 
   // Formatting helpers
