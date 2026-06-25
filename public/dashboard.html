@@ -539,33 +539,48 @@
       }
       return true;
     }
-
-    // --- Normalization functions ---
+    // 1. จัดกลุ่มช่องทางหลัก (Channel) ตามที่กำหนด
     function getNormalizedChannel(rawChannel) {
       let ch = (rawChannel || '').toString().trim();
       if (!ch) return 'Other';
       let lower = ch.toLowerCase();
+      
       if (lower.includes('facebook') || lower === 'fb') return 'Facebook';
-      if (lower.includes('line')) return 'Line';
+      if (lower.includes('line')) return 'Line'; // รวบ Line และ Line OA ไว้ด้วยกัน
       if (lower.includes('tiktok')) return 'Tiktok';
       if (lower.includes('shopee')) return 'Shopee';
       if (lower.includes('lazada')) return 'Lazada';
       if (lower.includes('ig') || lower.includes('instagram')) return 'Instagram';
-      if (lower.includes('call')) return 'Call';
+      if (lower.includes('call') || lower.includes('phone')) return 'Call';
       if (lower.includes('crm')) return 'CRM';
-      return ch;
+      if (lower.includes('other')) return 'Other';
+      
+      return 'Other'; // ค่าอื่น ๆ นอกเหนือจากนี้ให้เป็น Other ทั้งหมด
     }
 
+    // 2. จัดกลุ่มช่องทางย่อย (SubChannel) ตามที่กำหนด
     function getNormalizedSubChannel(row) {
       if (!row) return 'Other';
-      let sub = getRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง']);
-      if (!sub || sub.toString().trim() === '') {
-        sub = getRowValue(row, ['ช่องทาง', 'Channel']) || 'Other';
-      }
-      let cleanSub = sub.toString().trim();
-      let lower = cleanSub.toLowerCase();
-      if (cleanSub === '865219993' || cleanSub === '986291641') return 'Other';
       
+      // ดึงค่าจากคอลัมน์ 'Sub Channel', 'SubChannel', หรือ 'ชื่อคลัง'
+      let sub = getRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง (คลังสินค้า)', 'ชื่อคลัง']);
+      
+      // เคสไฟล์ 2021 ไม่มีคอลัมน์คลัง/ช่องทางโดยตรง แต่แฝงอยู่ใน Remark (เช่น "FBH, แอน")
+      if (!sub || sub.toString().trim() === '') {
+        const remark = getRowValue(row, ['Remark', 'หมายเหตุ']);
+        if (remark.includes('\n')) {
+          const lines = remark.split('\n');
+          if (lines.length > 1 && lines[1].includes(',')) {
+            sub = lines[1].split(',')[0].trim();
+          }
+        }
+      }
+      
+      let cleanSub = (sub || '').toString().trim();
+      if (!cleanSub) return 'Other';
+      let lower = cleanSub.toLowerCase();
+      
+      // รายการตรวจสอบชุดคำตามที่กำหนดมาเป๊ะ ๆ
       if (lower === 'fb' || lower === 'facebook') return 'FB';
       if (lower === 'fbc') return 'FBC';
       if (lower === 'fbd') return 'FBD';
@@ -582,114 +597,99 @@
       if (lower === 'ig-fbh' || lower === 'ig_fbh') return 'IG-FBH';
       if (lower === 'ig-fbss' || lower === 'ig_fbss') return 'IG-FBSS';
       if (lower === 'ig-fbw' || lower === 'ig_fbw') return 'IG-FBW';
-      if (lower.includes('line')) return 'Line';
+      if (lower.includes('line')) return 'Line'; // รวบ Line และ Line OA เป็น Line
       if (lower === 'lazada') return 'Lazada';
       if (lower === 'shopee') return 'Shopee';
       if (lower === 'tiktok') return 'Tiktok';
-      if (lower === 'other') return 'Other';
+      if (lower === 'call' || lower === 'phone') return 'Call';
+      if (lower === 'crm') return 'CRM';
+      if (lower === 'email') return 'Email';
       if (lower === 'pc') return 'PC';
       if (lower === 'telesale') return 'Telesale';
       if (lower === 'website' || lower === 'web') return 'Website';
-      if (lower === 'email') return 'Email';
-      if (lower === 'crm') return 'CRM';
-      if (lower === 'call' || lower === 'phone') return 'Call';
-      return cleanSub;
+      if (lower === 'other') return 'Other';
+      
+      return 'Other'; // นอกเหนือจากนี้ปัดตกเป็น Other
     }
 
-    function getNormalizedProduct(rawProd) {
-      let p = (rawProd || '').toString().trim();
-      if (!p) return 'Unknown';
-      let lower = p.toLowerCase();
-      if (lower.includes('plus')) return 'Plus';
-      if (lower.includes('gold')) return 'Gold';
-      if (lower.includes('wiss')) return 'Wiss';
-      if (lower.includes('kides') || lower.includes('kide')) return 'Kides';
-      if (lower.includes('collagen') || lower.includes('callagen')) return 'Collagen';
-      return p;
-    }
-
-    function getNormalizedSubProduct(rawProd) {
-      let p = (rawProd || '').toString().trim();
-      if (!p) return 'Unknown';
-      let lower = p.toLowerCase();
-      if (lower.includes('kides') || lower.includes('kide')) {
-        if (lower.includes('ส้ม')) return 'Kidesส้ม';
-        if (lower.includes('แตงโม')) return 'Kides แตงโม';
-        return 'Kides original';
-      }
-      if (lower.includes('plus')) return 'Plus';
-      if (lower.includes('gold')) return 'Gold';
-      if (lower.includes('wiss')) return 'Wiss';
-      if (lower.includes('collagen') || lower.includes('callagen')) return 'Collagen';
-      return p;
-    }
-
+    // 3. จัดกลุ่มแอดมิน (Admin) ล็อกเฉพาะรายชื่อที่ระบุ
     function getNormalizedAdmin(row) {
       if (!row) return 'Unknown';
       let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
-      if (!val) val = getRowValue(row, ['หมายเหตุ', 'Remark']);
+      
+      // เคสไฟล์ 2021 แฝงอยู่ใน Remark บรรทัดที่สองต่อจากชื่อทีม (เช่น "FBH, แอน")
+      if (!val || val.toString().trim() === '') {
+        const remark = getRowValue(row, ['Remark', 'หมายเหตุ']);
+        if (remark.includes('\n')) {
+          const lines = remark.split('\n');
+          if (lines.length > 1 && lines[1].includes(',')) {
+            val = lines[1].split(',')[1].trim();
+          }
+        }
+      }
+      
       let a = (val || '').toString().trim();
       if (!a) return 'Unknown';
       let lower = a.toLowerCase();
+      
       if (lower.includes('may') || lower.includes('เมย์')) return 'May';
       if (lower.includes('บี')) return 'บี';
       if (lower.includes('มิ้ว')) return 'มิ้ว';
       if (lower.includes('แอน')) return 'แอน';
       if (lower.includes('แอล')) return 'แอล';
-      return a;
+      
+      return 'Unknown'; // แอดมินคนอื่น ๆ นอกเหนือจากนี้ให้เป็น Unknown
     }
-    // --- Dropdowns & Filters Logic ---
+    
     function populateDropdowns() {
-      const options = { Month: new Set(), Year: new Set(), Channel: new Set(), SubChannel: new Set(), Product: new Set(), SubProduct: new Set(), Admin: new Set() };
+      // ตรวจหาปีและเดือนที่มีอยู่จริงในไฟล์ดิบก่อน
+      const yearsSet = new Set();
+      const monthsSet = new Set();
       
       rawData.forEach(row => {
         const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
         if (!dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
-        
-        options.Month.add(d.str);
-        options.Year.add(d.y.toString());
-        
-        // ดักจับข้อมูลอย่างปลอดภัย หากไฟล์ไม่มีคอลัมน์นี้ จะได้ไม่พังค้าง
-        const rawChannel = getRowValue(row, ['ช่องทาง', 'Channel']);
-        const channel = rawChannel ? getNormalizedChannel(rawChannel) : 'Other';
-        
-        const subChannel = getNormalizedSubChannel(row);
-        
-        const rawProductName = getRowValue(row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']);
-        const product = rawProductName ? getNormalizedProduct(rawProductName) : 'Unknown';
-        const subProduct = rawProductName ? getNormalizedSubProduct(rawProductName) : 'Unknown';
-        
-        const admin = getNormalizedAdmin(row);
-        
-        options.Channel.add(channel);
-        options.SubChannel.add(subChannel);
-        options.Product.add(product);
-        options.SubProduct.add(subProduct);
-        options.Admin.add(admin);
+        yearsSet.add(d.y.toString());
+        monthsSet.add(d.str);
       });
 
-      // สั่งสร้างปุ่มในเมนูเฉพาะเมื่อเซ็ตข้อมูลมีค่าจริงเท่านั้น ป้องกันเมนูเอเรอร์
-      ['Year', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].forEach(type => {
+      // ล็อกรายการแสดงผลหน้าฟรอนต์เอนด์ตามที่คุณกำหนดเป๊ะ ๆ
+      const fixedLists = {
+        Channel: ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'],
+        SubChannel: ['Call', 'CRM', 'Email', 'FB', 'FBC', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'IG-FBH', 'IG-FBSS', 'IG-FBW', 'Lazada', 'Line', 'Other', 'PC', 'Shopee', 'Telesale', 'Tiktok', 'Website'],
+        Admin: ['May', 'บี', 'มิ้ว', 'แอน', 'แอล']
+      };
+
+      // สร้างปุ่มให้กับหมวดหมู่ Year
+      const yearMenu = document.getElementById('menu-Year');
+      if (yearMenu) {
+        yearMenu.innerHTML = `<div onclick="setFilter('Year', 'All')">All</div>`;
+        Array.from(yearsSet).sort().forEach(val => {
+          yearMenu.innerHTML += `<div onclick="setFilter('Year', '${val}')">${val}</div>`;
+        });
+      }
+
+      // สร้างปุ่มให้กับหมวดหมู่ Month
+      const monthMenu = document.getElementById('menu-Month');
+      if (monthMenu) {
+        monthMenu.innerHTML = `<div onclick="setFilter('Month', 'All')">All</div>`;
+        Array.from(monthsSet).sort().reverse().forEach(val => {
+          monthMenu.innerHTML += `<div onclick="setFilter('Month', '${val}')">${val}</div>`;
+        });
+      }
+
+      // วนลูปสร้างปุ่ม Dropdown ของช่องทางและแอดมินตามลิสต์ที่ฟิกไว้
+      ['Channel', 'SubChannel', 'Admin'].forEach(type => {
         const menu = document.getElementById('menu-' + type);
         if (!menu) return;
         menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
         
-        // ล้างค่าว่างหรือค่า undefined ออกก่อนเอาไปสร้างปุ่ม
-        const sortedOptions = Array.from(options[type]).filter(v => v && v !== 'null' && v !== 'undefined').sort();
-        sortedOptions.forEach(val => {
+        fixedLists[type].forEach(val => {
           menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
         });
       });
-      
-      const monthMenu = document.getElementById('menu-Month');
-      if (monthMenu) {
-        monthMenu.innerHTML = `<div onclick="setFilter('Month', 'All')">All</div>`;
-        Array.from(options.Month).sort().reverse().forEach(val => {
-          monthMenu.innerHTML += `<div onclick="setFilter('Month', '${val}')">${val}</div>`;
-        });
-      }
     }
 
     function setFilter(type, val) {
