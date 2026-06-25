@@ -2,7 +2,7 @@
 function renderExecutive2(filteredData, rawData) {
   const container = document.getElementById('view-executive2');
   
-  // เลือกแหล่งข้อมูลที่ปลอดภัยที่สุด
+  // เลือกแหล่งข้อมูลที่สมบูรณ์ที่สุด
   const dataSrc = (rawData && rawData.length > 0) ? rawData : (filteredData || []);
 
   if (!dataSrc || dataSrc.length === 0) {
@@ -67,95 +67,76 @@ function renderExecutive2(filteredData, rawData) {
     document.head.appendChild(style);
   }
 
-  // ฟังก์ชันกลางสำหรับดึงค่าคอลัมน์แบบไม่สนใจตัวพิมพ์เล็ก-ใหญ่ หรือช่องว่างแฝง (Case-Insensitive Match)
+  // ฟังก์ชันกลางดึงค่าหัวคอลัมน์
   function getFlexibleValue(row, keysArray) {
     if (!row) return '';
     const rowKeys = Object.keys(row);
     for (let targetKey of keysArray) {
       const cleanTarget = targetKey.toLowerCase().replace(/[\s_\-]+/g, '');
-      // วิ่งหาคีย์ที่ชื่อตรงกัน
       for (let rKey of rowKeys) {
         const cleanRowKey = rKey.toLowerCase().replace(/[\s_\-]+/g, '');
-        if (cleanRowKey === cleanTarget) {
-          return row[rKey];
-        }
+        if (cleanRowKey === cleanTarget) return row[rKey];
       }
     }
     return '';
   }
 
-  // เดือนแมปปิ้งหน้าระบบ
-  const monthMap = {
-    'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
-    'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
-    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
-  };
+  // ฟังก์ชันดึงแชนเนลที่ปรับให้ตรงตามข้อมูลดิบในไฟล์เป๊ะๆ
+  function getExec2Group(row) {
+    let rawCh = getFlexibleValue(row, ['ช่องทาง', 'channel', 'platform']);
+    let chStr = (rawCh || '').toString().trim().toLowerCase();
+    
+    // ดักจับคำตามโครงสร้างจริงในไฟล์ Excel ตัวอย่างของคุณ
+    if (chStr.includes('line') || chStr.includes('ไลน์')) return 'Line';
+    if (chStr.includes('phone') || chStr.includes('call') || chStr.includes('โทร')) return 'Call';
+    if (chStr.includes('tiktok') || chStr.includes('tt')) return 'Tiktok';
+    if (chStr.includes('lazada')) return 'Lazada';
+    if (chStr.includes('shopee')) return 'Shopee';
+    if (chStr.includes('facebook') || chStr === 'fb') return 'Facebook';
+    if (chStr.includes('crm')) return 'CRM';
+    if (chStr.includes('instagram') || chStr === 'ig') return 'Instagram';
+    
+    return 'Other';
+  }
 
-  // ฟังก์ชันแปลงวันที่ที่อัปเกรดให้แกะค่าไฟล์จริงได้ชัวร์
+  // ฟังก์ชันแปลงวันที่
   const parseD = (dateStr) => {
     if (!dateStr) return null;
-    const datePart = dateStr.toString().trim().split(' ')[0]; // ตัดส่วนเวลาออกไปก่อน
+    const datePart = dateStr.toString().trim().split(' ')[0];
     let parts = datePart.split('/');
-    if (parts.length < 3) parts = datePart.split('-'); // รองรับทั้ง format / และ -
+    if (parts.length < 3) parts = datePart.split('-');
     
     if (parts.length >= 3) {
       let p0 = parseInt(parts[0], 10);
       let p1 = parseInt(parts[1], 10);
       let p2 = parseInt(parts[2], 10);
       if (isNaN(p0) || isNaN(p1) || isNaN(p2)) return null;
-      
       let y, m, d;
-      if (p0 > 1000) { y = p0; m = p1; d = p2; } // YYYY-MM-DD
-      else if (p2 > 1000) { d = p0; m = p1; y = p2; } // DD/MM/YYYY
+      if (p0 > 1000) { y = p0; m = p1; d = p2; } 
+      else if (p2 > 1000) { d = p0; m = p1; y = p2; } 
       else { d = p0; m = p1; y = p2; if (y < 2000) y += 2000; }
-      
-      if (y > 2500) y -= 543; // แก้ไขกรณีเป็นปี พ.ศ. ให้กลับเป็น ค.ศ.
+      if (y > 2500) y -= 543;
       return { y, m, d, val: y * 10000 + m * 100 + d, monthNum: m, str: `${y}-${m.toString().padStart(2, '0')}` };
     }
     return null;
   };
 
-  // ดึงกลุ่มแชนเนลหลัก
-  function getExec2Group(row) {
-    let rawCh = getFlexibleValue(row, ['ช่องทาง', 'channel', 'platform']);
-    let chStr = (rawCh || '').toString().trim();
-    let lower = chStr.toLowerCase();
-    
-    if (lower.includes('facebook') || lower === 'fb' || lower.includes('เพจ')) return 'Facebook';
-    if (lower.includes('line') || lower.includes('ไลน์')) return 'Line';
-    if (lower.includes('tiktok') || lower === 'tt' || lower.includes('ติ๊ก')) return 'Tiktok';
-    if (lower.includes('lazada') || lower.includes('ลาซา')) return 'Lazada';
-    if (lower.includes('shopee') || lower.includes('ช้อป')) return 'Shopee';
-    if (lower.includes('call') || lower.includes('โทร') || lower.includes('tele')) return 'Call';
-    if (lower.includes('crm')) return 'CRM';
-    if (lower.includes('instagram') || lower === 'ig') return 'Instagram';
-    
-    return 'Other';
-  }
-
-  // ตรวจสอบความถูกต้องของออเดอร์
+  // ตรวจสอบความถูกต้องออเดอร์
   function isLocalSaleOrder(row) {
     if (!row) return false;
-    let revenueStr = getFlexibleValue(row, ['ยอดโอน', 'ราคารวม', 'ยอดขาย', 'ราคาสุทธิ', 'revenue', 'amount']);
+    let revenueStr = getFlexibleValue(row, ['ยอดโอน', 'ราคารวม', 'ยอดขาย', 'ราคาสุทธิ']);
     let revenue = parseFloat((revenueStr || '0').toString().replace(/,/g, '').trim());
-    if (isNaN(revenue) || revenue <= 0) return false;
-
-    const remark = getFlexibleValue(row, ['หมายเหตุ', 'remark']).toString().toUpperCase();
-    const nonSaleKeywords = ['ของขวัญวันเกิด', 'ของขวัญปีใหม่', 'เคลม', 'ของแถม', 'แจก', 'SAMPLE', 'REPLACE', 'คืนเงิน', 'REFUND'];
-    for (let kw of nonSaleKeywords) {
-      if (remark.includes(kw)) return false;
-    }
-    return true;
+    return (!isNaN(revenue) && revenue > 0);
   }
 
   function getLocalCustomerId(row) {
     let addr = getFlexibleValue(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่', 'address']);
     if (addr) return addr.toString().toLowerCase().replace(/[\s\r\n\t\-,\.\/\\_]+/g, '');
-    let cid = getFlexibleValue(row, ['รหัสลูกค้า', 'customerid', 'phone']);
-    return cid.toString().trim();
+    let cid = getFlexibleValue(row, ['รหัสลูกค้า', 'customerid', 'phone', 'Phone']);
+    return cid ? cid.toString().trim() : '';
   }
 
-  // 1. ค้นหาประวัติการซื้อครั้งแรก
+  // 1. หาประวัติออเดอร์แรก
   const localGlobalFirstPurchase = {};
   const localChFirstPurchase = {};
 
@@ -177,27 +158,14 @@ function renderExecutive2(filteredData, rawData) {
     }
   });
 
-  // 2. ตั้งค่าเตรียมโครงสร้างข้อมูลให้กับ 9 ช่องทางหลัก
+  // 2. เตรียมข้อมูล 9 แชนเนลหลัก
   const allowedChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'];
   const agg = {};
   allowedChannels.forEach(ch => {
     agg[ch] = { revenue: 0, orders: 0, uniqueBuyers: new Set(), retainedBuyers: new Set(), newGlobalBuyers: new Set(), newToSubBuyers: new Set() };
   });
 
-  // ถอดรหัสตัวกรองหน้าระบบหลัก
-  const currentFilters = window.filters || { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Admin: 'All' };
-  let targetFilterMonthNum = null;
-  if (currentFilters.Month && currentFilters.Month !== 'All') {
-    const fMonthLower = currentFilters.Month.toString().toLowerCase().trim();
-    if (monthMap[fMonthLower]) {
-      targetFilterMonthNum = monthMap[fMonthLower];
-    } else {
-      const parts = fMonthLower.split('-');
-      if (parts.length > 1) targetFilterMonthNum = parseInt(parts[1], 10);
-    }
-  }
-
-  // 3. กวาดข้อมูลและกรองเก็บสถิติ
+  // 3. คำนวณยอดเงินและจำนวนคำสั่งซื้อ
   dataSrc.forEach(row => {
     if (!isLocalSaleOrder(row)) return;
     
@@ -208,40 +176,32 @@ function renderExecutive2(filteredData, rawData) {
 
     const ch = getExec2Group(row);
     const id = getLocalCustomerId(row);
-    const revenueStr = getFlexibleValue(row, ['ยอดโอน', 'ราคารวม', 'ยอดขาย', 'revenue']);
-    
-    const subChannel = getFlexibleValue(row, ['subchannel', 'sub channel', 'ชื่อคลัง']) || ch;
-    const adminVal = getFlexibleValue(row, ['ชื่อแอดมิน', 'admin']);
-
-    // การคัดกรองมิติข้อมูลด้านบนหน้าจอ
-    if (currentFilters.Year !== 'All' && d.y.toString() !== currentFilters.Year.toString()) return;
-    if (targetFilterMonthNum !== null && d.monthNum !== targetFilterMonthNum) return;
-    if (currentFilters.Channel !== 'All' && ch !== currentFilters.Channel) return;
-    if (currentFilters.SubChannel !== 'All' && subChannel.toString().trim() !== currentFilters.SubChannel) return;
-    if (currentFilters.Admin !== 'All' && !adminVal.toString().includes(currentFilters.Admin)) return;
+    const revenueStr = getFlexibleValue(row, ['ยอดโอน', 'ราคารวม', 'ยอดขาย']);
+    const rev = parseFloat((revenueStr || '0').toString().replace(/,/g, '').trim()) || 0;
 
     let targetCh = agg[ch] ? ch : 'Other';
-    const rev = parseFloat((revenueStr || '0').toString().replace(/,/g, '').trim()) || 0;
     
     agg[targetCh].revenue += rev;
     agg[targetCh].orders += 1;
-    agg[targetCh].uniqueBuyers.add(id);
+    if (id) agg[targetCh].uniqueBuyers.add(id);
 
-    if (localGlobalFirstPurchase[id] && localGlobalFirstPurchase[id] < d.val) {
-      agg[targetCh].retainedBuyers.add(id);
-    } else {
-      agg[targetCh].newGlobalBuyers.add(id);
-    }
+    if (id) {
+      if (localGlobalFirstPurchase[id] && localGlobalFirstPurchase[id] < d.val) {
+        agg[targetCh].retainedBuyers.add(id);
+      } else {
+        agg[targetCh].newGlobalBuyers.add(id);
+      }
 
-    const chKey = id + '_' + targetCh;
-    if (localChFirstPurchase[chKey] === d.val) {
-      if (!agg[targetCh].newGlobalBuyers.has(id)) {
-        agg[targetCh].newToSubBuyers.add(id);
+      const chKey = id + '_' + targetCh;
+      if (localChFirstPurchase[chKey] === d.val) {
+        if (!agg[targetCh].newGlobalBuyers.has(id)) {
+          agg[targetCh].newToSubBuyers.add(id);
+        }
       }
     }
   });
 
-  // 4. คำนวณกลุ่มสถานะ (Vanguard, Migration, Retention, Cash Cow)
+  // 4. ประกอบข้อมูลประเมินเกณฑ์
   const results = allowedChannels.map(ch => {
     const data = agg[ch];
     const buyers = data.uniqueBuyers.size;
@@ -273,14 +233,14 @@ function renderExecutive2(filteredData, rawData) {
     };
   });
 
-  // เรียงตามรายได้สุทธิจากมากไปน้อย
+  // เรียงลำดับตามยอดขาย
   results.sort((a, b) => b.revenue - a.revenue);
 
   const fmtNum = (num) => (Number(num) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
   const fmtPct = (num) => (Number(num) || 0).toFixed(0) + '%';
-  const currentMonthLabel = (currentFilters.Month !== 'All') ? currentFilters.Month : 'All Months';
+  const currentMonthLabel = (window.filters && window.filters.Month !== 'All') ? window.filters.Month : 'All Months';
 
-  // 5. เรนเดอร์ HTML ออกหน้าจอ
+  // 5. พ่น HTML ออกแดชบอร์ด
   let html = `
     <div class="exec2-cards">
       <div class="exec2-card vanguard">
