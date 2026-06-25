@@ -528,7 +528,7 @@
     function isSaleOrder(row) {
       if (!row) return false;
       const remark = getRowValue(row, ['หมายเหตุ', 'Remark']);
-      const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+      const revenueStr = getRowValue(row, ['ยอดโอน', 'ราคารวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาขาย', 'ยอดรวม', 'Net Sales', 'Revenue', 'Amount']) || '0';
       const revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim());
       if (isNaN(revenue) || revenue <= 0) return false;
       
