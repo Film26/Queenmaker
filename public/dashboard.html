@@ -724,32 +724,42 @@
     }
 
     function applyFilters() {
+      // สร้าง Dropdown เมนูเฉพาะเมื่อยังไม่มีเมนูถูกสร้างขึ้น
       if (rawData.length > 0 && document.getElementById('menu-Year').children.length === 0) populateDropdowns();
+      
       filteredData = rawData.filter(row => {
         if (!isSaleOrder(row)) return false;
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+        
+        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
         if (!dateStr) return false;
         const d = parseDate(dateStr);
         if (!d) return false;
+        
+        // 🚨 อัปเดตให้ใช้ฟังก์ชันใหม่ที่เราสร้างไว้ดักกรองข้อมูล
         const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
         const subChannel = getNormalizedSubChannel(row);
+        const admin = getNormalizedAdmin(row);
         
-        const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
+        // ส่วนจัดการสินค้า (Product) ปล่อยตามสถาปัตยกรรมเดิมของคุณ
+        const rawProductName = getRowValue(row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
         const product = getNormalizedProduct(rawProductName);
         const subProduct = getNormalizedSubProduct(rawProductName);
-        const admin = getNormalizedAdmin(row);
+        
+        // ตรวจสอบเงื่อนไขตัวกรอง
         if (filters.Year !== 'All' && d.y.toString() !== filters.Year) return false;
+        if (filters.Month !== 'All' && d.str !== filters.Month) return false;
         if (filters.Channel !== 'All' && channel !== filters.Channel) return false;
         if (filters.SubChannel !== 'All' && subChannel !== filters.SubChannel) return false;
         if (filters.Product !== 'All' && product !== filters.Product) return false;
         if (filters.SubProduct !== 'All' && subProduct !== filters.SubProduct) return false;
         if (filters.Admin !== 'All' && admin !== filters.Admin) return false;
+        
         return true;
       });
       
       processData(filteredData);
       
-      // ดักจับ Error แยกแต่ละไฟล์อย่างปลอดภัย
+      // เรียกใช้สคริปต์การคำนวณแท็บอื่นๆ อย่างปลอดภัย
       try { if (document.getElementById('view-cohort').style.display === 'block' && typeof renderCohortHeatmap === 'function') { renderCohortHeatmap(filteredData, rawData); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-executive1').style.display === 'block' && typeof renderExecutive1 === 'function') { renderExecutive1(filteredData, rawData); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-executive2').style.display === 'block' && typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, rawData); } } catch(e) { console.error(e); }
@@ -762,40 +772,45 @@
       if (!data || data.length === 0) { renderEmpty(); return; }
       
       data.forEach(row => {
-        if (!isSaleOrder(row)) return;
-        const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-        const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
-        const admin = getNormalizedAdmin(row);
-        
-        if (!id || !dateStr) return;
-        const d = parseDate(dateStr);
-        if (!d) return;
-        const revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim()) || 0;
-        const mStr = d.str;
-        
-        if (!monthlyData[mStr]) {
-          monthlyData[mStr] = { sales: 0, orders: 0, buyers: new Set(), channels: {}, admins: {}, year: d.y };
+        try {
+          if (!isSaleOrder(row)) return;
+          const id = getCustomerUniqueId(row);
+          const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
+          const revenueStr = getRowValue(row, ['Net Sales', 'ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ยอดโอน']) || '0';
+          
+          // 🚨 เรียกใช้ฟังก์ชันที่ปรับแต่งใหม่ทั้งหมด
+          const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
+          const admin = getNormalizedAdmin(row);
+          
+          if (!id || !dateStr) return;
+          const d = parseDate(dateStr);
+          if (!d) return;
+          
+          const revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim()) || 0;
+          const mStr = d.str;
+          
+          if (!monthlyData[mStr]) {
+            monthlyData[mStr] = { sales: 0, orders: 0, buyers: new Set(), channels: {}, admins: {}, year: d.y };
+          }
+          
+          let m = monthlyData[mStr];
+          m.sales += revenue;
+          m.orders++;
+          m.buyers.add(id);
+          
+          if (!m.channels[channel]) m.channels[channel] = 0;
+          m.channels[channel] += revenue;
+          
+          if (!m.admins[admin]) m.admins[admin] = 0;
+          m.admins[admin] += revenue;
+        } catch (err) {
+          console.error("Error processing row:", err);
         }
-        let m = monthlyData[mStr];
-        m.sales += revenue;
-        m.orders++;
-        m.buyers.add(id);
-        if (!m.channels[channel]) m.channels[channel] = 0;
-        m.channels[channel] += revenue;
-        if (!m.admins[admin]) m.admins[admin] = 0;
-        m.admins[admin] += revenue;
       });
+      
       availableMonths = Object.keys(monthlyData).sort();
       renderDashboard();
     }
-
-    const thaiMonths = {
-      '01': 'มกราคม', '02': 'กุมภาพันธ์', '03': 'มีนาคม', '04': 'เมษายน',
-      '05': 'พฤษภาคม', '06': 'มิถุนายน', '07': 'กรกฎาคม', '08': 'สิงหาคม',
-      '09': 'กันยายน', '10': 'ตุลาคม', '11': 'พฤศจิกายน', '12': 'ธันวาคม'
-    };
 
     function renderEmpty() {
       const titleSalesEl = document.getElementById('title-sales');
