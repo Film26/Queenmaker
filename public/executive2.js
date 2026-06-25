@@ -156,6 +156,11 @@ function renderExecutive2(filteredData, rawData) {
     const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
     const revenueStr = getVal(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
     
+    // 🚨 สคริปต์ตรวจเช็กพิเศษ: เปิดหน้าจอ Inspect (F12) -> Console ดูว่ามีข้อมูลแชนเนลวิ่งเข้ามาไหม
+    if (['CRM', 'Lazada', 'Shopee', 'Tiktok'].includes(ch)) {
+       console.log(`[Exec2 Check] เจอแชนเนล ${ch}: ยอดเงินดิบ=${revenueStr}, ID=${id}, วันที่=${dateStr}`);
+    }
+
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
     if (!d) return;
