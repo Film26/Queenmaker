@@ -82,29 +82,33 @@ function renderExecutive2(filteredData, rawData) {
     return { y, m, d, val: y * 10000 + m * 100 + d };
   };
 
-  // 🚨 ล็อกรายชื่อ 9 ช่องทางหลักตามที่คุณเลือก
+  // รายการ 9 ช่องทางหลักมาตรฐาน
   const allowedChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'];
 
+  // ฟังก์ชันดึงค่าที่ฉลาดขึ้นและแมปปิ้งคำตรงจากในไฟล์ Excel ของคุณงับ
   function getExec2Group(row) {
-    const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-    // ขยายการค้นหาหัวคอลัมน์ให้ครอบคลุมมากขึ้นเพื่อกันพลาด
-    let rawCh = getVal(row, ['ช่องทาง', 'Channel', 'Platform', 'Marketplace', 'ช่องทางการขาย']);
+    if (!row) return 'Other';
     
-    // ส่งเข้าฟังก์ชันกลางก่อน
-    let ch = window.getNormalizedChannel ? window.getNormalizedChannel(rawCh) : '';
-    if (!ch) ch = (rawCh || '').toString().trim();
+    // ดึงค่าแบบยืดหยุ่นจากคีย์ภาษาไทยและอังกฤษที่เป็นไปได้ทั้งหมดใน Row
+    let rawCh = row['ช่องทาง'] || row['channel'] || row['Channel'] || row['Platform'] || '';
+    let chStr = rawCh.toString().trim();
     
-    let lower = ch.toLowerCase();
+    // ถ้าหน้าระบบมีฟังก์ชันเกลี่ยช่องทางอยู่แล้วให้ลองเรียกใช้ดูก่อน
+    if (!chStr && window.getNormalizedChannel) {
+      chStr = window.getNormalizedChannel(row);
+    }
     
-    // ดักจับจับกลุ่มคำพ้องความหมายโดยไม่สนใจตัวพิมพ์เล็ก-ใหญ่ และรองรับภาษาไทย
-    if (lower.includes('facebook') || lower.includes('fb') || lower.includes('เพจ')) return 'Facebook';
+    let lower = chStr.toLowerCase();
+    
+    // ดักคำพ้องความหมายตามคำที่เจอในไฟล์จริง
+    if (lower.includes('facebook') || lower === 'fb' || lower.includes('เพจ')) return 'Facebook';
     if (lower.includes('line') || lower.includes('ไลน์')) return 'Line';
-    if (lower.includes('call') || lower.includes('โทร') || lower.includes('tele')) return 'Call';
-    if (lower.includes('crm')) return 'CRM';
+    if (lower.includes('tiktok') || lower.includes('tt')) return 'Tiktok';
     if (lower.includes('lazada') || lower.includes('ลาซาด้า')) return 'Lazada';
     if (lower.includes('shopee') || lower.includes('ช้อปปี้')) return 'Shopee';
-    if (lower.includes('tiktok') || lower.includes('ติ๊กต๊อก') || lower.includes('tt')) return 'Tiktok';
-    if (lower.includes('instagram') || lower.includes('ig')) return 'Instagram';
+    if (lower.includes('call') || lower.includes('โทร') || lower.includes('tele')) return 'Call';
+    if (lower.includes('crm')) return 'CRM';
+    if (lower.includes('instagram') || lower === 'ig') return 'Instagram';
     if (lower.includes('website') || lower.includes('เว็บ')) return 'Website';
     
     return 'Other';
@@ -116,14 +120,18 @@ function renderExecutive2(filteredData, rawData) {
     if (rawData && rawData.length > 0) {
       rawData.forEach(row => {
         if (window.isSaleOrder && !window.isSaleOrder(row)) return;
-        const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-        const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+        
+        // ดึง Unique ID ของลูกค้า
+        let id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : (row['รหัสลูกค้า'] || row['Customer ID'] || row['Phone'] || row['phone']);
         const ch = getExec2Group(row);
-        const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+        
+        // ดึงวันที่สร้างออเดอร์
+        let dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
+        
         if (!id || !dateStr) return;
-        const d = parseD(dateStr);
+        const d = parseD(dateStr.toString());
         if (!d) return;
-        const key = id + '_' + ch;
+        const key = id.toString().trim() + '_' + ch;
         if (!window.chFirstPurchase[key] || d.val < window.chFirstPurchase[key]) {
           window.chFirstPurchase[key] = d.val;
         }
@@ -135,57 +143,48 @@ function renderExecutive2(filteredData, rawData) {
   // Aggregate data by Channel for the CURRENTLY FILTERED data
   const agg = {};
   
-  // ตั้งค่าเตรียมพื้นที่ให้กับทั้ง 9 ช่องทางหลักล่วงหน้า
   allowedChannels.forEach(ch => {
-    agg[ch] = { 
-      revenue: 0, 
-      orders: 0, 
-      uniqueBuyers: new Set(), 
-      retainedBuyers: new Set(), 
-      newGlobalBuyers: new Set(), 
-      newToSubBuyers: new Set() // (คีย์เวิร์ดระบบภายในนับเป็น New-to-Channel)
-    };
+    agg[ch] = { revenue: 0, orders: 0, uniqueBuyers: new Set(), retainedBuyers: new Set(), newGlobalBuyers: new Set(), newToSubBuyers: new Set() };
   });
   
   filteredData.forEach(row => {
     let ch = getExec2Group(row);
     if (!agg[ch]) ch = 'Other';
     
-    const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-    const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
-    const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-    const revenueStr = getVal(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+    let id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : (row['รหัสลูกค้า'] || row['Customer ID'] || row['Phone'] || row['phone']);
+    let dateStr = row['วันที่สร้าง'] || row['วันที่โอนเงิน'] || row['OrderDate'] || row['Date'] || row['วันที่'];
     
-    // 🚨 สคริปต์ตรวจเช็กพิเศษ: เปิดหน้าจอ Inspect (F12) -> Console ดูว่ามีข้อมูลแชนเนลวิ่งเข้ามาไหม
-    if (['CRM', 'Lazada', 'Shopee', 'Tiktok'].includes(ch)) {
-       console.log(`[Exec2 Check] เจอแชนเนล ${ch}: ยอดเงินดิบ=${revenueStr}, ID=${id}, วันที่=${dateStr}`);
-    }
-
+    // ดึงยอดเงินโดยเน้นไปที่ 'ยอดโอน' และ 'ราคารวม' ก่อนตามหัวตารางจริงในไฟล์ของคุณ
+    let revenueStr = row['ยอดโอน'] || row['ราคารวม'] || row['ยอดขาย'] || row['ราคาสินค้ายังไม่รวมภาษี'] || row['Net Sales'] || '0';
+    
     if (!id || !dateStr) return;
-    const d = parseD(dateStr);
+    const d = parseD(dateStr.toString());
     if (!d) return;
     
-    const rev = parseFloat((revenueStr || '0').toString().replace(/,/g, ''));
+    const rev = parseFloat(revenueStr.toString().replace(/,/g, '').trim());
     agg[ch].revenue += isNaN(rev) ? 0 : rev;
     agg[ch].orders += 1;
-    agg[ch].uniqueBuyers.add(id);
+    agg[ch].uniqueBuyers.add(id.toString().trim());
 
     // Global New vs Retained
-    if (globalFirstPurchase && globalFirstPurchase[id]) {
-      const firstDate = globalFirstPurchase[id];
+    let buyerId = id.toString().trim();
+    if (window.globalFirstPurchase && window.globalFirstPurchase[buyerId]) {
+      const firstDate = window.globalFirstPurchase[buyerId];
       if (firstDate.val < d.val) {
-        agg[ch].retainedBuyers.add(id);
+        agg[ch].retainedBuyers.add(buyerId);
       } else {
-        agg[ch].newGlobalBuyers.add(id);
+        agg[ch].newGlobalBuyers.add(buyerId);
       }
+    } else {
+      agg[ch].newGlobalBuyers.add(buyerId);
     }
 
     // New-to-Channel (Migration) logic
-    const key = id + '_' + ch;
+    const key = buyerId + '_' + ch;
     if (chFirstPurchase[key]) {
       if (chFirstPurchase[key] === d.val) {
-        if (!agg[ch].newGlobalBuyers.has(id)) {
-          agg[ch].newToSubBuyers.add(id);
+        if (!agg[ch].newGlobalBuyers.has(buyerId)) {
+          agg[ch].newToSubBuyers.add(buyerId);
         }
       }
     }
@@ -201,7 +200,6 @@ function renderExecutive2(filteredData, rawData) {
     const pctNew = buyers === 0 ? 0 : (newCust / buyers) * 100;
     const pctMig = buyers === 0 ? 0 : (newToChannel / buyers) * 100;
     
-    // Categorization Logic
     let category = '';
     let categoryClass = '';
     let dotClass = '';
