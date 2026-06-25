@@ -2,6 +2,7 @@
 function renderExecutive2(filteredData, rawData) {
   const container = document.getElementById('view-executive2');
   
+  // ดึงแหล่งข้อมูลดิบหลักจากไฟล์ RAW 2025
   const dataSrc = (rawData && rawData.length > 0) ? rawData : (filteredData || []);
 
   if (!dataSrc || dataSrc.length === 0) {
@@ -9,7 +10,7 @@ function renderExecutive2(filteredData, rawData) {
     return;
   }
 
-  // Inject CSS
+  // Inject CSS ปรับแต่งดีไซน์และย่อขนาดตัวอักษรตามรูปภาพต้นฉบับ
   if (!document.getElementById('exec2-styles')) {
     const style = document.createElement('style');
     style.id = 'exec2-styles';
@@ -30,22 +31,28 @@ function renderExecutive2(filteredData, rawData) {
       .dot-retention { background: #ff9900; }
       .dot-cashcow { background: #ff4949; }
 
+      .exec2-card-text { display: flex; flex-direction: column; }
+      .exec2-card-title { font-weight: 700; font-size: 13px; color: #333; }
+      .exec2-card-sub { font-size: 11px; color: #888; margin-top: 4px; }
+
       .exec2-table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-      .exec2-table-header h3 { margin: 0; font-size: 16px; color: #222; }
-      .month-label { font-size: 14px; font-weight: 700; color: #d95f1d; }
+      .exec2-table-header h3 { margin: 0; font-size: 15px; color: #222; font-weight: 700; }
+      .month-label { font-size: 13px; font-weight: 700; color: #d95f1d; }
 
       .exec2-table-wrapper { background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow-x: auto; }
       .exec2-table { width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif; }
-      .exec2-table th, .exec2-table td { padding: 15px 20px; text-align: left; border-bottom: 1px solid #f2f2f2; }
-      .exec2-table th { color: #777; font-weight: 600; font-size: 13px; background: #fff; white-space: nowrap; }
-      .exec2-table td { color: #333; font-size: 14px; font-weight: 500; }
+      
+      /* ปรับขนาดตัวอักษรตารางให้เล็กและกระชับตามรูปภาพ */
+      .exec2-table th, .exec2-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #f2f2f2; }
+      .exec2-table th { color: #666; font-weight: 500; font-size: 13px; background: #fff; white-space: nowrap; }
+      .exec2-table td { color: #333; font-size: 13px; font-weight: 400; }
 
-      .exec2-badge { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+      .exec2-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
       .badge-vanguard { color: #2684ff; background: #ebf3ff; }
       .badge-migration { color: #13ce66; background: #e7fbf0; }
       .badge-retention { color: #ff9900; background: #fff8eb; }
       .badge-cashcow { color: #ff4949; background: #ffebeb; }
-      .badge-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; display: inline-block; }
+      .badge-dot { width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; display: inline-block; }
     `;
     document.head.appendChild(style);
   }
@@ -112,13 +119,12 @@ function renderExecutive2(filteredData, rawData) {
     return null;
   };
 
-  // 1. ตรวจสอบประวัติซื้อครั้งแรก (กรองเฉพาะแถวที่มีรายได้/ยอดโอนจริงเท่านั้น)
   const customerFirstDates = {};
   const customerChannelFirstDates = {};
 
   dataSrc.forEach(row => {
     const rev = extractRevenue(row);
-    if (rev <= 0) return; // 🛑 ตัดรายการยอดเงินที่เป็น 0 ทิ้ง ไม่นำมาหาประวัติลูกค้า
+    if (rev <= 0) return;
 
     const id = getLocalCustomerId(row);
     if (!id) return;
@@ -136,17 +142,15 @@ function renderExecutive2(filteredData, rawData) {
     }
   });
 
-  // 2. ตั้งช่องทางหลักทั้ง 9 ช่องทาง
   const allowedChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'];
   const agg = {};
   allowedChannels.forEach(ch => {
     agg[ch] = { revenue: 0, buyers: new Set(), newCustBuyers: new Set(), migrationBuyers: new Set() };
   });
 
-  // 3. คำนวณสรุปผลข้อมูลจริง
   dataSrc.forEach(row => {
     const rev = extractRevenue(row);
-    if (rev <= 0) return; // 🛑 ป้องกันจุดบอดเด็ดขาด! ถ้ายอดขายเป็น 0 หรือน้อยกว่า จะไม่เอาไปคำนวณสถิติเลยสักช่องเดียว
+    if (rev <= 0) return;
 
     const ch = getExec2Group(row);
     const id = getLocalCustomerId(row);
@@ -170,7 +174,6 @@ function renderExecutive2(filteredData, rawData) {
     }
   });
 
-  // 4. ตัดกลุ่มเชิงกลยุทธ์ตามเกณฑ์ความแม่นยำสูงสุด
   const results = allowedChannels.map(ch => {
     const data = agg[ch];
     const buyersCount = data.buyers.size;
@@ -182,7 +185,6 @@ function renderExecutive2(filteredData, rawData) {
 
     let category = ''; let categoryClass = ''; let dotClass = '';
     
-    // ตรรกะใหม่: ถ้าไม่มีคนซื้อจริงหรือ Revenue เป็น 0 จะดิ่งไปที่ Cash Cow ทันที ไม่มีหลุดไป Vanguard อีกแล้ว
     if (buyersCount === 0 || data.revenue === 0) {
       category = 'Cash Cow (เสือนอนกิน)'; categoryClass = 'badge-cashcow'; dotClass = 'dot-cashcow';
     } else if (pctNew > 70) {
@@ -208,7 +210,6 @@ function renderExecutive2(filteredData, rawData) {
   const fmtNum = (num) => (Number(num) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
   const fmtPct = (num) => (Number(num) || 0).toFixed(0) + '%';
 
-  // 5. แสดงตารางข้อมูล
   let html = `
     <div class="exec2-cards">
       <div class="exec2-card vanguard">
@@ -266,8 +267,8 @@ function renderExecutive2(filteredData, rawData) {
   results.forEach(r => {
     html += `
       <tr>
-        <td style="font-weight: 700;">${r.channel}</td>
-        <td style="color: #2c3e50; font-weight: bold;">฿${fmtNum(r.revenue)}</td>
+        <td style="font-weight: 600;">${r.channel}</td>
+        <td style="color: #2c3e50; font-weight: 600;">฿${fmtNum(r.revenue)}</td>
         <td>${fmtNum(r.buyers)}</td>
         <td>${fmtNum(r.newCust)}</td>
         <td>${fmtNum(r.newToSub)}</td>
