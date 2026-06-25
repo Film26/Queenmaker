@@ -293,106 +293,27 @@
       if (!rawData || rawData.length === 0) return;
       
       rawData.forEach(row => {
-        if (!isSaleOrder(row)) return;
-        const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-        if (!id || !dateStr) return;
-        const d = parseDate(dateStr);
-        if (!d) return;
-        const val = d.y * 10000 + d.m * 100 + d.d;
-        if (!globalFirstPurchase[id] || val < globalFirstPurchase[id].val) {
-          globalFirstPurchase[id] = { val: val, monthStr: d.str, year: d.y };
+        try {
+          if (!isSaleOrder(row)) return;
+          const id = getCustomerUniqueId(row);
+          const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
+          
+          // ⚠️ ดักจับด่วน: ถ้าไม่มี ID หรือไม่มีวันที่ ให้ข้ามแถวนี้ไปเลย ระบบจะไม่หมุนค้างชัวร์!
+          if (!id || id.trim() === '' || !dateStr) return;
+          
+          const d = parseDate(dateStr);
+          if (!d) return;
+          
+          const val = d.y * 10000 + d.m * 100 + d.d;
+          if (!globalFirstPurchase[id] || val < globalFirstPurchase[id].val) {
+            globalFirstPurchase[id] = { val: val, monthStr: d.str, year: d.y };
+          }
+        } catch (err) {
+          // ถ้าแถวไหนพัง ให้บันทึก Error เงียบๆ แล้วรันแถวต่อไป ห้ามค้าง
+          console.error("Error parsing row in precompute: ", err);
         }
       });
     }
-
-    // --- DOMContentLoaded Section ---
-    window.addEventListener('DOMContentLoaded', () => {
-      const importBtn = document.getElementById('importBtn');
-      const fileInput = document.getElementById('fileInput');
-      
-      if (importBtn && fileInput) {
-        importBtn.addEventListener('click', () => fileInput.click());
-      }
-      
-      if (fileInput) {
-        fileInput.addEventListener('change', (e) => {
-          const file = e.target.files[0];
-          if (file) {
-            showLoading(true);
-            Papa.parse(file, {
-              header: true,
-              skipEmptyLines: true, // ตัดแถวว่างตั้งแต่ตอนโหลด
-              complete: (results) => {
-                try {
-                  for (let k in keyCache) delete keyCache[k];
-                  window.userCohorts = null;
-                  window.scFirstPurchase = null;
-                  
-                  // คลีนแถวขยะออกให้หมดก่อนประมวลผล
-                  rawData = results.data.filter(row => {
-                    if (!row) return false;
-                    return Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
-                  });
-
-                  precomputeGlobalFirstPurchases();
-                  applyFilters();
-                } catch (err) {
-                  console.error(err);
-                  alert('เกิดข้อผิดพลาดในการประมวลผลข้อมูล');
-                } finally {
-                  showLoading(false); // การันตีว่าตัวหมุนต้องปิดเสมอ
-                }
-              },
-              error: (err) => { console.error(err); showLoading(false); alert('Error parsing CSV'); }
-            });
-          }
-        });
-      }
-
-      const loadSampleBtn = document.getElementById('loadSampleBtn');
-      if (loadSampleBtn) {
-        loadSampleBtn.addEventListener('click', () => {
-          showLoading(true);
-          fetch(sampleUrl)
-            .then(res => res.text())
-            .then(text => {
-              Papa.parse(text, { 
-                header: true, 
-                skipEmptyLines: true,
-                complete: (results) => {
-                  try {
-                    for (let k in keyCache) delete keyCache[k];
-                    window.userCohorts = null;
-                    window.scFirstPurchase = null;
-                    rawData = results.data.filter(row => {
-                      if (!row) return false;
-                      return Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
-                    });
-                    precomputeGlobalFirstPurchases();
-                    applyFilters();
-                  } finally {
-                    showLoading(false);
-                  }
-                }
-              });
-            })
-            .catch(err => { showLoading(false); alert('Failed to load sample data'); });
-        });
-      }
-
-      initCharts();
-    });
-
-    window.onclick = function(event) {
-      if (!event.target.closest('.filter-dropdown')) {
-        var dropdowns = document.getElementsByClassName("filter-content");
-        for (var i = 0; i < dropdowns.length; i++) {
-          dropdowns[i].classList.remove('show');
-        }
-      }
-    };
-
     // --- Navigation & UI Control ---
     function switchTab(tabId) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -493,15 +414,28 @@
       }
       return mappedKey ? (row[mappedKey] || '').toString().trim() : '';
     }
-
+    // 1. ปรับปรุงการดึง ID ลูกค้าให้ปลอดภัยจากอักขระพิเศษและการขึ้นบรรทัดใหม่
     function getCustomerUniqueId(row) {
-      const addr = getRowValue(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่', 'Address', 'address']);
-      if (addr) {
-        return addr.toString().toLowerCase().replace(/[\s\r\n\t\-,\.\/\\_]+/g, '');
+      if (!row) return '';
+      try {
+        // ลองดึงจาก Phone หรือ Customer ID ก่อนเพราะเป็นคีย์ที่สั้นและสะอาดกว่า
+        let phoneOrId = getRowValue(row, ['Phone', 'phone', 'Customer ID', 'รหัสลูกค้า']);
+        if (phoneOrId && phoneOrId.toString().trim() !== '') {
+          return phoneOrId.toString().trim().toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
+        }
+        
+        // ถ้าไม่มีเบอร์โทร ค่อยดึงจากที่อยู่มาทำ ID คีย์
+        const addr = getRowValue(row, ['Address', 'address', 'ที่อยู่ (ลูกค้า)', 'ที่อยู่']);
+        if (addr && addr.toString().trim() !== '') {
+          // คลีนช่องว่างและการขึ้นบรรทัดใหม่ให้ปลอดภัย
+          return addr.toString().toLowerCase().replace(/[^a-zA-Z0-9\u0e00-\u0e7f]/g, '').slice(0, 50);
+        }
+      } catch (e) {
+        console.error("Error generating Customer ID: ", e);
       }
-      return getRowValue(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+      return ''; // ถ้าไม่มีอะไรเลย คืนค่าว่างอย่างปลอดภัย
     }
-
+    
     function parseDate(dateStr) {
       if (!dateStr) return null;
       const datePart = dateStr.toString().trim().split(' ')[0];
