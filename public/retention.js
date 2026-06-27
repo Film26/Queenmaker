@@ -8,8 +8,7 @@ function renderRetention(filteredData, rawData) {
       <div style="text-align:center; padding:60px 20px; color:#64748b; font-family:'Prompt',sans-serif; background: white; border-radius:16px; border:1px dashed #cbd5e1; margin: 20px;">
         <span style="font-size: 40px; display:block; margin-bottom:15px;">📊</span>
         <b style="font-size:16px; color:#0f172a; display:block; margin-bottom:5px;">ไม่พบข้อมูลสำหรับการวิเคราะห์ประสิทธิภาพ</b>
-        <p style="font-size:13px; color:#94a3b8; margin:0 auto; max-width:400px;">กรุณาตรวจสอบว่าได้ทำการอัปโหลดไฟล์ข้อมูลยอดขาย และตรวจสอบระบบคัดกรองวันที่ (Filter) ด้านบนเรียบร้อยแล้ว</p>
-      </div>
+        </div>
     `;
     return;
   }
