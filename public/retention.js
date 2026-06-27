@@ -8,7 +8,8 @@ function renderRetention(filteredData, rawData) {
       <div style="text-align:center; padding:60px 20px; color:#64748b; font-family:'Prompt',sans-serif; background: white; border-radius:16px; border:1px dashed #cbd5e1; margin: 20px;">
         <span style="font-size: 40px; display:block; margin-bottom:15px;">📊</span>
         <b style="font-size:16px; color:#0f172a; display:block; margin-bottom:5px;">ไม่พบข้อมูลสำหรับการวิเคราะห์ประสิทธิภาพ</b>
-        </div>
+        <p style="font-size:13px; color:#94a3b8; margin:0 auto; max-width:400px;">กรุณาตรวจสอบว่าได้ทำการอัปโหลดไฟล์ข้อมูลยอดขาย และตรวจสอบระบบคัดกรองวันที่ (Filter) ด้านบนเรียบร้อยแล้ว</p>
+      </div>
     `;
     return;
   }
@@ -321,8 +322,7 @@ function renderRetention(filteredData, rawData) {
     <div class="biz-dashboard">
       <div class="biz-header">
         <div class="biz-header-title">
-          <h1>แดชบอร์ดกลยุทธ์การซื้อซ้ำและรักษารากฐานลูกค้า (Strategic Customer Retention Dashboard)</h1>
-          <p>ข้อมูลและกราฟแท่งทั้งหมดเชื่อมโยงและแปรผันตามเงื่อนไขตัวกรอง (Filter) หลักของระบบโดยตรง</p>
+          แดชบอร์ดกลยุทธ์การซื้อซ้ำและรักษารากฐานลูกค้า (Strategic Customer Retention Dashboard)
         </div>
       </div>
 
@@ -419,6 +419,8 @@ function renderRetention(filteredData, rawData) {
           <div class="biz-card" style="margin-bottom:24px;">
             <div class="biz-card-title">
               <div>กราฟแท่งเปรียบเทียบปริมาณสินค้าซื้อซ้ำในแต่ละเดือน (Monthly Product Unit Vol.)
+                <div class="biz-card-subtitle">แท่งกราฟจะปรากฏและเปรียบเทียบตามช่วงเดือนที่ถูกกรองมาจาก Filter หลักด้านบนอัตโนมัติ</div>
+              </div>
             </div>
             <div class="biz-chart-container">
               ${sortedChartMonths.length === 0 
