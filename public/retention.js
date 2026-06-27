@@ -322,7 +322,6 @@ function renderRetention(filteredData, rawData) {
       <div class="biz-header">
         <div class="biz-header-title">
           <h1>แดชบอร์ดกลยุทธ์การซื้อซ้ำและรักษารากฐานลูกค้า (Strategic Customer Retention Dashboard)</h1>
-          <p>ข้อมูลและกราฟแท่งทั้งหมดเชื่อมโยงและแปรผันตามเงื่อนไขตัวกรอง (Filter) หลักของระบบโดยตรง</p>
         </div>
       </div>
 
