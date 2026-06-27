@@ -69,7 +69,6 @@ function renderRetention(filteredData, rawData) {
       .biz-kpi-desc { font-size: 11.5px; color: #94a3b8; font-weight: 500; }
       .biz-kpi-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
       
-      /* กล่องรายงานด่วนสไตล์สรุปเกรดพรีเมียม */
       .report-summary-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
       .report-summary-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
       .report-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
@@ -87,6 +86,15 @@ function renderRetention(filteredData, rawData) {
       .biz-month-lbl { font-size: 11px; font-weight: 800; text-transform: uppercase; }
       .biz-month-prod { font-size: 13px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .biz-month-qty { font-size: 11.5px; color: #475569; font-weight: 500; }
+      
+      /* สไตล์สำหรับการจำลองกราฟแท่งด้วย CSS Flex/Progress (ไม่ต้องพึ่งไลบรารีภายนอก) */
+      .biz-chart-container { display: flex; align-items: flex-end; justify-content: space-between; height: 180px; padding: 20px 10px 10px 10px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 15px; gap: 8px; }
+      .biz-chart-bar-wrapper { display: flex; flex-direction: column; align-items: center; flex: 1; height: 100%; justify-content: flex-end; }
+      .biz-chart-bar { width: 100%; max-width: 35px; border-radius: 6px 6px 0 0; background: #3b82f6; transition: height 0.4s ease; position: relative; cursor: pointer; }
+      .biz-chart-bar:hover .biz-chart-tooltip { display: block; }
+      .biz-chart-tooltip { display: none; position: absolute; top: -35px; left: 50%; transform: translateX(-50%); background: #0f172a; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+      .biz-chart-label { font-size: 11px; font-weight: 600; color: #64748b; margin-top: 8px; text-align: center; }
+
       .biz-rank-list { display: flex; flex-direction: column; gap: 14px; }
       .biz-rank-item { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9; }
       .biz-rank-badge { width: 26px; height: 26px; border-radius: 50%; background: #e2e8f0; color: #475569; font-size: 11.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
@@ -100,7 +108,8 @@ function renderRetention(filteredData, rawData) {
       .biz-rank-vals { text-align: right; margin-left: 15px; flex-shrink: 0; }
       .biz-val-m { font-size: 13px; font-weight: 700; color: #0f172a; }
       .biz-val-s { font-size: 11px; color: #64748b; }
-      .biz-table-wrapper { background: white; border: 1px solid #e2e8f0; border-radius: 16px; overflow-x: auto; margin-top: 24px; }
+      
+      .biz-table-wrapper { background: white; border: 1px solid #e2e8f0; border-radius: 16px; overflow-x: auto; }
       .biz-table { width: 100%; border-collapse: collapse; text-align: left; }
       .biz-table th, .biz-table td { padding: 14px 18px; border-bottom: 1px solid #f1f5f9; }
       .biz-table th { background: #f8fafc; color: #475569; font-weight: 600; font-size: 12px; text-transform: uppercase; }
@@ -155,7 +164,7 @@ function renderRetention(filteredData, rawData) {
         }
       }
       
-      if (!targetFormula) return; // ข้ามแก้วน้ำ/ขวดเชค
+      if (!targetFormula) return; 
 
       let isSachet = nameUpper.includes('ซอง') || nameUpper.includes('แบบซอง') || nameUpper.includes('SACHET');
       let calculatedQty = orderQty;
@@ -258,7 +267,7 @@ function renderRetention(filteredData, rawData) {
   const totalRepeatOrdersCount = currentPeriodRepeat.length;
   const repeatBuyerSharePct = totalActiveBuyersInPeriod.size === 0 ? 0 : (periodRepeatBuyers.size / totalActiveBuyersInPeriod.size) * 100;
 
-  // --- 6. 📊 HIGH-ACCURACY FINAL FINAL REPORT CALCULATOR (สำหรับรอบที่เลือก) ---
+  // --- 6. CALCULATE REPORT SUMMARY ---
   const finalReportSummary = {
     plus: { boxes: 0, sachets: 0 },
     gold: { boxes: 0, sachets: 0 },
@@ -268,9 +277,15 @@ function renderRetention(filteredData, rawData) {
   };
 
   const productSummaryMap = {};
-  const crossMonthProductTracker = {};
-  for (let m = 1; m <= 12; m++) crossMonthProductTracker[m] = {};
+  
+  // โครงสร้างสำหรับเก็บสถิติยอดจำหน่ายสินค้ารายเดือนเพื่อวาดกราฟแท่ง
+  const monthlyBarChartData = {
+    'Jan': 0, 'Feb': 0, 'Mar': 0, 'Apr': 0, 'May': 0, 'Jun': 0,
+    'Jul': 0, 'Aug': 0, 'Sep': 0, 'Oct': 0, 'Nov': 0, 'Dec': 0
+  };
+  const monthsArr = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+  // วนลูปออเดอร์เพื่อเก็บผลลัพธ์
   currentPeriodRepeat.forEach(row => {
     const revStr = getFlexibleValue(row, ['ยอดขาย', 'ยอดโอน', 'Revenue', 'จำนวนเงิน', 'ยอดเงิน']) || '0';
     const orderRev = parseFloat(revStr.toString().replace(/,/g, '')) || 0;
@@ -280,7 +295,6 @@ function renderRetention(filteredData, rawData) {
     const totalItemsInOrder = parsedItems.reduce((acc, p) => acc + p.qty, 0) || 1;
 
     parsedItems.forEach(p => {
-      // 1. บันทึกลงตารางสรุปรายงานด่วนแยกประเภท กล่อง VS ซอง
       if (finalReportSummary[p.formula]) {
         if (p.isSachet) {
           finalReportSummary[p.formula].sachets += p.qty;
@@ -289,7 +303,6 @@ function renderRetention(filteredData, rawData) {
         }
       }
 
-      // 2. บันทึกลงชุดข้อมูลของตารางจัดอันดับหลัก
       const distributedRev = orderRev * (p.qty / totalItemsInOrder);
       if (!productSummaryMap[p.key]) {
         productSummaryMap[p.key] = { key: p.key, count: 0, revenue: 0, formula: p.formula };
@@ -299,33 +312,26 @@ function renderRetention(filteredData, rawData) {
     });
   });
 
-  // คำนวณรายเดือนสำหรับกราฟเทรนด์ยอดนิยม
+  // วนลูปออเดอร์ซื้อซ้ำทั้งหมดเพื่อจับกลุ่มรายเดือนสำหรับใช้แสดงความสูงของกราฟแท่ง
   repeatOrders.forEach(row => {
-    const d = parseDateObj(getFlexibleValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'วันที่', 'Date']));
+    const dateStr = getFlexibleValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'วันที่', 'Date']);
+    const d = parseDateObj(dateStr);
     if (!d || d.m < 1 || d.m > 12) return;
     
+    const mLabel = monthsArr[d.m - 1];
     const salesData = getFlexibleValue(row, ['รายการขาย', 'ชื่อสินค้า', 'Product', 'Product Set', 'สินค้า']) || '';
     const parsedItems = parseProductItemToFlatList(salesData, activeToggle);
 
     parsedItems.forEach(p => {
-      if (!crossMonthProductTracker[d.m][p.key]) {
-        crossMonthProductTracker[d.m][p.key] = { count: 0, formula: p.formula };
-      }
-      crossMonthProductTracker[d.m][p.key].count += p.qty;
+      monthlyBarChartData[mLabel] += p.qty;
     });
   });
 
   const sortedProducts = Object.values(productSummaryMap).sort((a, b) => b.count - a.count);
   const topProductMaxCount = sortedProducts.length > 0 ? sortedProducts[0].count : 1;
 
-  const monthNamesTh = { 1:'ม.ค.', 2:'ก.พ.', 3:'มี.ค.', 4:'เม.ย.', 5:'พ.ค.', 6:'มิ.ย.', 7:'ก.ค.', 8:'ส.ค.', 9:'ก.ย.', 10:'ต.ค.', 11:'พ.ย.', 12:'ธ.ค.' };
-  const topProductsPerMonthList = [];
-  for (let m = 1; m <= 12; m++) {
-    const list = Object.keys(crossMonthProductTracker[m]).map(k => ({
-      name: k, count: crossMonthProductTracker[m][k].count, formula: crossMonthProductTracker[m][k].formula
-    })).sort((a,b) => b.count - a.count);
-    topProductsPerMonthList.push({ monthNum: m, nameTh: monthNamesTh[m], topItem: list[0] || null });
-  }
+  // หาค่าสูงสุดของรายเดือนเพื่อหามาตราส่วนความสูงแท่งกราฟ
+  const maxMonthlyQtyVal = Math.max(...Object.values(monthlyBarChartData)) || 1;
 
   // --- 7. CHANNELS KPI PROCESSING ---
   const bizChannels = ['Facebook', 'Line', 'Call', 'CRM', 'Other'];
@@ -413,7 +419,7 @@ function renderRetention(filteredData, rawData) {
       <div class="report-summary-box">
         <div class="report-summary-title">
           <span>📊 ผลรายงานสรุปปริมาณผลิตภัณฑ์จากการซื้อซ้ำในรอบ (${selMonth})</span>
-          <span style="font-size:12px; font-weight:normal; color:#64748b; margin-left:auto;">คำนวณจากออเดอร์ซื้อซ้ำ: ${totalRepeatOrdersCount.toLocaleString()} รายการ</span>
+          <span style="font-size:12px; font-weight:normal; color:#64748b; margin-left:auto;">คำนวณสุทธิจากสินค้าที่ไม่มีโปรและมีโปรโมชั่นแล้ว</span>
         </div>
         <div class="report-summary-grid">
           <div class="report-formula-card" style="border-left: 4px solid #10b981;">
@@ -444,16 +450,64 @@ function renderRetention(filteredData, rawData) {
         </div>
       </div>
 
+      <div class="biz-card" style="margin-bottom:24px;">
+        <div class="biz-card-title">ตารางตรวจสอบผลสัมฤทธิ์ทางการตลาดเทียบเป้าหมาย (Retention KPI Matrix)</div>
+        <div class="biz-table-wrapper">
+          <table class="biz-table">
+            <thead>
+              <tr>
+                <th>ช่องทางปิดการขาย</th><th>รายได้จริง (Actual)</th><th>เป้ารายได้ (Plan)</th><th>จำนวนออเดอร์</th><th>เป้าออเดอร์</th><th>ส่วนต่างออเดอร์</th><th>KPI %</th><th>ประเมินสถานะ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bizChannels.map(ch => {
+                const act = channelDataStore[ch];
+                const planBase = bizTargetPlans[ch];
+                const planCount = selMonth === 'YTD' ? planBase.targetOrders : Math.round(planBase.targetOrders / 6);
+                const planRev = selMonth === 'YTD' ? planBase.targetRev : Math.round(planBase.targetRev / 6);
+                const diffOrders = act.count - planCount;
+                const achRate = planRev === 0 ? 0 : (act.revenue / planRev) * 100;
+                return `
+                  <tr>
+                    <td style="font-weight:600;">${ch}</td>
+                    <td style="font-weight:700; color:#059669;">฿${Math.round(act.revenue).toLocaleString()}</td>
+                    <td>฿${planRev.toLocaleString()}</td>
+                    <td>${act.count} ครั้ง</td>
+                    <td>${planCount} ครั้ง</td>
+                    <td style="font-weight:600; color:${diffOrders >= 0 ? '#10b981' : '#ef4444'}">${diffOrders >= 0 ? '+' + diffOrders : diffOrders}</td>
+                    <td style="font-weight:700;">${achRate.toFixed(1)}%</td>
+                    <td><span class="biz-status-pill ${achRate >= 100 ? 'pill-pass' : 'pill-fail'}">${achRate >= 100 ? '▲ ทะลุเป้า' : '▼ ต่ำกว่าเป้า'}</span></td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="biz-main-grid">
         <div>
           <div class="biz-card" style="margin-bottom:24px;">
-            <div class="biz-card-title"><div>เทรนด์สินค้าซื้อซ้ำยอดนิยมรายเดือน <div class="biz-card-subtitle">วิเคราะห์ลอจิกคัดแยกโปรโมชั่น (รวมตัวคูณ 1แถม1 และจำนวนกล่องแล้ว)</div></div></div>
-            <div class="biz-monthly-grid">
-              ${topProductsPerMonthList.map(m => {
-                if (m.topItem) {
-                  return `<div class="biz-monthly-box"><span class="biz-month-lbl" style="color:${getFormulaColor(m.topItem.formula)};">${m.nameTh}</span><span class="biz-month-prod" title="${m.topItem.name}">${m.topItem.name}</span><span class="biz-month-qty"><b>${m.topItem.count.toLocaleString()}</b> ชิ้นซ้ำ</span></div>`;
-                }
-                return `<div class="biz-monthly-box" style="opacity:0.4;"><span class="biz-month-lbl" style="color:#64748b;">${m.nameTh}</span><span class="biz-month-prod" style="font-style:italic; font-size:11px;">ไม่มีข้อมูลซ้ำ</span></div>`;
+            <div class="biz-card-title">
+              <div>กราฟแท่งเปรียบเทียบปริมาณสินค้าซื้อซ้ำในแต่ละเดือน (Monthly Product Unit Vol.)
+                <div class="biz-card-subtitle">รวมผลลัพธ์สุทธิจากทุกกลุ่มสินค้าแยกรายเดือน (ม.ค. - มิ.ย.)</div>
+              </div>
+            </div>
+            <div class="biz-chart-container">
+              ${monthsArr.slice(0,6).map(mKey => {
+                const qty = monthlyBarChartData[mKey];
+                const heightPct = maxMonthlyQtyVal > 0 ? (qty / maxMonthlyQtyVal) * 100 : 0;
+                // ไฮไลท์แท่งของเดือนปัจจุบันที่กำลังฟิลเตอร์อยู่
+                const isCurrentMonth = (selMonth === mKey || (selMonth === 'YTD'));
+                const barColor = isCurrentMonth ? '#3b82f6' : '#cbd5e1';
+                return `
+                  <div class="biz-chart-bar-wrapper">
+                    <div class="biz-chart-bar" style="height:${Math.max(heightPct, 5)}%; background-color:${barColor};">
+                      <div class="biz-chart-tooltip">${mKey}: ${qty.toLocaleString()} ชิ้น</div>
+                    </div>
+                    <div class="biz-chart-label" style="${isCurrentMonth ? 'color:#0f172a; font-weight:700;' : ''}">${mKey}</div>
+                  </div>
+                `;
               }).join('')}
             </div>
           </div>
@@ -493,41 +547,6 @@ function renderRetention(filteredData, rawData) {
               `;
             }).join('')}
           </div>
-        </div>
-      </div>
-
-      <div class="biz-card">
-        <div class="biz-card-title">ตารางตรวจสอบผลสัมฤทธิ์ทางการตลาดเทียบเป้าหมาย (Retention KPI Matrix)</div>
-        <div class="biz-table-wrapper">
-          <table class="biz-table">
-            <thead>
-              <tr>
-                <th>ช่องทาง</th><th>รายได้จริง (Act)</th><th>เป้ารายได้ (Plan)</th><th>จำนวนออเดอร์</th><th>เป้าออเดอร์</th><th>ส่วนต่างเป้า</th><th>KPI %</th><th>สถานะ</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${bizChannels.map(ch => {
-                const act = channelDataStore[ch];
-                const planBase = bizTargetPlans[ch];
-                const planCount = selMonth === 'YTD' ? planBase.targetOrders : Math.round(planBase.targetOrders / 6);
-                const planRev = selMonth === 'YTD' ? planBase.targetRev : Math.round(planBase.targetRev / 6);
-                const diffOrders = act.count - planCount;
-                const achRate = planRev === 0 ? 0 : (act.revenue / planRev) * 100;
-                return `
-                  <tr>
-                    <td style="font-weight:600;">${ch}</td>
-                    <td style="font-weight:700; color:#059669;">฿${Math.round(act.revenue).toLocaleString()}</td>
-                    <td>฿${planRev.toLocaleString()}</td>
-                    <td>${act.count} ครั้ง</td>
-                    <td>${planCount} ครั้ง</td>
-                    <td style="font-weight:600; color:${diffOrders >= 0 ? '#10b981' : '#ef4444'}">${diffOrders >= 0 ? '+' + diffOrders : diffOrders}</td>
-                    <td style="font-weight:700;">${achRate.toFixed(1)}%</td>
-                    <td><span class="biz-status-pill ${achRate >= 100 ? 'pill-pass' : 'pill-fail'}">${achRate >= 100 ? '▲ ทะลุเป้า' : '▼ ต่ำกว่าเป้า'}</span></td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>
