@@ -322,6 +322,7 @@ function renderRetention(filteredData, rawData) {
       <div class="biz-header">
         <div class="biz-header-title">
           <h1>แดชบอร์ดกลยุทธ์การซื้อซ้ำและรักษารากฐานลูกค้า (Strategic Customer Retention Dashboard)</h1>
+          <p>ข้อมูลและกราฟแท่งทั้งหมดเชื่อมโยงและแปรผันตามเงื่อนไขตัวกรอง (Filter) หลักของระบบโดยตรง</p>
         </div>
       </div>
 
@@ -418,8 +419,6 @@ function renderRetention(filteredData, rawData) {
           <div class="biz-card" style="margin-bottom:24px;">
             <div class="biz-card-title">
               <div>กราฟแท่งเปรียบเทียบปริมาณสินค้าซื้อซ้ำในแต่ละเดือน (Monthly Product Unit Vol.)
-                <div class="biz-card-subtitle">แท่งกราฟจะปรากฏและเปรียบเทียบตามช่วงเดือนที่ถูกกรองมาจาก Filter หลักด้านบนอัตโนมัติ</div>
-              </div>
             </div>
             <div class="biz-chart-container">
               ${sortedChartMonths.length === 0 
