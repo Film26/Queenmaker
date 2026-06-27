@@ -39,9 +39,6 @@ function renderRetention(filteredData, rawData) {
     return getFlexibleValue(row, ['รหัสลูกค้า', 'Customer ID', 'เบอร์โทร', 'Phone', 'ชื่อลูกค้า', 'Customer Name', 'ID']);
   };
 
-  // --- INITIALIZE GLOBAL STATES ---
-  window.retentionActiveToggle = window.retentionActiveToggle || 'category';
-
   // --- 1. PREMIUM ENTREPRENEUR STYLES ---
   if (!document.getElementById('retention-entrepreneur-styles')) {
     const style = document.createElement('style');
@@ -51,10 +48,6 @@ function renderRetention(filteredData, rawData) {
       .biz-header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; padding: 24px 30px; border-radius: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.1); }
       .biz-header-title h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
       .biz-header-title p { margin: 6px 0 0 0; font-size: 13px; color: #94a3b8; }
-      .biz-control-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 15px; flex-wrap: wrap; }
-      .biz-toggle-group { display: flex; background: #e2e8f0; padding: 4px; border-radius: 10px; }
-      .biz-toggle-btn { border: none; background: transparent; padding: 8px 18px; font-size: 13px; font-weight: 600; color: #475569; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }
-      .biz-toggle-btn.active { background: white; color: #0f172a; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08); }
       .biz-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 24px; }
       .biz-kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px; display: flex; align-items: center; justify-content: space-between; position: relative; overflow: hidden; }
       .biz-kpi-card::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; background: #cbd5e1; }
@@ -80,9 +73,9 @@ function renderRetention(filteredData, rawData) {
       .biz-card-title { font-size: 16px; font-weight: 700; color: #0f172a; margin: 0 0 18px 0; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
       .biz-card-subtitle { font-size: 12px; font-weight: 400; color: #64748b; margin-top: 2px; }
       
-      .biz-chart-container { display: flex; align-items: flex-end; justify-content: space-between; height: 180px; padding: 20px 10px 10px 10px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 15px; gap: 8px; }
-      .biz-chart-bar-wrapper { display: flex; flex-direction: column; align-items: center; flex: 1; height: 100%; justify-content: flex-end; }
-      .biz-chart-bar { width: 100%; max-width: 35px; border-radius: 6px 6px 0 0; background: #3b82f6; transition: height 0.4s ease; position: relative; cursor: pointer; }
+      .biz-chart-container { display: flex; align-items: flex-end; justify-content: flex-start; height: 180px; padding: 20px 15px 10px 15px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 15px; gap: 16px; overflow-x: auto; }
+      .biz-chart-bar-wrapper { display: flex; flex-direction: column; align-items: center; min-width: 45px; flex: 1; height: 100%; justify-content: flex-end; }
+      .biz-chart-bar { width: 100%; max-width: 32px; border-radius: 6px 6px 0 0; background: #3b82f6; transition: height 0.4s ease; position: relative; cursor: pointer; }
       .biz-chart-bar:hover .biz-chart-tooltip { display: block; }
       .biz-chart-tooltip { display: none; position: absolute; top: -35px; left: 50%; transform: translateX(-50%); background: #0f172a; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
       .biz-chart-label { font-size: 11px; font-weight: 600; color: #64748b; margin-top: 8px; text-align: center; }
@@ -137,7 +130,7 @@ function renderRetention(filteredData, rawData) {
     collagen: ['COLLAGEN', 'คลอลาเจน', 'คอลลาเจน']
   };
 
-  const parseProductItemToFlatList = (productString, activeToggle) => {
+  const parseProductItemToFlatList = (productString) => {
     if (!productString) return [];
     const items = productString.split('|');
     const results = [];
@@ -169,12 +162,8 @@ function renderRetention(filteredData, rawData) {
         calculatedQty = 2 * orderQty;
       }
 
-      let displayKey = '';
-      if (activeToggle === 'category') {
-        displayKey = targetFormula.toUpperCase();
-      } else {
-        displayKey = `${name.trim()} (${isSachet ? '✉️ ซอง' : '📦 กล่อง'})`;
-      }
+      // บังคับการแสดงผลกลุ่มเป็นชื่อสูตรหลัก (Category) เท่านั้น
+      let displayKey = targetFormula.toUpperCase();
 
       results.push({
         formula: targetFormula,
@@ -216,11 +205,6 @@ function renderRetention(filteredData, rawData) {
     return d && localFirstPurchaseMap[id] && localFirstPurchaseMap[id].val < d.val;
   });
 
-  // --- 5. EXECUTE TOGGLES ---
-  window.bizUpdateToggle = function(t) { window.retentionActiveToggle = t; renderRetention(filteredData, rawData); };
-  const activeToggle = window.retentionActiveToggle;
-
-  // ใช้ข้อมูลตาม Filter หลักที่ส่งเข้ามาตรงๆ
   const totalActiveBuyersInPeriod = new Set();
   validSaleOrders.forEach(row => {
     const id = getCustId(row);
@@ -241,7 +225,7 @@ function renderRetention(filteredData, rawData) {
   const totalRepeatOrdersCount = repeatOrders.length;
   const repeatBuyerSharePct = totalActiveBuyersInPeriod.size === 0 ? 0 : (periodRepeatBuyers.size / totalActiveBuyersInPeriod.size) * 100;
 
-  // --- 6. CALCULATE REPORT SUMMARY ---
+  // --- 5. CALCULATE REPORT SUMMARY & MONTHLY BARS ---
   const finalReportSummary = {
     plus: { boxes: 0, sachets: 0 },
     gold: { boxes: 0, sachets: 0 },
@@ -251,21 +235,22 @@ function renderRetention(filteredData, rawData) {
   };
 
   const productSummaryMap = {};
-  
-  // โครงสร้างสำหรับกราฟแท่งรายเดือน (คำนวณจาก rawData ของลูกค้าเก่าเพื่อดูแนวโน้ม)
-  const monthlyBarChartData = {
-    'Jan': 0, 'Feb': 0, 'Mar': 0, 'Apr': 0, 'May': 0, 'Jun': 0,
-    'Jul': 0, 'Aug': 0, 'Sep': 0, 'Oct': 0, 'Nov': 0, 'Dec': 0
-  };
+  const dynamicMonthlyMap = {};
   const monthsArr = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  // วนลูปคำนวณยอดผลิตภัณฑ์ในงวดที่ถูก Filter
   repeatOrders.forEach(row => {
     const revStr = getFlexibleValue(row, ['ยอดขาย', 'ยอดโอน', 'Revenue', 'จำนวนเงิน', 'ยอดเงิน']) || '0';
     const orderRev = parseFloat(revStr.toString().replace(/,/g, '')) || 0;
     
+    const dateStr = getFlexibleValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'วันที่', 'Date']);
+    const d = parseDateObj(dateStr);
+    let mLabel = "Unknown";
+    if (d && d.m >= 1 && d.m <= 12) {
+      mLabel = monthsArr[d.m - 1];
+    }
+    
     const salesData = getFlexibleValue(row, ['รายการขาย', 'ชื่อสินค้า', 'Product', 'Product Set', 'สินค้า']) || '';
-    const parsedItems = parseProductItemToFlatList(salesData, activeToggle);
+    const parsedItems = parseProductItemToFlatList(salesData);
     const totalItemsInOrder = parsedItems.reduce((acc, p) => acc + p.qty, 0) || 1;
 
     parsedItems.forEach(p => {
@@ -283,33 +268,21 @@ function renderRetention(filteredData, rawData) {
       }
       productSummaryMap[p.key].count += p.qty;
       productSummaryMap[p.key].revenue += distributedRev;
+
+      if (mLabel !== "Unknown") {
+        if (!dynamicMonthlyMap[mLabel]) dynamicMonthlyMap[mLabel] = 0;
+        dynamicMonthlyMap[mLabel] += p.qty;
+      }
     });
-  });
-
-  // วนลูปเพื่อหยอดข้อมูลลงกราฟแท่งเปรียบเทียบในแต่ละเดือน (อิงจากประวัติการซื้อซ้ำทั้งหมดใน rawData)
-  const allRawValidOrders = rawData.filter(row => checkIsSaleOrder(row));
-  allRawValidOrders.forEach(row => {
-    const id = getCustId(row);
-    const dateStr = getFlexibleValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'วันที่', 'Date']);
-    const d = parseDateObj(dateStr);
-    if (!id || !d || d.m < 1 || d.m > 12) return;
-
-    // ตรวจสอบว่าเป็นคำสั่งซื้อซ้ำ (ไม่ใช่ครั้งแรกของชีวิตลูกค้า)
-    if (localFirstPurchaseMap[id] && localFirstPurchaseMap[id].val < d.val) {
-      const mLabel = monthsArr[d.m - 1];
-      const salesData = getFlexibleValue(row, ['รายการขาย', 'ชื่อสินค้า', 'Product', 'Product Set', 'สินค้า']) || '';
-      const parsedItems = parseProductItemToFlatList(salesData, activeToggle);
-      parsedItems.forEach(p => {
-        monthlyBarChartData[mLabel] += p.qty;
-      });
-    }
   });
 
   const sortedProducts = Object.values(productSummaryMap).sort((a, b) => b.count - a.count);
   const topProductMaxCount = sortedProducts.length > 0 ? sortedProducts[0].count : 1;
-  const maxMonthlyQtyVal = Math.max(...Object.values(monthlyBarChartData)) || 1;
 
-  // --- 7. CHANNELS KPI PROCESSING ---
+  const sortedChartMonths = Object.keys(dynamicMonthlyMap).sort((a, b) => monthsArr.indexOf(a) - monthsArr.indexOf(b));
+  const maxMonthlyQtyVal = Math.max(...Object.values(dynamicMonthlyMap)) || 1;
+
+  // --- 6. CHANNELS KPI PROCESSING ---
   const bizChannels = ['Facebook', 'Line', 'Call', 'CRM', 'Other'];
   const channelDataStore = {};
   bizChannels.forEach(ch => { channelDataStore[ch] = { name: ch, count: 0, revenue: 0 }; });
@@ -333,32 +306,24 @@ function renderRetention(filteredData, rawData) {
   const sortedChannels = Object.values(channelDataStore).sort((a,b) => b.revenue - a.revenue);
   const maxChannelRevVal = sortedChannels.length > 0 ? sortedChannels[0].revenue : 1;
 
-  // ตั้งค่าเป้าหมายแบบเฉลี่ยรายเดือนอัตโนมัติอิงตามข้อมูลที่ถูกส่งเข้ามา
   const bizTargetPlans = {
-    'Facebook': { targetOrders: 27, targetRev: 21600 },
-    'Line': { targetOrders: 36, targetRev: 31600 },
-    'Call': { targetOrders: 15, targetRev: 14100 },
-    'CRM': { targetOrders: 66, targetRev: 83300 },
-    'Other': { targetOrders: 2, targetRev: 1600 }
+    'Facebook': { targetOrders: Math.max(Math.round(totalRepeatOrdersCount * 0.15), 5), targetRev: Math.round(totalRepeatRevenue * 0.15) },
+    'Line': { targetOrders: Math.max(Math.round(totalRepeatOrdersCount * 0.20), 8), targetRev: Math.round(totalRepeatRevenue * 0.20) },
+    'Call': { targetOrders: Math.max(Math.round(totalRepeatOrdersCount * 0.08), 3), targetRev: Math.round(totalRepeatRevenue * 0.08) },
+    'CRM': { targetOrders: Math.max(Math.round(totalRepeatOrdersCount * 0.55), 15), targetRev: Math.round(totalRepeatRevenue * 0.55) },
+    'Other': { targetOrders: Math.max(Math.round(totalRepeatOrdersCount * 0.02), 1), targetRev: Math.round(totalRepeatRevenue * 0.02) }
   };
 
   const getChannelColor = (ch) => ({ 'Facebook': '#38bdf8', 'Line': '#06c755', 'CRM': '#ea580c', 'Call': '#64748b', 'Other': '#94a3b8' }[ch] || '#94a3b8');
   const getFormulaColor = (f) => ({ 'plus': '#10b981', 'gold': '#eab308', 'wiss': '#3b82f6', 'kides': '#f97316', 'collagen': '#ef4444' }[f] || '#64748b');
 
-  // --- 8. BUILD DASHBOARD TEMPLATE ---
+  // --- 7. BUILD DASHBOARD TEMPLATE ---
   let html = `
     <div class="biz-dashboard">
       <div class="biz-header">
         <div class="biz-header-title">
           <h1>แดชบอร์ดกลยุทธ์การซื้อซ้ำและรักษารากฐานลูกค้า (Strategic Customer Retention Dashboard)</h1>
-          <p>ข้อมูลทั้งหมดจะถูกคำนวณและอัปเดตแบบ Dynamic อิงตามแถบตัวกรองวันที่ (Filter) ด้านบนสุดของระบบ</p>
-        </div>
-      </div>
-
-      <div class="biz-control-bar">
-        <div class="biz-toggle-group">
-          <button class="biz-toggle-btn ${activeToggle === 'category' ? 'active' : ''}" onclick="window.bizUpdateToggle('category')">มุมมองแยกรายสูตรหลัก</button>
-          <button class="biz-toggle-btn ${activeToggle === 'item' ? 'active' : ''}" onclick="window.bizUpdateToggle('item')">มุมมองจำแนกแพ็กเกจย่อย</button>
+          <p>ข้อมูลและกราฟแท่งทั้งหมดเชื่อมโยงและแปรผันตามเงื่อนไขตัวกรอง (Filter) หลักของระบบโดยตรง</p>
         </div>
       </div>
 
@@ -415,7 +380,7 @@ function renderRetention(filteredData, rawData) {
         </div>
       </div>
 
-      <!-- 📈 SECTION 2: ตารางตรวจสอบผลสัมฤทธิ์ทางการตลาดเทียบเป้าหมาย -->
+      <!-- 📈 SECTION 2: ตารางตรวจสอบผลสัมฤทธิ์ทางการตลาดเทียบเป้าหมาย (KPI Matrix) -->
       <div class="biz-card" style="margin-bottom:24px;">
         <div class="biz-card-title">ตารางตรวจสอบผลสัมฤทธิ์ทางการตลาดเทียบเป้าหมาย (Retention KPI Matrix)</div>
         <div class="biz-table-wrapper">
@@ -455,27 +420,30 @@ function renderRetention(filteredData, rawData) {
           <div class="biz-card" style="margin-bottom:24px;">
             <div class="biz-card-title">
               <div>กราฟแท่งเปรียบเทียบปริมาณสินค้าซื้อซ้ำในแต่ละเดือน (Monthly Product Unit Vol.)
-                <div class="biz-card-subtitle">แสดงสถิติแนวโน้มการซื้อซ้ำสะสมรวมรายเดือน (ม.ค. - มิ.ย.) ของฐานลูกค้าเก่า</div>
+                <div class="biz-card-subtitle">แท่งกราฟจะปรากฏและเปรียบเทียบตามช่วงเดือนที่ถูกกรองมาจาก Filter หลักด้านบนอัตโนมัติ</div>
               </div>
             </div>
             <div class="biz-chart-container">
-              ${monthsArr.slice(0,6).map(mKey => {
-                const qty = monthlyBarChartData[mKey];
-                const heightPct = maxMonthlyQtyVal > 0 ? (qty / maxMonthlyQtyVal) * 100 : 0;
-                return `
-                  <div class="biz-chart-bar-wrapper">
-                    <div class="biz-chart-bar" style="height:${Math.max(heightPct, 5)}%; background-color:#3b82f6;">
-                      <div class="biz-chart-tooltip">${mKey}: ${qty.toLocaleString()} ชิ้น</div>
-                    </div>
-                    <div class="biz-chart-label">${mKey}</div>
-                  </div>
-                `;
-              }).join('')}
+              ${sortedChartMonths.length === 0 
+                ? '<div style="color:#94a3b8; text-align:center; width:100%; padding:40px 0;">โปรดระบุช่วงวันที่ที่กว้างขึ้นที่ Filter ด้านบน เพื่อเปรียบเทียบแนวโน้มรายเดือน</div>' 
+                : sortedChartMonths.map(mKey => {
+                    const qty = dynamicMonthlyMap[mKey];
+                    const heightPct = maxMonthlyQtyVal > 0 ? (qty / maxMonthlyQtyVal) * 100 : 0;
+                    return `
+                      <div class="biz-chart-bar-wrapper">
+                        <div class="biz-chart-bar" style="height:${Math.max(heightPct, 8)}%; background-color:#3b82f6;">
+                          <div class="biz-chart-tooltip">${mKey}: ${qty.toLocaleString()} ชิ้น</div>
+                        </div>
+                        <div class="biz-chart-label" style="color:#0f172a; font-weight:700;">${mKey}</div>
+                      </div>
+                    `;
+                  }).join('')
+              }
             </div>
           </div>
 
           <div class="biz-card">
-            <div class="biz-card-title"><div>อันดับยอดจำหน่ายสินค้าที่ลูกค้าเก่าเลือกซื้อสูงสุดในรอบเวลาที่เลือก</div></div>
+            <div class="biz-card-title"><div>อันดับยอดจำหน่ายสูตรสินค้าที่ลูกค้าเก่าเลือกซื้อสูงสุด</div></div>
             <div class="biz-rank-list">
               ${sortedProducts.length === 0 ? '<div style="color:#94a3b8; text-align:center; padding:15px;">ไม่พบประวัติการซื้อสินค้าซ้ำในช่วงเวลานี้</div>' : sortedProducts.map((p, idx) => {
                 const pct = (p.count / topProductMaxCount) * 100;
@@ -483,7 +451,7 @@ function renderRetention(filteredData, rawData) {
                   <div class="biz-rank-item">
                     <div style="display:flex; align-items:center; flex-grow:1; min-width:0;">
                       <div class="biz-rank-badge ${idx<3?'rank-'+(idx+1):''}">${idx+1}</div>
-                      <div class="biz-rank-meta"><span class="biz-rank-name">${p.key}</span><div class="biz-progress-bg"><div class="biz-progress-bar" style="width:${pct}%; background-color:${getFormulaColor(p.formula)};"></div></div></div>
+                      <div class="biz-rank-meta"><span class="biz-rank-name">สูตร ${p.key}</span><div class="biz-progress-bg"><div class="biz-progress-bar" style="width:${pct}%; background-color:${getFormulaColor(p.formula)};"></div></div></div>
                     </div>
                     <div class="biz-rank-vals"><span class="biz-val-m">${p.count.toLocaleString()} ชิ้น</span><span class="biz-val-s">฿${Math.round(p.revenue).toLocaleString()}</span></div>
                   </div>
