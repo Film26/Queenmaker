@@ -1,8 +1,6 @@
-// public/retention.js
+// public/retention.jsฃ
 function renderRetention(filteredData, rawData) {
   const container = document.getElementById('view-retention');
-  
-  // ป้องกันกรณีตัวแปรหลักไม่มีค่าเข้ามา
   const dataSrc = (filteredData && filteredData.length > 0) ? filteredData : [];
 
   if (!dataSrc || dataSrc.length === 0) {
@@ -16,12 +14,11 @@ function renderRetention(filteredData, rawData) {
     return;
   }
 
-  // --- ฟังก์ชันอัจฉริยะสำหรับดักจับชื่อคอลัมน์ภาษาไทย/อังกฤษ (Fallback Mapping) ---
+  // --- ฟังก์ชันดักจับชื่อคอลัมน์ภาษาไทย/อังกฤษ ยืดหยุ่นตามไฟล์ดิบ ---
   const getFlexibleValue = (row, keys) => {
     for (let key of keys) {
       if (row[key] !== undefined && row[key] !== null) return row[key];
     }
-    // ดักจับกรณีชื่อคอลัมน์เว้นวรรคไม่เท่ากัน หรือพิมพ์เล็ก-ใหญ่ต่างกัน
     for (let rKey in row) {
       const cleanRKey = rKey.replace(/\s+/g, '').toLowerCase();
       for (let key of keys) {
@@ -32,14 +29,12 @@ function renderRetention(filteredData, rawData) {
     return '';
   };
 
-  // ตรวจสอบว่าเป็นออเดอร์ขายจริงหรือไม่
   const checkIsSaleOrder = (row) => {
     const status = getFlexibleValue(row, ['สถานะ', 'Status', 'สถานะออเดอร์', 'ประเภท']).toString().toLowerCase();
     if (status.includes('ยกเลิก') || status.includes('cancel') || status.includes('คืนสินค้า')) return false;
     return true;
   };
 
-  // ดึงรหัสลูกค้าที่ไม่ซ้ำกัน
   const getCustId = (row) => {
     return getFlexibleValue(row, ['รหัสลูกค้า', 'Customer ID', 'เบอร์โทร', 'Phone', 'ชื่อลูกค้า', 'Customer Name', 'ID']);
   };
@@ -107,7 +102,7 @@ function renderRetention(filteredData, rawData) {
     document.head.appendChild(style);
   }
 
-  // --- 2. DATE PARSING LOGIC WITH FALLBACK ---
+  // --- 2. DATE PARSING LOGIC ---
   const parseDateObj = (dateStr) => {
     if (!dateStr) return null;
     const clean = dateStr.toString().trim().split(' ')[0];
@@ -123,35 +118,70 @@ function renderRetention(filteredData, rawData) {
     return null;
   };
 
-  const parseOrderProducts = (row) => {
-    const rawProd = getFlexibleValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set', 'สินค้า']) || 'Other';
-    if (!rawProd || rawProd === 'Other') return [{ name: 'Other', category: 'Other', qty: 1 }];
-    
-    const results = [];
-    rawProd.split('|').forEach(part => {
-      const sub = part.split('=');
-      const name = sub[0].trim();
-      let qty = 1;
-      if (sub.length > 1) {
-        const q = parseInt(sub[1].trim());
-        if (!isNaN(q)) qty = q;
-      }
-      if (name) {
-        let category = 'Other';
-        const lower = name.toLowerCase();
-        if (lower.includes('plus')) category = 'Plus';
-        else if (lower.includes('gold')) category = 'Gold';
-        else if (lower.includes('wiss')) category = 'Wiss';
-        else if (lower.includes('kides') || lower.includes('kide')) category = 'Kides';
-        else if (lower.includes('collagen')) category = 'Collagen';
-        results.push({ name, category, qty });
-      }
-    });
-    return results.length > 0 ? results : [{ name: 'Other', category: 'Other', qty: 1 }];
+  // --- 3. 🧩 INTEGRATED HIGH-ACCURACY PARSER (จากโค้ดที่คุณส่งมา) ---
+  const FORMULA_MAP = {
+    plus: ['PLUS', 'พลัส'],
+    gold: ['GOLD', 'โกลด์'],
+    wiss: ['WISS', 'วิสส์'],
+    kides: ['KIDES', 'คิดส์'],
+    collagen: ['COLLAGEN', 'คลอลาเจน', 'คอลลาเจน']
   };
 
-  // --- 3. RETENTION DATA FILTERING ---
-  // สร้างตารางซื้อครั้งแรก (First Purchase) อิงจาก rawData ทั้งระบบเพื่อความแม่นยำสูงสุด
+  const parseProductItemToFlatList = (productString, activeToggle) => {
+    if (!productString) return [];
+    const items = productString.split('|');
+    const results = [];
+
+    items.forEach(item => {
+      if (!item.includes('=')) return;
+      let [name, quantityStr] = item.split('=');
+      let orderQty = parseInt(quantityStr) || 0;
+      let nameUpper = name.toUpperCase().trim();
+
+      let targetFormula = null;
+      for (const [formula, keywords] of Object.entries(FORMULA_MAP)) {
+        if (keywords.some(k => nameUpper.includes(k))) {
+          targetFormula = formula;
+          break;
+        }
+      }
+      
+      if (!targetFormula) return; // ข้ามของแถมแก้วน้ำ/ขวดเชคตามลอจิกคุณ
+
+      let isSachet = nameUpper.includes('ซอง') || nameUpper.includes('แบบซอง') || nameUpper.includes('SACHET');
+      let calculatedQty = orderQty;
+
+      // จัดการเคสระบุจำนวนกล่องในชื่อ (เช่น 3 กล่อง = 1) หรือ 1แถม1
+      const boxMatch = nameUpper.match(/(\d+)\s*กล่อง/);
+      if (boxMatch) {
+        calculatedQty = parseInt(boxMatch[1]) * orderQty;
+      }
+      if (nameUpper.includes('1แถม1')) {
+        calculatedQty = 2 * orderQty;
+      }
+
+      // ปรับคีย์เพื่อเอาไปแสดงผลบน Dashboard (ตามการเลือกแบรนด์หรือรายแพ็กเกจ)
+      let displayKey = '';
+      if (activeToggle === 'category') {
+        // แสดงชื่อแบรนด์แบบทางการ
+        displayKey = targetFormula.toUpperCase();
+      } else {
+        // แสดงตามชื่อแพ็กเกจย่อย + ระบุประเภทกล่อง/ซองท้ายชื่อให้อ่านง่าย
+        displayKey = `${name.trim()} (${isSachet ? '✉️ ซอง' : '📦 กล่อง'})`;
+      }
+
+      results.push({
+        formula: targetFormula,
+        isSachet: isSachet,
+        qty: calculatedQty,
+        key: displayKey
+      });
+    });
+
+    return results;
+  };
+
+  // --- 4. RETENTION CORE DATA FILTERING ---
   const localFirstPurchaseMap = {};
   rawData.forEach(row => {
     if (!checkIsSaleOrder(row)) return;
@@ -160,13 +190,11 @@ function renderRetention(filteredData, rawData) {
     if (!id || !dateStr) return;
     const d = parseDateObj(dateStr);
     if (!d) return;
-
     if (!localFirstPurchaseMap[id] || d.val < localFirstPurchaseMap[id].val) {
       localFirstPurchaseMap[id] = d;
     }
   });
 
-  // คัดกรองออเดอร์ขายจริงที่มีเงินเข้าจริง
   const validSaleOrders = dataSrc.filter(row => {
     if (!checkIsSaleOrder(row)) return false;
     const revStr = getFlexibleValue(row, ['ยอดขาย', 'ยอดโอน', 'Revenue', 'จำนวนเงิน', 'ยอดเงิน']) || '0';
@@ -174,7 +202,6 @@ function renderRetention(filteredData, rawData) {
     return !isNaN(rev) && rev > 0;
   });
 
-  // คัดกรองข้อมูลออเดอร์ของ "ลูกค้าเก่าที่กลับมาซื้อซ้ำ"
   const repeatOrders = validSaleOrders.filter(row => {
     const id = getCustId(row);
     const dateStr = getFlexibleValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'วันที่', 'Date']);
@@ -183,14 +210,13 @@ function renderRetention(filteredData, rawData) {
     return d && localFirstPurchaseMap[id] && localFirstPurchaseMap[id].val < d.val;
   });
 
-  // --- 4. DYNAMIC ACTIONS ---
+  // --- 5. EXECUTE FILTERS AND TOGGLES ---
   window.bizUpdateMonth = function(m) { window.retentionSelectedMonth = m; renderRetention(filteredData, rawData); };
   window.bizUpdateToggle = function(t) { window.retentionActiveToggle = t; renderRetention(filteredData, rawData); };
 
   const selMonth = window.retentionSelectedMonth;
   const activeToggle = window.retentionActiveToggle;
 
-  // กรองออเดอร์ตามช่วงเวลาที่ผู้บริหารเลือก
   const currentPeriodRepeat = repeatOrders.filter(row => {
     if (selMonth === 'YTD') return true;
     const dateStr = getFlexibleValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'วันที่', 'Date']);
@@ -227,47 +253,43 @@ function renderRetention(filteredData, rawData) {
   const totalRepeatOrdersCount = currentPeriodRepeat.length;
   const repeatBuyerSharePct = totalActiveBuyersInPeriod.size === 0 ? 0 : (periodRepeatBuyers.size / totalActiveBuyersInPeriod.size) * 100;
 
-  // --- 5. PRODUCTS PROCESSING ---
+  // --- 6. CALCULATE HIGHEST ACCURACY PRODUCTS DISTRIBUTION ---
   const productSummaryMap = {};
   const crossMonthProductTracker = {};
   for (let m = 1; m <= 12; m++) crossMonthProductTracker[m] = {};
 
+  // สรุปยอดตามช่วงเวลาที่เลือก
   currentPeriodRepeat.forEach(row => {
     const revStr = getFlexibleValue(row, ['ยอดขาย', 'ยอดโอน', 'Revenue', 'จำนวนเงิน', 'ยอดเงิน']) || '0';
     const orderRev = parseFloat(revStr.toString().replace(/,/g, '')) || 0;
     
-    const prods = parseOrderProducts(row);
-    const sumQty = prods.reduce((acc, p) => acc + p.qty, 0) || 1;
+    const salesData = getFlexibleValue(row, ['รายการขาย', 'ชื่อสินค้า', 'Product', 'Product Set', 'สินค้า']) || '';
+    const parsedItems = parseProductItemToFlatList(salesData, activeToggle);
+    const totalItemsInOrder = parsedItems.reduce((acc, p) => acc + p.qty, 0) || 1;
 
-    prods.forEach(p => {
-      const distributedRev = orderRev * (p.qty / sumQty);
-      const key = activeToggle === 'category' ? p.category : p.name;
-
-      if (!productSummaryMap[key]) {
-        productSummaryMap[key] = { key, count: 0, revenue: 0, category: p.category };
+    parsedItems.forEach(p => {
+      const distributedRev = orderRev * (p.qty / totalItemsInOrder);
+      if (!productSummaryMap[p.key]) {
+        productSummaryMap[p.key] = { key: p.key, count: 0, revenue: 0, formula: p.formula };
       }
-      productSummaryMap[key].count += p.qty;
-      productSummaryMap[key].revenue += distributedRev;
+      productSummaryMap[p.key].count += p.qty;
+      productSummaryMap[p.key].revenue += distributedRev;
     });
   });
 
+  // คำนวณรายเดือนของเทรนด์สินค้าขายดี
   repeatOrders.forEach(row => {
     const d = parseDateObj(getFlexibleValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'วันที่', 'Date']));
     if (!d || d.m < 1 || d.m > 12) return;
-    const revStr = getFlexibleValue(row, ['ยอดขาย', 'ยอดโอน', 'Revenue', 'จำนวนเงิน', 'ยอดเงิน']) || '0';
-    const orderRev = parseFloat(revStr.toString().replace(/,/g, '')) || 0;
     
-    const prods = parseOrderProducts(row);
-    const sumQty = prods.reduce((acc, p) => acc + p.qty, 0) || 1;
+    const salesData = getFlexibleValue(row, ['รายการขาย', 'ชื่อสินค้า', 'Product', 'Product Set', 'สินค้า']) || '';
+    const parsedItems = parseProductItemToFlatList(salesData, activeToggle);
 
-    prods.forEach(p => {
-      const distributedRev = orderRev * (p.qty / sumQty);
-      const key = activeToggle === 'category' ? p.category : p.name;
-      if (!crossMonthProductTracker[d.m][key]) {
-        crossMonthProductTracker[d.m][key] = { count: 0, revenue: 0 };
+    parsedItems.forEach(p => {
+      if (!crossMonthProductTracker[d.m][p.key]) {
+        crossMonthProductTracker[d.m][p.key] = { count: 0, formula: p.formula };
       }
-      crossMonthProductTracker[d.m][key].count += p.qty;
-      crossMonthProductTracker[d.m][key].revenue += distributedRev;
+      crossMonthProductTracker[d.m][p.key].count += p.qty;
     });
   });
 
@@ -278,12 +300,12 @@ function renderRetention(filteredData, rawData) {
   const topProductsPerMonthList = [];
   for (let m = 1; m <= 12; m++) {
     const list = Object.keys(crossMonthProductTracker[m]).map(k => ({
-      name: k, count: crossMonthProductTracker[m][k].count, category: activeToggle === 'category' ? k : (productSummaryMap[k] ? productSummaryMap[k].category : 'Other')
+      name: k, count: crossMonthProductTracker[m][k].count, formula: crossMonthProductTracker[m][k].formula
     })).sort((a,b) => b.count - a.count);
     topProductsPerMonthList.push({ monthNum: m, nameTh: monthNamesTh[m], topItem: list[0] || null });
   }
 
-  // --- 6. CHANNELS PERFORMANCE KPI ---
+  // --- 7. CHANNELS KPI PROCESSING ---
   const bizChannels = ['Facebook', 'Line', 'Call', 'CRM', 'Other'];
   const channelDataStore = {};
   bizChannels.forEach(ch => { channelDataStore[ch] = { name: ch, count: 0, revenue: 0 }; });
@@ -316,22 +338,22 @@ function renderRetention(filteredData, rawData) {
   };
 
   const getChannelColor = (ch) => ({ 'Facebook': '#38bdf8', 'Line': '#06c755', 'CRM': '#ea580c', 'Call': '#64748b', 'Other': '#94a3b8' }[ch] || '#94a3b8');
-  const getProductColor = (cat) => ({ 'Plus': '#ea580c', 'Gold': '#d97706', 'Wiss': '#2563eb', 'Collagen': '#ec4899', 'Kides': '#059669', 'Other': '#64748b' }[cat] || '#ea580c');
+  const getFormulaColor = (f) => ({ 'plus': '#ea580c', 'gold': '#d97706', 'wiss': '#2563eb', 'collagen': '#ec4899', 'kides': '#059669' }[f] || '#64748b');
 
-  // --- 7. RENDER USER INTERFACE ---
+  // --- 8. BUILD DASHBOARD TEMPLATE ---
   let html = `
     <div class="biz-dashboard">
       <div class="biz-header">
         <div class="biz-header-title">
           <h1>แดชบอร์ดกลยุทธ์การซื้อซ้ำและรักษารากฐานลูกค้า (Strategic Customer Retention & KPI Dashboard)</h1>
-          <p>เครื่องมือวิเคราะห์พฤทีพพรรณลูกค้าเก่าเพื่อการตัดสินใจเชิงธุรกิจของผู้นำองค์กร</p>
+          <p>เครื่องมือวิเคราะห์พฤติกรรมการจำหน่ายและคำนวณแพ็กเกจ (กล่อง/ซอง) ความแม่นยำสูงระดับผู้บริหาร</p>
         </div>
       </div>
 
       <div class="biz-control-bar">
         <div class="biz-toggle-group">
-          <button class="biz-toggle-btn ${activeToggle === 'category' ? 'active' : ''}" onclick="window.bizUpdateToggle('category')">มุมมองกลุ่มแบรนด์สินค้า</button>
-          <button class="biz-toggle-btn ${activeToggle === 'item' ? 'active' : ''}" onclick="window.bizUpdateToggle('item')">มุมมองรายแพ็กเกจย่อย</button>
+          <button class="biz-toggle-btn ${activeToggle === 'category' ? 'active' : ''}" onclick="window.bizUpdateToggle('category')">มุมมองแยกรายสูตรหลัก</button>
+          <button class="biz-toggle-btn ${activeToggle === 'item' ? 'active' : ''}" onclick="window.bizUpdateToggle('item')">มุมมองจำแนกแพ็กเกจย่อย</button>
         </div>
         <div>
           <span style="font-size:12.5px; font-weight:600; color:#475569; margin-right:8px;">เลือกรอบระยะเวลาประเมินผล:</span>
@@ -369,11 +391,11 @@ function renderRetention(filteredData, rawData) {
       <div class="biz-main-grid">
         <div>
           <div class="biz-card" style="margin-bottom:24px;">
-            <div class="biz-card-title"><div>เทรนด์สินค้าซื้อซ้ำยอดนิยมรายเดือน <div class="biz-card-subtitle">แบรนด์สินค้าที่ดึงดูดลูกค้าเก่ากลับมาซื้อได้ดีที่สุด</div></div></div>
+            <div class="biz-card-title"><div>เทรนด์สินค้าซื้อซ้ำยอดนิยมรายเดือน <div class="biz-card-subtitle">วิเคราะห์ลอจิกคัดแยกโปรโมชั่น (รวมตัวคูณ 1แถม1 และจำนวนกล่องแล้ว)</div></div></div>
             <div class="biz-monthly-grid">
               ${topProductsPerMonthList.map(m => {
                 if (m.topItem) {
-                  return `<div class="biz-monthly-box"><span class="biz-month-lbl" style="color:${getProductColor(m.topItem.category)};">${m.nameTh}</span><span class="biz-month-prod" title="${m.topItem.name}">${m.topItem.name}</span><span class="biz-month-qty"><b>${m.topItem.count}</b> ชิ้นซ้ำ</span></div>`;
+                  return `<div class="biz-monthly-box"><span class="biz-month-lbl" style="color:${getFormulaColor(m.topItem.formula)};">${m.nameTh}</span><span class="biz-month-prod" title="${m.topItem.name}">${m.topItem.name}</span><span class="biz-month-qty"><b>${m.topItem.count.toLocaleString()}</b> ชิ้นซ้ำ</span></div>`;
                 }
                 return `<div class="biz-monthly-box" style="opacity:0.4;"><span class="biz-month-lbl" style="color:#64748b;">${m.nameTh}</span><span class="biz-month-prod" style="font-style:italic; font-size:11px;">ไม่มีข้อมูลซ้ำ</span></div>`;
               }).join('')}
@@ -381,7 +403,7 @@ function renderRetention(filteredData, rawData) {
           </div>
 
           <div class="biz-card">
-            <div class="biz-card-title"><div>อันดับสินค้าที่ลูกค้าเก่าเลือกซื้อสูงสุดในรอบ (${selMonth})</div></div>
+            <div class="biz-card-title"><div>อันดับยอดจำหน่ายสินค้าที่ลูกค้าเก่าเลือกซื้อสูงสุดในรอบ (${selMonth})</div></div>
             <div class="biz-rank-list">
               ${sortedProducts.length === 0 ? '<div style="color:#94a3b8; text-align:center; padding:15px;">ไม่พบประวัติการซื้อสินค้าซ้ำในรอบนี้</div>' : sortedProducts.map((p, idx) => {
                 const pct = (p.count / topProductMaxCount) * 100;
@@ -389,9 +411,9 @@ function renderRetention(filteredData, rawData) {
                   <div class="biz-rank-item">
                     <div style="display:flex; align-items:center; flex-grow:1; min-width:0;">
                       <div class="biz-rank-badge ${idx<3?'rank-'+(idx+1):''}">${idx+1}</div>
-                      <div class="biz-rank-meta"><span class="biz-rank-name">${p.key}</span><div class="biz-progress-bg"><div class="biz-progress-bar" style="width:${pct}%; background-color:${getProductColor(p.category)};"></div></div></div>
+                      <div class="biz-rank-meta"><span class="biz-rank-name">${p.key}</span><div class="biz-progress-bg"><div class="biz-progress-bar" style="width:${pct}%; background-color:${getFormulaColor(p.formula)};"></div></div></div>
                     </div>
-                    <div class="biz-rank-vals"><span class="biz-val-m">${p.count} ชิ้น</span><span class="biz-val-s">฿${Math.round(p.revenue).toLocaleString()}</span></div>
+                    <div class="biz-rank-vals"><span class="biz-val-m">${p.count.toLocaleString()} ชิ้น</span><span class="biz-val-s">฿${Math.round(p.revenue).toLocaleString()}</span></div>
                   </div>
                 `;
               }).join('')}
@@ -400,7 +422,7 @@ function renderRetention(filteredData, rawData) {
         </div>
 
         <div class="biz-card">
-          <div class="biz-card-title"><div>ประสิทธิภาพช่องทางปิดการขายลูกค้าเก่า</div></div>
+          <div class="biz-card-title"><div>ประสิทธิภาพช่องทางปิดการขายลูกค้าเก่า (เรียงตามรายได้จริง)</div></div>
           <div class="biz-rank-list">
             ${sortedChannels.map((c, idx) => {
               const pct = (c.revenue / maxChannelRevVal) * 100;
