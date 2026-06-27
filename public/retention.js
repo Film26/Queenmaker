@@ -1,411 +1,405 @@
 // public/retention.js
 function renderRetention(filteredData, rawData) {
   const container = document.getElementById('view-retention');
-  
-  // ยึดหลักแหล่งข้อมูลหลักผูกผันกับตัวกรองของระบบแดชบอร์ดหลัก
   const dataSrc = (filteredData && filteredData.length > 0) ? filteredData : [];
 
   if (!dataSrc || dataSrc.length === 0) {
-    container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">ไม่พบข้อมูลสั่งซื้อซ้ำ กรุณาปรับ Filter หรือโหลดไฟล์ข้อมูลใหม่อีกครั้ง</div>';
+    container.innerHTML = '<div style="text-align:center; padding:50px; color:#999; font-family:\'Inter\',sans-serif;">📊 ยังไม่มีข้อมูลสำหรับการวิเคราะห์ในรอบนี้ กรุณาเลือกไฟล์ข้อมูลที่มีสถิติยอดโอนเงิน</div>';
     return;
   }
 
-  // กำหนดสเตตัสการเก็บค่า Dropdown และปุ่ม Toggle ของแถบแบรนด์/แพ็กเกจสินค้า
+  // ใช้ Global State เพื่อจดจำค่าตัวเลือกของผู้บริหาร แม้จะเปลี่ยนหน้าไปมา
   window.retentionActiveToggle = window.retentionActiveToggle || 'category';
   window.retentionSelectedMonth = window.retentionSelectedMonth || 'YTD';
 
-  // 1. Inject CSS Styles สำหรับปรับปรุงหน้าตา KPI Dashboard ให้เรียบร้อย
-  if (!document.getElementById('retention-kpi-master-styles')) {
+  // --- 1. MODERN ENTREPRENEUR DASHBOARD STYLES ---
+  if (!document.getElementById('retention-entrepreneur-styles')) {
     const style = document.createElement('style');
-    style.id = 'retention-kpi-master-styles';
+    style.id = 'retention-entrepreneur-styles';
     style.innerHTML = `
-      .retention-container { font-family: 'Inter', 'Outfit', sans-serif; color: #1e293b; background-color: #f8fafc; }
-      .retention-header {
-        background: linear-gradient(135deg, #0b2240 0%, #1e293b 100%); color: white;
-        padding: 22px 28px; border-radius: 12px; margin-bottom: 20px;
-        display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+      .biz-dashboard { font-family: 'Inter', 'Prompt', sans-serif; color: #0f172a; background-color: #f8fafc; padding: 5px; }
+      
+      /* Header ไล่เฉดสีสไตล์พรีเมียมสำหรับผู้บริหาร */
+      .biz-header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white;
+        padding: 24px 30px; border-radius: 16px; margin-bottom: 24px;
+        display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.1);
       }
-      .retention-header-text h2 { margin: 0; font-size: 20px; font-weight: 700; }
-      .retention-header-text p { margin: 4px 0 0 0; font-size: 12.5px; color: #cbd5e1; }
+      .biz-header-title h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+      .biz-header-title p { margin: 6px 0 0 0; font-size: 13px; color: #94a3b8; }
       
-      .retention-ctrl-bar { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
-      .retention-toggle-container { display: flex; background: #e2e8f0; padding: 4px; border-radius: 8px; width: fit-content; }
-      .retention-toggle-btn {
-        border: none; background: transparent; padding: 7px 16px; font-size: 12.5px;
-        font-weight: 600; color: #475569; border-radius: 6px; cursor: pointer; transition: all 0.2s ease;
+      /* แถบควบคุมฟิลเตอร์ */
+      .biz-control-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 15px; flex-wrap: wrap; }
+      .biz-toggle-group { display: flex; background: #e2e8f0; padding: 4px; border-radius: 10px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+      .biz-toggle-btn {
+        border: none; background: transparent; padding: 8px 18px; font-size: 13px;
+        font-weight: 600; color: #475569; border-radius: 8px; cursor: pointer; transition: all 0.2s ease;
       }
-      .retention-toggle-btn.active { background: white; color: #0b2240; box-shadow: 0 2px 5px rgba(0,0,0,0.08); }
+      .biz-toggle-btn.active { background: white; color: #0f172a; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08); }
       
-      .kpi-month-select { padding: 7px 14px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: 500; color: #334155; background: #fff; cursor: pointer; }
+      .biz-dropdown { padding: 8px 16px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: 600; color: #334155; background: white; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
-      .retention-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
-      .retention-kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; display: flex; align-items: center; justify-content: space-between; }
-      .retention-kpi-lbl { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; }
-      .retention-kpi-val { font-size: 22px; font-weight: 700; color: #0f172a; margin-top: 4px; }
-      .retention-kpi-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
-
-      .retention-layout-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 20px; margin-bottom: 20px; }
-      @media (max-width: 1024px) { .retention-layout-grid { grid-template-columns: 1fr; } }
+      /* การ์ดสถิติสำคัญสูงสุด (Strategic Metrics) */
+      .biz-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 24px; }
+      .biz-kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); position: relative; overflow: hidden; }
+      .biz-kpi-card::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; background: #cbd5e1; }
+      .biz-kpi-card.card-revenue::before { background: #10b981; }
+      .biz-kpi-card.card-orders::before { background: #3b82f6; }
+      .biz-kpi-card.card-buyers::before { background: #8b5cf6; }
+      .biz-kpi-card.card-share::before { background: #f59e0b; }
       
-      .retention-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-      .retention-card h3 { font-size: 15px; font-weight: 700; color: #1e293b; margin: 0 0 15px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-      .retention-card-subtitle { font-size: 11px; font-weight: normal; color: #64748b; margin-top: 2px; }
+      .biz-kpi-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+      .biz-kpi-value { font-size: 26px; font-weight: 700; color: #0f172a; margin: 6px 0 2px 0; }
+      .biz-kpi-desc { font-size: 11.5px; color: #94a3b8; font-weight: 500; }
+      .biz-kpi-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
 
-      .monthly-prod-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-      .monthly-prod-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
-      .month-name-lbl { font-size: 11px; font-weight: 800; text-transform: uppercase; }
-      .month-prod-name { font-size: 13px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      /* เลย์เอาต์บอร์ดวิเคราะห์โครงสร้างหลัก */
+      .biz-main-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; margin-bottom: 24px; }
+      @media (max-width: 1024px) { .biz-main-grid { grid-template-columns: 1fr; } }
       
-      .rank-list { display: flex; flex-direction: column; gap: 12px; }
-      .rank-item { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid #f8fafc; }
-      .rank-number { width: 24px; height: 24px; border-radius: 50%; background: #e2e8f0; color: #475569; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-      .rank-number.top-1 { background: #fdf1e6; color: #d95f1d; }
-      .rank-number.top-2 { background: #eff6ff; color: #2563eb; }
-      .rank-number.top-3 { background: #ecfdf5; color: #059669; }
-      .rank-name { font-size: 13px; font-weight: 600; color: #1e293b; }
-      .rank-progress-container { width: 100%; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; margin-top: 4px; }
-      .rank-progress-bar { height: 100%; border-radius: 3px; }
-      .rank-values { text-align: right; display: flex; flex-direction: column; }
-      .rank-val-primary { font-size: 13px; font-weight: 700; color: #0f172a; }
-      .rank-val-secondary { font-size: 11px; color: #64748b; }
+      .biz-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+      .biz-card-title { font-size: 16px; font-weight: 700; color: #0f172a; margin: 0 0 18px 0; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+      .biz-card-subtitle { font-size: 12px; font-weight: 400; color: #64748b; margin-top: 2px; }
 
-      .kpi-table-wrapper { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow-x: auto; margin-top: 20px; }
-      .kpi-perf-table { width: 100%; border-collapse: collapse; }
-      .kpi-perf-table th, .kpi-perf-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #f1f5f9; }
-      .kpi-perf-table th { background: #f8fafc; color: #475569; font-weight: 600; font-size: 12px; white-space: nowrap; }
-      .kpi-perf-table td { font-size: 13px; color: #334155; }
-      .status-tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-      .tag-pass { color: #065f46; background: #d1fae5; }
-      .tag-fail { color: #991b1b; background: #fee2e2; }
+      /* รายเดือนกล่องสินค้าขายดี */
+      .biz-monthly-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+      .biz-monthly-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 4px; transition: all 0.2s ease; }
+      .biz-monthly-box:hover { background: #ffffff; border-color: #cbd5e1; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+      .biz-month-lbl { font-size: 11px; font-weight: 800; text-transform: uppercase; }
+      .biz-month-prod { font-size: 13px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .biz-month-qty { font-size: 11.5px; color: #475569; font-weight: 500; }
+
+      /* บอร์ดตาราง Ranking โครงสร้างกราฟความคืบหน้า (Progress Bar) */
+      .biz-rank-list { display: flex; flex-direction: column; gap: 14px; }
+      .biz-rank-item { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9; }
+      .biz-rank-item:last-child { border-bottom: none; padding-bottom: 0; }
+      .biz-rank-badge { width: 26px; height: 26px; border-radius: 50%; background: #e2e8f0; color: #475569; font-size: 11.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+      .biz-rank-badge.rank-1 { background: #fef3c7; color: #d97706; }
+      .biz-rank-badge.rank-2 { background: #dbeafe; color: #2563eb; }
+      .biz-rank-badge.rank-3 { background: #d1fae5; color: #059669; }
+      
+      .biz-rank-meta { display: flex; flex-direction: column; flex-grow: 1; margin-left: 12px; min-width: 0; }
+      .biz-rank-name { font-size: 13px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .biz-progress-bg { width: 100%; height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; margin-top: 5px; }
+      .biz-progress-bar { height: 100%; border-radius: 3px; }
+      
+      .biz-rank-vals { text-align: right; margin-left: 15px; flex-shrink: 0; }
+      .biz-val-m { font-size: 13px; font-weight: 700; color: #0f172a; }
+      .biz-val-s { font-size: 11px; color: #64748b; }
+
+      /* ตารางผลลัพธ์เชิงกลยุทธ์ (Strategic KPI Table) */
+      .biz-table-wrapper { background: white; border: 1px solid #e2e8f0; border-radius: 16px; overflow-x: auto; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); margin-top: 24px; }
+      .biz-table { width: 100%; border-collapse: collapse; text-align: left; }
+      .biz-table th, .biz-table td { padding: 14px 18px; border-bottom: 1px solid #f1f5f9; }
+      .biz-table th { background: #f8fafc; color: #475569; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+      .biz-table td { font-size: 13.5px; }
+      
+      .biz-status-pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; }
+      .pill-pass { color: #065f46; background: #d1fae5; }
+      .pill-fail { color: #991b1b; background: #fee2e2; }
     `;
     document.head.appendChild(style);
   }
 
-  // 2. ข้อมูลตัวแปรจำลองสเกลวันเวลาและแปลงรูปแบบวันที่ให้มีเสถียรภาพ
-  const parseD = (dateStr) => {
+  // --- 2. DATA PROCESSING HELPER LOGIC ---
+  const parseDateObj = (dateStr) => {
     if (!dateStr) return null;
-    const datePart = dateStr.toString().trim().split(' ')[0];
-    let parts = datePart.split('-');
-    if (parts.length < 3) parts = datePart.split('/');
+    const clean = dateStr.toString().trim().split(' ')[0];
+    let parts = clean.split('-');
+    if (parts.length < 3) parts = clean.split('/');
     if (parts.length >= 3) {
-      let p0 = parseInt(parts[0], 10);
-      let p1 = parseInt(parts[1], 10);
-      let p2 = parseInt(parts[2], 10);
-      let y = p0 > 1000 ? p0 : p2;
-      let m = p1;
-      let d = p0 > 1000 ? p2 : p0;
+      let p0 = parseInt(parts[0], 10), p1 = parseInt(parts[1], 10), p2 = parseInt(parts[2], 10);
+      let y = p0 > 1000 ? p0 : p2, m = p1, d = p0 > 1000 ? p2 : p0;
       if (y < 2000) y += 2000;
-      if (y > 2500) y -= 543;
+      if (y > 2500) y -= 543; // แปลง พ.ศ. เป็น ค.ศ. เพื่อความสม่ำเสมอ
       return { y, m, d, val: y * 10000 + m * 100 + d };
     }
     return null;
   };
 
-  const parseProductsFromRow = (row) => {
+  const parseOrderProducts = (row) => {
     const rawProd = window.getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']) || 'Other';
-    if (!rawProd || rawProd === 'Other') {
-      return [{ rawName: 'Other', cleanName: 'Other', category: 'Other', qty: 1 }];
-    }
-    const products = [];
-    const parts = rawProd.split('|');
-    parts.forEach(part => {
-      const subParts = part.split('=');
-      const rawName = subParts[0].trim();
+    if (!rawProd || rawProd === 'Other') return [{ name: 'Other', category: 'Other', qty: 1 }];
+    
+    const results = [];
+    rawProd.split('|').forEach(part => {
+      const sub = part.split('=');
+      const name = sub[0].trim();
       let qty = 1;
-      if (subParts.length > 1) {
-        const parsedQty = parseInt(subParts[1].trim());
-        if (!isNaN(parsedQty)) qty = parsedQty;
+      if (sub.length > 1) {
+        const q = parseInt(sub[1].trim());
+        if (!isNaN(q)) qty = q;
       }
-      if (rawName) {
+      if (name) {
         let category = 'Other';
-        const nameLower = rawName.toLowerCase();
-        if (nameLower.includes('plus')) category = 'Plus';
-        else if (nameLower.includes('gold')) category = 'Gold';
-        else if (nameLower.includes('wiss')) category = 'Wiss';
-        else if (nameLower.includes('kides') || nameLower.includes('kide')) category = 'Kides';
-        else if (nameLower.includes('collagen') || nameLower.includes('callagen')) category = 'Collagen';
-        
-        products.push({ rawName, cleanName: rawName, category, qty });
+        const lower = name.toLowerCase();
+        if (lower.includes('plus')) category = 'Plus';
+        else if (lower.includes('gold')) category = 'Gold';
+        else if (lower.includes('wiss')) category = 'Wiss';
+        else if (lower.includes('kides') || lower.includes('kide')) category = 'Kides';
+        else if (lower.includes('collagen')) category = 'Collagen';
+        results.push({ name, category, qty });
       }
     });
-    return products.length > 0 ? products : [{ rawName: 'Other', cleanName: 'Other', category: 'Other', qty: 1 }];
+    return results.length > 0 ? results : [{ name: 'Other', category: 'Other', qty: 1 }];
   };
 
   const firstPurchaseMap = typeof globalFirstPurchase !== 'undefined' ? globalFirstPurchase : {};
 
-  // กรองเฉพาะคำสั่งซื้อสเตตัสเสร็จสมบูรณ์ และมียอดโอนเงินจริง > 0 เท่านั้น
-  const saleOrders = dataSrc.filter(row => {
+  // กรองล้างข้อมูลขยะ: ต้องระบุว่าเป็น Sale Order และมียอดเงินที่โอนเข้ามาจริง ๆ เท่านั้น
+  const validSaleOrders = dataSrc.filter(row => {
     if (!window.isSaleOrder(row)) return false;
-    const revStr = window.getRowValue(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'ยอดโอน']) || '0';
+    const revStr = window.getRowValue(row, ['ยอดขาย', 'ยอดโอน', 'Revenue']) || '0';
     const rev = parseFloat(revStr.toString().replace(/,/g, ''));
     return !isNaN(rev) && rev > 0;
   });
 
-  // แยกประเภหาคำสั่งซื้อซ้ำซ้อน (Repeat Orders) จากฐานประวัติการซื้อครั้งแรก
-  const repeatOrders = saleOrders.filter(row => {
+  // แยกเฉพาะลูกค้าเก่ากลับมาซื้อซ้ำ (Repeat Behavior)
+  const repeatOrders = validSaleOrders.filter(row => {
     const id = window.getCustomerUniqueId(row);
-    const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'วันที่']);
+    const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน']);
     if (!id || !dateStr) return false;
-    const d = parseD(dateStr);
-    if (!d) return false;
-    const firstDate = firstPurchaseMap[id];
-    return firstDate && firstDate.val < d.val;
+    const d = parseDateObj(dateStr);
+    return d && firstPurchaseMap[id] && firstPurchaseMap[id].val < d.val;
   });
 
-  // --- LOGIC INTERACTIVE RE-RENDER ---
-  window.changeRetentionMonthFilter = function(monthVal) {
-    window.retentionSelectedMonth = monthVal;
-    renderRetention(filteredData, rawData);
-  };
+  // --- 3. DYNAMIC INTERACTIVE DISPATCHERS ---
+  window.bizUpdateMonth = function(m) { window.retentionSelectedMonth = m; renderRetention(filteredData, rawData); };
+  window.bizUpdateToggle = function(t) { window.retentionActiveToggle = t; renderRetention(filteredData, rawData); };
 
-  window.setRetentionToggle = function(type) {
-    window.retentionActiveToggle = type;
-    renderRetention(filteredData, rawData);
-  };
+  // --- 4. STRATEGIC CALCULATIONS BASED ON SELECTOR ---
+  const selMonth = window.retentionSelectedMonth;
+  const activeToggle = window.retentionActiveToggle;
 
-  // --- คำนวณสถิติตามเงื่อนไข Dropdown เดือนที่เลือก ---
-  const activeMonth = window.retentionSelectedMonth;
-  
-  const filteredRepeatOrders = repeatOrders.filter(row => {
-    if (activeMonth === 'YTD') return true;
-    const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน']);
-    const d = parseD(dateStr);
+  const currentPeriodRepeat = repeatOrders.filter(row => {
+    if (selMonth === 'YTD') return true;
+    const d = parseDateObj(window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน']));
     if (!d) return false;
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return monthNames[d.m - 1] === activeMonth;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[d.m - 1] === selMonth;
   });
 
-  // คำนวณยอดรวมกล่อง KPI บอร์ดด้านบน
-  let repeatRevenue = 0;
-  const repeatBuyers = new Set();
-  const activeUniqueBuyers = new Set();
-
-  // หาลูกค้าทั้งหมดที่แอคทีฟในรอบเดือนนั้น ๆ เพื่อทำเปอร์เซ็นต์ส่วนแบ่งแชร์
-  saleOrders.forEach(row => {
+  // คำนวณหาฐานลูกค้า Active ทั้งหมดในรอบที่เลือกเพื่อประเมินค่า Share ของร้าน
+  const totalActiveBuyersInPeriod = new Set();
+  validSaleOrders.forEach(row => {
     const id = window.getCustomerUniqueId(row);
-    const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน']);
-    const d = parseD(dateStr);
+    const d = parseDateObj(window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน']));
     if (!id || !d) return;
-    if (activeMonth !== 'YTD') {
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      if (monthNames[d.m - 1] !== activeMonth) return;
+    if (selMonth !== 'YTD') {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      if (months[d.m - 1] !== selMonth) return;
     }
-    activeUniqueBuyers.add(id);
+    totalActiveBuyersInPeriod.add(id);
   });
 
-  filteredRepeatOrders.forEach(row => {
+  let totalRepeatRevenue = 0;
+  const periodRepeatBuyers = new Set();
+  
+  currentPeriodRepeat.forEach(row => {
     const id = window.getCustomerUniqueId(row);
-    if (id) repeatBuyers.add(id);
+    if (id) periodRepeatBuyers.add(id);
     const revStr = window.getRowValue(row, ['ยอดขาย', 'ยอดโอน']) || '0';
     const rev = parseFloat(revStr.toString().replace(/,/g, ''));
-    if (!isNaN(rev)) repeatRevenue += rev;
+    if (!isNaN(rev)) totalRepeatRevenue += rev;
   });
 
-  const repeatCount = filteredRepeatOrders.length;
-  const repeatBuyerPct = activeUniqueBuyers.size === 0 ? 0 : (repeatBuyers.size / activeUniqueBuyers.size) * 100;
+  const totalRepeatOrdersCount = currentPeriodRepeat.length;
+  const repeatBuyerSharePct = totalActiveBuyersInPeriod.size === 0 ? 0 : (periodRepeatBuyers.size / totalActiveBuyersInPeriod.size) * 100;
 
-  // จัดอันดับสินค้าซื้อซ้ำรายปี (YTD) และรายเดือน
-  const annualProdMap = {};
-  const monthlyProdMap = {};
-  for (let m = 1; m <= 12; m++) monthlyProdMap[m] = {};
+  // --- 5. PRODUCT INSIGHTS GROUPING ---
+  const productSummaryMap = {};
+  const crossMonthProductTracker = {};
+  for (let m = 1; m <= 12; m++) crossMonthProductTracker[m] = {};
 
-  // เติมเต็มอาร์เรย์จัดอันดับผลิตภัณฑ์
-  filteredRepeatOrders.forEach(row => {
-    const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน']);
-    const d = parseD(dateStr);
-    if (!d || d.m < 1 || d.m > 12) return;
-
-    const parsedProds = parseProductsFromRow(row);
-    const totalQty = parsedProds.reduce((sum, p) => sum + p.qty, 0) || 1;
+  currentPeriodRepeat.forEach(row => {
     const revStr = window.getRowValue(row, ['ยอดขาย', 'ยอดโอน']) || '0';
     const orderRev = parseFloat(revStr.toString().replace(/,/g, '')) || 0;
+    
+    const prods = parseOrderProducts(row);
+    const sumQty = prods.reduce((acc, p) => acc + p.qty, 0) || 1;
 
-    parsedProds.forEach(p => {
-      const pRevenue = orderRev * (p.qty / totalQty);
-      const groupName = window.retentionActiveToggle === 'category' ? p.category : p.cleanName;
+    prods.forEach(p => {
+      const distributedRev = orderRev * (p.qty / sumQty);
+      const key = activeToggle === 'category' ? p.category : p.name;
 
-      if (!annualProdMap[groupName]) {
-        annualProdMap[groupName] = { name: groupName, count: 0, revenue: 0, category: p.category };
+      if (!productSummaryMap[key]) {
+        productSummaryMap[key] = { key, count: 0, revenue: 0, category: p.category };
       }
-      annualProdMap[groupName].count += p.qty;
-      annualProdMap[groupName].revenue += pRevenue;
+      productSummaryMap[key].count += p.qty;
+      productSummaryMap[key].revenue += distributedRev;
     });
   });
 
-  // ทำแผนที่สรุปรายเดือนย่อยของปีเก็บไว้โชว์กล่องตาราง
+  // เก็บสถิติรายเดือนสำหรับแสดงความเคลื่อนไหวสินค้าขายดีรายเดือน
   repeatOrders.forEach(row => {
-    const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน']);
-    const d = parseD(dateStr);
+    const d = parseDateObj(window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน']));
     if (!d || d.m < 1 || d.m > 12) return;
-    const parsedProds = parseProductsFromRow(row);
-    const totalQty = parsedProds.reduce((sum, p) => sum + p.qty, 0) || 1;
     const revStr = window.getRowValue(row, ['ยอดขาย', 'ยอดโอน']) || '0';
     const orderRev = parseFloat(revStr.toString().replace(/,/g, '')) || 0;
+    
+    const prods = parseOrderProducts(row);
+    const sumQty = prods.reduce((acc, p) => acc + p.qty, 0) || 1;
 
-    parsedProds.forEach(p => {
-      const pRevenue = orderRev * (p.qty / totalQty);
-      const groupName = window.retentionActiveToggle === 'category' ? p.category : p.cleanName;
-      if (!monthlyProdMap[d.m][groupName]) {
-        monthlyProdMap[d.m][groupName] = { count: 0, revenue: 0 };
+    prods.forEach(p => {
+      const distributedRev = orderRev * (p.qty / sumQty);
+      const key = activeToggle === 'category' ? p.category : p.name;
+      if (!crossMonthProductTracker[d.m][key]) {
+        crossMonthProductTracker[d.m][key] = { count: 0, revenue: 0 };
       }
-      monthlyProdMap[d.m][groupName].count += p.qty;
-      monthlyProdMap[d.m][groupName].revenue += pRevenue;
+      crossMonthProductTracker[d.m][key].count += p.qty;
+      crossMonthProductTracker[d.m][key].revenue += distributedRev;
     });
   });
 
-  const rankedProducts = Object.values(annualProdMap).sort((a, b) => b.count - a.count);
-  const maxProductCount = rankedProducts.length > 0 ? rankedProducts[0].count : 1;
+  const sortedProducts = Object.values(productSummaryMap).sort((a, b) => b.count - a.count);
+  const topProductMaxCount = sortedProducts.length > 0 ? sortedProducts[0].count : 1;
 
-  const thaiMonths = { 1: 'มกราคม', 2: 'กุมภาพันธ์', 3: 'มีนาคม', 4: 'เมษายน', 5: 'พฤษภาคม', 6: 'มิถุนายน', 7: 'กรกฎาคม', 8: 'สิงหาคม', 9: 'กันยายน', 10: 'ตุลาคม', 11: 'พฤศจิกายน', 12: 'ธันวาคม' };
-  const monthlyTopProducts = [];
+  const monthNamesTh = { 1:'ม.ค.', 2:'ก.พ.', 3:'มี.ค.', 4:'เม.ย.', 5:'พ.ค.', 6:'มิ.ย.', 7:'ก.ค.', 8:'ส.ค.', 9:'ก.ย.', 10:'ต.ค.', 11:'พ.ย.', 12:'ธ.ค.' };
+  const topProductsPerMonthList = [];
   for (let m = 1; m <= 12; m++) {
-    const prods = Object.keys(monthlyProdMap[m]).map(name => ({
-      name, count: monthlyProdMap[m][name].count, revenue: monthlyProdMap[m][name].revenue,
-      category: window.retentionActiveToggle === 'category' ? name : (annualProdMap[name] ? annualProdMap[name].category : 'Other')
-    }));
-    if (prods.length > 0) {
-      prods.sort((a, b) => b.count - a.count);
-      monthlyTopProducts.push({ month: m, monthName: thaiMonths[m], topProduct: prods[0] });
-    } else {
-      monthlyTopProducts.push({ month: m, monthName: thaiMonths[m], topProduct: null });
-    }
+    const list = Object.keys(crossMonthProductTracker[m]).map(k => ({
+      name: k, count: crossMonthProductTracker[m][k].count, category: activeToggle === 'category' ? k : (productSummaryMap[k] ? productSummaryMap[k].category : 'Other')
+    })).sort((a,b) => b.count - a.count);
+    topProductsPerMonthList.push({ monthNum: m, nameTh: monthNamesTh[m], topItem: list[0] || null });
   }
 
-  // คำนวณแยกตามช่องทางจำหน่าย (Channels) สำหรับสร้างตาราง KPI ท้ายบิล
-  const channelMap = {};
-  const allowedChannels = ['Facebook', 'Line', 'Call', 'CRM', 'Other'];
-  allowedChannels.forEach(ch => { channelMap[ch] = { name: ch, count: 0, revenue: 0 }; });
+  // --- 6. CHANNELS PERFORMANCE KPI (REAL TARGET VS ACTUAL) ---
+  const bizChannels = ['Facebook', 'Line', 'Call', 'CRM', 'Other'];
+  const channelDataStore = {};
+  bizChannels.forEach(ch => { channelDataStore[ch] = { name: ch, count: 0, revenue: 0 }; });
 
-  filteredRepeatOrders.forEach(row => {
+  currentPeriodRepeat.forEach(row => {
     let rawCh = window.getRowValue(row, ['ช่องทาง', 'Channel']) || 'Other';
-    let channel = 'Other';
-    const chLower = rawCh.toString().toLowerCase();
-    if (chLower.includes('facebook') || chLower === 'fb') channel = 'Facebook';
-    else if (chLower.includes('line')) channel = 'Line';
-    else if (chLower.includes('crm')) channel = 'CRM';
-    else if (chLower.includes('call') || chLower.includes('phone')) channel = 'Call';
+    let normCh = 'Other';
+    const low = rawCh.toString().toLowerCase();
+    if (low.includes('facebook') || low === 'fb') normCh = 'Facebook';
+    else if (low.includes('line')) normCh = 'Line';
+    else if (low.includes('crm')) normCh = 'CRM';
+    else if (low.includes('call') || low.includes('phone')) normCh = 'Call';
 
     const revStr = window.getRowValue(row, ['ยอดขาย', 'ยอดโอน']) || '0';
     const rev = parseFloat(revStr.toString().replace(/,/g, ''));
     
-    channelMap[channel].count++;
-    if (!isNaN(rev)) channelMap[channel].revenue += rev;
+    channelDataStore[normCh].count++;
+    if (!isNaN(rev)) channelDataStore[normCh].revenue += rev;
   });
 
-  const rankedChannels = Object.values(channelMap).sort((a, b) => b.revenue - a.revenue);
-  const maxChannelRevenue = rankedChannels.length > 0 ? rankedChannels[0].revenue : 1;
+  const sortedChannels = Object.values(channelDataStore).sort((a,b) => b.revenue - a.revenue);
+  const maxChannelRevVal = sortedChannels.length > 0 ? sortedChannels[0].revenue : 1;
 
-  // Mock Target Base Plans สำหรับฝั่งการรักษาลูกค้าเก่า (Retention Customer Plan)
-  const retentionPlans = {
-    'Facebook': { planCount: 150, planRev: 120000 },
-    'Line': { planCount: 200, planRev: 180000 },
-    'Call': { planCount: 100, planRev: 90000 },
-    'CRM': { planCount: 350, planRev: 450000 },
-    'Other': { planCount: 10, planRev: 8000 }
+  // แผนตั้งเป้าหมายเชิงกลยุทธ์ประจำปี (ผู้บริหารสามารถปรับแต่งตัวเลขตรงนี้ให้ตรงกับเป้าบริษัทได้)
+  const bizTargetPlans = {
+    'Facebook': { targetOrders: 160, targetRev: 130000 },
+    'Line': { targetOrders: 220, targetRev: 190000 },
+    'Call': { targetOrders: 90, targetRev: 85000 },
+    'CRM': { targetOrders: 400, targetRev: 500000 },
+    'Other': { targetOrders: 10, targetRev: 10000 }
   };
 
   const getChannelColor = (ch) => {
-    const colors = { 'Facebook': '#38bdf8', 'Line': '#06c755', 'CRM': '#d95f1d', 'Other': '#9ca3af', 'Call': '#71717a' };
-    return colors[ch] || '#9ca3af';
+    return { 'Facebook': '#38bdf8', 'Line': '#06c755', 'CRM': '#ea580c', 'Call': '#64748b', 'Other': '#94a3b8' }[ch] || '#94a3b8';
   };
-  const getProductColor = (prod) => {
-    const colors = { 'Plus': '#ea580c', 'Gold': '#d97706', 'Wiss': '#2563eb', 'Collagen': '#ec4899', 'Kides': '#059669', 'Other': '#64748b' };
-    return colors[prod] || '#d95f1d';
+  const getProductColor = (cat) => {
+    return { 'Plus': '#ea580c', 'Gold': '#d97706', 'Wiss': '#2563eb', 'Collagen': '#ec4899', 'Kides': '#059669', 'Other': '#64748b' }[cat] || '#ea580c';
   };
 
-  // 6. Build โครงสร้างหน้าจอ HTML ทั้งหน้าใหม่
+  // --- 7. CONSTRUCT CLEAN ACTIONABLE LAYOUT ---
   let html = `
-    <div class="retention-container">
-      <div class="retention-header">
-        <div class="retention-header-text">
-          <h2>ระบบวิเคราะห์อัตราการรักษาลูกค้าและตัวชี้วัดความซ้ำ (Retention & Customer KPI Insights)</h2>
-          <p>รายงานตรวจสอบประสิทธิภาพงานบริการลูกค้าเก่า การซื้อซ้ำ และการตรวจวัดผลสำเร็จเทียบ KPI รายช่องทาง</p>
+    <div class="biz-dashboard">
+      <!-- ส่วนที่ 1: ส่วนหัวรายงานระดับบริหาร -->
+      <div class="biz-header">
+        <div class="biz-header-title">
+          <h1>แดชบอร์ดกลยุทธ์การซื้อซ้ำและรักษารากฐานลูกค้า (Strategic Customer Retention & KPI Dashboard)</h1>
+          <p>เครื่องมือวิเคราะห์พฤติกรรมลูกค้าเก่าเพื่อการตัดสินใจเชิงธุรกิจของผู้นำองค์กร มองเห็นจุดทำกำไรและควบคุมประสิทธิภาพทีมขายได้ทันที</p>
         </div>
       </div>
 
-      <div class="retention-ctrl-bar">
-        <div class="retention-toggle-container">
-          <button class="retention-toggle-btn ${window.retentionActiveToggle === 'category' ? 'active' : ''}" onclick="window.setRetentionToggle('category')">
-            ตามกลุ่มสินค้า (Product Brand)
-          </button>
-          <button class="retention-toggle-btn ${window.retentionActiveToggle === 'item' ? 'active' : ''}" onclick="window.setRetentionToggle('item')">
-            ตามรายการสินค้า/แพ็กเกจ (Product Package)
-          </button>
+      <!-- ส่วนที่ 2: แถบตัวควบคุมการสลับมิติข้อมูลเพื่อหาคำตอบทางธุรกิจ -->
+      <div class="biz-control-bar">
+        <div class="biz-toggle-group">
+          <button class="biz-toggle-btn ${activeToggle === 'category' ? 'active' : ''}" onclick="window.bizUpdateToggle('category')">มุมมองกลุ่มแบรนด์สินค้า (Product Brand)</button>
+          <button class="biz-toggle-btn ${activeToggle === 'item' ? 'active' : ''}" onclick="window.bizUpdateToggle('item')">มุมมองรายแพ็กเกจย่อย (Product Package)</button>
         </div>
-
-        <select class="kpi-month-select" id="retention-month-dropdown" onchange="window.changeRetentionMonthFilter(this.value)">
-          <option value="YTD" ${activeMonth === 'YTD' ? 'selected' : ''}>YTD (รวมสะสมทุกเดือน)</option>
-          <option value="Jan" ${activeMonth === 'Jan' ? 'selected' : ''}>January</option>
-          <option value="Feb" ${activeMonth === 'Feb' ? 'selected' : ''}>February</option>
-          <option value="Mar" ${activeMonth === 'Mar' ? 'selected' : ''}>March</option>
-          <option value="Apr" ${activeMonth === 'Apr' ? 'selected' : ''}>April</option>
-          <option value="May" ${activeMonth === 'May' ? 'selected' : ''}>May</option>
-          <option value="Jun" ${activeMonth === 'Jun' ? 'selected' : ''}>June</option>
-        </select>
-      </div>
-
-      <div class="retention-kpi-grid">
-        <div class="retention-kpi-card">
-          <div class="retention-kpi-info">
-            <span class="retention-kpi-lbl">Repeat Revenue</span>
-            <span class="retention-kpi-val">฿${Math.round(repeatRevenue).toLocaleString()}</span>
-          </div>
-          <div class="retention-kpi-icon" style="color:#059669; background:#ecfdf5;">
-            <i class="fas fa-dollar-sign"></i>
-          </div>
-        </div>
-        <div class="retention-kpi-card">
-          <div class="retention-kpi-info">
-            <span class="retention-kpi-lbl">Repeat Orders</span>
-            <span class="retention-kpi-val">${repeatCount.toLocaleString()} ออเดอร์</span>
-          </div>
-          <div class="retention-kpi-icon" style="color:#2563eb; background:#eff6ff;">
-            <i class="fas fa-shopping-bag"></i>
-          </div>
-        </div>
-        <div class="retention-kpi-card">
-          <div class="retention-kpi-info">
-            <span class="retention-kpi-lbl">Repeat Buyers</span>
-            <span class="retention-kpi-val">${repeatBuyers.size.toLocaleString()} ราย</span>
-          </div>
-          <div class="retention-kpi-icon" style="color:#8b5cf6; background:#f5f3ff;">
-            <i class="fas fa-users"></i>
-          </div>
-        </div>
-        <div class="retention-kpi-card">
-          <div class="retention-kpi-info">
-            <span class="retention-kpi-lbl">Repeat Buyer Share</span>
-            <span class="retention-kpi-val">${repeatBuyerPct.toFixed(1)}%</span>
-          </div>
-          <div class="retention-kpi-icon" style="color:#ea580c; background:#fdf1e6;">
-            <i class="fas fa-chart-pie"></i>
-          </div>
-        </div>
-      </div>
-
-      <div class="retention-layout-grid">
+        
         <div>
-          <div class="retention-card">
-            <h3>
-              <div>อันดับสินค้าซื้อซ้ำสูงสุดรายเดือน <div class="retention-card-subtitle">แบรนด์ที่ลูกค้ากลับมาซื้อซ้ำแยกตามเดือนจริงประจำปี</div></div>
-              <i class="fas fa-calendar-alt" style="color: #d95f1d;"></i>
-            </h3>
-            <div class="monthly-prod-grid">
-              ${monthlyTopProducts.map(m => {
-                if (m.topProduct) {
-                  const barColor = getProductColor(m.topProduct.category);
+          <span style="font-size:12.5px; font-weight:600; color:#475569; margin-right:8px;">เลือกรอบระยะเวลาประเมินผล:</span>
+          <select class="biz-dropdown" id="biz-month-sel" onchange="window.bizUpdateMonth(this.value)">
+            <option value="YTD" ${selMonth === 'YTD' ? 'selected' : ''}>ภาพรวมสะสมทั้งปี (YTD)</option>
+            <option value="Jan" ${selMonth === 'Jan' ? 'selected' : ''}>มกราคม (Jan)</option>
+            <option value="Feb" ${selMonth === 'Feb' ? 'selected' : ''}>กุมภาพันธ์ (Feb)</option>
+            <option value="Mar" ${selMonth === 'Mar' ? 'selected' : ''}>มีนาคม (Mar)</option>
+            <option value="Apr" ${selMonth === 'Apr' ? 'selected' : ''}>เมษายน (Apr)</option>
+            <option value="May" ${selMonth === 'May' ? 'selected' : ''}>พฤษภาคม (May)</option>
+            <option value="Jun" ${selMonth === 'Jun' ? 'selected' : ''}>มิถุนายน (Jun)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- ส่วนที่ 3: แผง 4 การ์ดชี้วัดความแข็งแรงของธุรกิจ (4 Strategic KPI Cards) -->
+      <div class="biz-kpi-grid">
+        <div class="biz-kpi-card card-revenue">
+          <div>
+            <div class="biz-kpi-label">รายได้จากการซื้อซ้ำ (Repeat Revenue)</div>
+            <div class="biz-kpi-value">฿${Math.round(totalRepeatRevenue).toLocaleString()}</div>
+            <div class="biz-kpi-desc">กระแสเงินสดหลักจากฐานลูกค้าเดิม</div>
+          </div>
+          <div class="biz-kpi-icon" style="color:#10b981; background:#d1fae5;"><i class="fas fa-wallet"></i></div>
+        </div>
+        
+        <div class="biz-kpi-card card-orders">
+          <div>
+            <div class="biz-kpi-label">จำนวนออเดอร์ซ้ำ (Repeat Orders)</div>
+            <div class="biz-kpi-value">${totalRepeatOrdersCount.toLocaleString()} <span style="font-size:14px; font-weight:500;">ครั้ง</span></div>
+            <div class="biz-kpi-desc">ปริมาณความถี่ในการกลับมาใช้บริการ</div>
+          </div>
+          <div class="biz-kpi-icon" style="color:#3b82f6; background:#dbeafe;"><i class="fas fa-shopping-cart"></i></div>
+        </div>
+
+        <div class="biz-kpi-card card-buyers">
+          <div>
+            <div class="biz-kpi-label">จำนวนลูกค้าที่ซื้อซ้ำ (Repeat Buyers)</div>
+            <div class="biz-kpi-value">${periodRepeatBuyers.size.toLocaleString()} <span style="font-size:14px; font-weight:500;">ราย</span></div>
+            <div class="biz-kpi-desc">จำนวนหัวลูกค้า Loyalty ของแบรนด์</div>
+          </div>
+          <div class="biz-kpi-icon" style="color:#8b5cf6; background:#f5f3ff;"><i class="fas fa-user-check"></i></div>
+        </div>
+
+        <div class="biz-kpi-card card-share">
+          <div>
+            <div class="biz-kpi-label">สัดส่วนลูกค้าซื้อซ้ำ (Retention Share)</div>
+            <div class="biz-kpi-value">${repeatBuyerPct.toFixed(1)}%</div>
+            <div class="biz-kpi-desc">สัดส่วนเทียบกับลูกค้าแอคทีฟทั้งหมด</div>
+          </div>
+          <div class="biz-kpi-icon" style="color:#f59e0b; background:#fef3c7;"><i class="fas fa-pie-chart"></i></div>
+        </div>
+      </div>
+
+      <!-- ส่วนที่ 4: บอร์ดคู่ขนานวิเคราะห์เจาะลึกสินค้าและทิศทางรายเดือน -->
+      <div class="biz-main-grid">
+        <div>
+          <!-- การกระจายตัวสินค้าขายดีรายเดือน -->
+          <div class="biz-card" style="margin-bottom:24px;">
+            <div class="biz-card-title">
+              <div>เทรนด์สินค้าซื้อซ้ำยอดนิยมรายเดือน <div class="biz-card-subtitle">แบรนด์สินค้าที่สร้างแรงดึงดูดให้ลูกค้าเก่ากลับมาซื้อมากที่สุดในแต่ละเดือน</div></div>
+              <i class="fas fa-chart-line" style="color:#ea580c;"></i>
+            </div>
+            <div class="biz-monthly-grid">
+              ${topProductsPerMonthList.map(m => {
+                if (m.topItem) {
+                  const c = getProductColor(m.topItem.category);
                   return `
-                    <div class="monthly-prod-box">
-                      <span class="month-name-lbl" style="color: ${barColor};">${m.monthName}</span>
-                      <span class="month-prod-name" title="${m.topProduct.name}">${m.topProduct.name}</span>
-                      <span class="month-prod-stat"><b>${m.topProduct.count.toLocaleString()}</b> ชิ้นซ้ำ</span>
+                    <div class="biz-monthly-box">
+                      <span class="biz-month-lbl" style="color:${c};">${m.nameTh}</span>
+                      <span class="biz-month-prod" title="${m.topItem.name}">${m.topItem.name}</span>
+                      <span class="biz-month-qty"><b>${m.topItem.count.toLocaleString()}</b> ชิ้นซ้ำ</span>
                     </div>
                   `;
                 } else {
                   return `
-                    <div class="monthly-prod-box" style="opacity: 0.5;">
-                      <span class="month-name-lbl" style="color:#64748b;">${m.monthName}</span>
-                      <span class="month-prod-name" style="font-style:italic; font-size:11px; color:#999;">ไม่มีข้อมูลซื้อซ้ำ</span>
+                    <div class="biz-monthly-box" style="opacity:0.5;">
+                      <span class="biz-month-lbl" style="color:#64748b;">${m.nameTh}</span>
+                      <span class="biz-month-prod" style="font-style:italic; font-size:11px; color:#94a3b8;">ไม่มีการซื้อซ้ำ</span>
+                      <span class="biz-month-qty">-</span>
                     </div>
                   `;
                 }
@@ -413,27 +407,28 @@ function renderRetention(filteredData, rawData) {
             </div>
           </div>
 
-          <div class="retention-card">
-            <h3>
-              <div>อันดับสินค้าซื้อซ้ำสูงสุดประจำรอบ (${activeMonth}) <div class="retention-card-subtitle">ลำดับสินค้าที่มีสัดส่วนปริมาณชิ้นการซื้อซ้ำมากที่สุด</div></div>
-              <i class="fas fa-medal" style="color: #f59e0b;"></i>
-            </h3>
-            <div class="rank-list">
-              ${rankedProducts.length === 0 ? '<div style="color:#999; text-align:center; font-style:italic; padding:15px;">ไม่มีการสั่งซื้อซ้ำในผลิตภัณฑ์รอบนี้</div>' : rankedProducts.map((p, index) => {
-                const pct = (p.count / maxProductCount) * 100;
-                const topClass = index === 0 ? 'top-1' : index === 1 ? 'top-2' : index === 2 ? 'top-3' : '';
+          <!-- จัดอันดับสินค้าในรอบปัจจุบัน -->
+          <div class="biz-card">
+            <div class="biz-card-title">
+              <div>อันดับสินค้าที่ลูกค้าเก่าเลือกซื้อสูงสุดในรอบ (${selMonth}) <div class="biz-card-subtitle">ใช้เพื่อวางกลยุทธ์ทำโปรโมชั่นกระตุ้นยอดขาย หรือจัด Bundle คู่ออกสู่ตลาด</div></div>
+              <i class="fas fa-trophy" style="color:#f59e0b;"></i>
+            </div>
+            <div class="biz-rank-list">
+              ${sortedProducts.length === 0 ? '<div style="color:#94a3b8; text-align:center; padding:15px; font-style:italic;">ไม่พบบันทึกการซื้อซ้ำของสินค้าในรอบเวลานี้</div>' : sortedProducts.map((p, idx) => {
+                const pct = (p.count / topProductMaxCount) * 100;
+                const rClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
                 return `
-                  <div class="rank-item">
-                    <div class="rank-item-info">
-                      <div class="rank-number ${topClass}">${index + 1}</div>
-                      <div class="rank-details">
-                        <span class="rank-name">${p.name}</span>
-                        <div class="rank-progress-container"><div class="rank-progress-bar" style="width: ${pct}%; background-color: ${getProductColor(p.category)};"></div></div>
+                  <div class="biz-rank-item">
+                    <div style="display:flex; align-items:center; flex-grow:1; min-width:0;">
+                      <div class="biz-rank-badge ${rClass}">${idx + 1}</div>
+                      <div class="biz-rank-meta">
+                        <span class="biz-rank-name" title="${p.key}">${p.key}</span>
+                        <div class="biz-progress-bg"><div class="biz-progress-bar" style="width:${pct}%; background-color:${getProductColor(p.category)};"></div></div>
                       </div>
                     </div>
-                    <div class="rank-values">
-                      <span class="rank-val-primary">${p.count.toLocaleString()} ชิ้นซ้ำ</span>
-                      <span class="rank-val-secondary">฿${Math.round(p.revenue).toLocaleString()}</span>
+                    <div class="biz-rank-vals">
+                      <span class="biz-val-m">${p.count.toLocaleString()} ชิ้น</span>
+                      <span class="biz-val-s">฿${Math.round(p.revenue).toLocaleString()}</span>
                     </div>
                   </div>
                 `;
@@ -442,27 +437,28 @@ function renderRetention(filteredData, rawData) {
           </div>
         </div>
 
-        <div class="retention-card">
-          <h3>
-            <div>อันดับช่องทางสั่งซื้อซ้ำ (Channels) <div class="retention-card-subtitle">เรียงตามช่องทางบริการที่สร้างเม็ดเงินซ้ำสูงสุด</div></div>
-            <i class="fas fa-chart-bar" style="color: #2563eb;"></i>
-          </h3>
-          <div class="rank-list">
-            ${rankedChannels.map((c, index) => {
-              const pct = (c.revenue / maxChannelRevenue) * 100;
-              const topClass = index === 0 ? 'top-1' : index === 1 ? 'top-2' : index === 2 ? 'top-3' : '';
+        <!-- ฝั่งขวา: ศักยภาพช่องทางจำหน่ายในการดึงดูดลูกค้าเก่า -->
+        <div class="biz-card">
+          <div class="biz-card-title">
+            <div>ประสิทธิภาพช่องทางปิดการขายลูกค้าเก่า <div class="biz-card-subtitle">ช่องทางจำหน่ายที่ดึงเม็ดเงิน Re-Order กลับมาสู้ร้านได้มากที่สุด เรียงตามรายได้</div></div>
+            <i class="fas fa-bullseye" style="color:#3b82f6;"></i>
+          </div>
+          <div class="biz-rank-list">
+            ${sortedChannels.map((c, idx) => {
+              const pct = (c.revenue / maxChannelRevVal) * 100;
+              const rClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
               return `
-                <div class="rank-item">
-                  <div class="rank-item-info">
-                    <div class="rank-number ${topClass}">${index + 1}</div>
-                    <div class="rank-details">
-                      <span class="rank-name">${c.name}</span>
-                      <div class="rank-progress-container"><div class="rank-progress-bar" style="width: ${pct}%; background-color: ${getChannelColor(c.name)};"></div></div>
+                <div class="biz-rank-item">
+                  <div style="display:flex; align-items:center; flex-grow:1; min-width:0;">
+                    <div class="biz-rank-badge ${rClass}">${idx + 1}</div>
+                    <div class="biz-rank-meta">
+                      <span class="biz-rank-name">${c.name}</span>
+                      <div class="biz-progress-bg"><div class="biz-progress-bar" style="width:${pct}%; background-color:${getChannelColor(c.name)};"></div></div>
                     </div>
                   </div>
-                  <div class="rank-values">
-                    <span class="rank-val-primary">฿${Math.round(c.revenue).toLocaleString()}</span>
-                    <span class="rank-val-secondary">${c.count} ออเดอร์</span>
+                  <div class="biz-rank-vals">
+                    <span class="biz-val-m">฿${Math.round(c.revenue).toLocaleString()}</span>
+                    <span class="biz-val-s">${c.count} ออเดอร์</span>
                   </div>
                 </div>
               `;
@@ -471,33 +467,35 @@ function renderRetention(filteredData, rawData) {
         </div>
       </div>
 
-      <div class="retention-card" style="margin-top: 25px;">
-        <h3 style="border-bottom:none; margin-bottom:5px;">ตารางวิเคราะห์ผลสัมฤทธิ์ KPI ลูกค้าเก่าซื้อซ้ำ (Old Customer KPI Progress)</h3>
-        <p style="font-size:12px; color:#64748b; margin:0 0 15px 0;">ตารางแสดงความก้าวหน้าและเปรียบเทียบสถิติเป้าหมายจริง (Actual) ปะทะแผนการตลาดประจำไตรมาส (Target Plan)</p>
+      <!-- ส่วนที่ 5: ตารางวัดผลลัพธ์ประสิทธิภาพความสำเร็จ (Strategic Business KPI Progress Table) -->
+      <div class="biz-card">
+        <div class="biz-card-title" style="border-bottom:none; margin-bottom:4px;">ตารางตรวจสอบผลสัมฤทธิ์ทางการตลาดเทียบเป้าหมาย (Retention KPI Matrix)</div>
+        <p style="font-size:12.5px; color:#64748b; margin:0 0 16px 0;">เปรียบเทียบผลงานจริงของทีมขายในแต่ละช่องทางเทียบกับแผนธุรกิจ (Target Plan) เพื่อการโยกย้ายงบประมาณและพิจารณาค่าคอมมิชชั่นได้อย่างยุติธรรม</p>
         
-        <div class="kpi-table-wrapper">
-          <table class="kpi-perf-table">
+        <div class="biz-table-wrapper">
+          <table class="biz-table">
             <thead>
               <tr>
-                <th>ช่องทางจำหน่าย</th>
-                <th>ยอดขายโอนจริง (Act)</th>
-                <th>เป้ายอดขายเก่า (Plan)</th>
-                <th>จำนวนออเดอร์ (Act)</th>
-                <th>เป้าออเดอร์เก่า (Plan)</th>
-                <th>Diff ออเดอร์</th>
-                <th>KPI Achieved (%)</th>
-                <th>ประเมินสเตตัส</th>
+                <th>ช่องทางดำเนินงาน</th>
+                <th>รายได้ที่ทำได้จริง (Act)</th>
+                <th>เป้ารายได้ลูกค้าเก่า (Plan)</th>
+                <th>จำนวนครั้งที่สั่งซื้อจริง</th>
+                <th>เป้าจำนวนออเดอร์</th>
+                <th>ส่วนต่างเป้าออเดอร์</th>
+                <th>อัตราความสำเร็จ (KPI %)</th>
+                <th>สถานะการประเมิน</th>
               </tr>
             </thead>
             <tbody>
     `;
 
-  allowedChannels.forEach(ch => {
-    const act = channelMap[ch];
-    // ดึงค่าแผนการตลาด หากเลือกแบบเจาะลึกรายเดือน ให้สเกลหาร 6 เพื่อประมาณเฉลี่ยค่าเป้าหมายที่ยุติธรรม
-    const plan = retentionPlans[ch];
-    const planCount = activeMonth === 'YTD' ? plan.planCount : Math.round(plan.planCount / 6);
-    const planRev = activeMonth === 'YTD' ? plan.planRev : Math.round(plan.planRev / 6);
+  bizChannels.forEach(ch => {
+    const act = channelDataStore[ch];
+    const planBase = bizTargetPlans[ch];
+    
+    // หากสลับมุมมองรายเดือน ให้หารเฉลี่ยเป้าหมายด้วย 6 เพื่อสะท้อนความเป็นจริงของเป้ารายเดือนโดยประมาณ
+    const planCount = selMonth === 'YTD' ? planBase.targetOrders : Math.round(planBase.targetOrders / 6);
+    const planRev = selMonth === 'YTD' ? planBase.targetRev : Math.round(planBase.targetRev / 6);
     
     const diffOrders = act.count - planCount;
     const achRate = planRev === 0 ? 0 : (act.revenue / planRev) * 100;
@@ -506,15 +504,17 @@ function renderRetention(filteredData, rawData) {
     html += `
       <tr>
         <td style="font-weight:600; color:#0f172a;">${ch}</td>
-        <td style="font-weight:600; color:#059669;">฿${Math.round(act.revenue).toLocaleString()}</td>
+        <td style="font-weight:700; color:#059669;">฿${Math.round(act.revenue).toLocaleString()}</td>
         <td style="color:#64748b;">฿${planRev.toLocaleString()}</td>
-        <td>${act.count}</td>
-        <td style="color:#64748b;">${planCount}</td>
-        <td style="font-weight:600; color:${diffOrders >= 0 ? '#10b981' : '#ef4444'}">${diffOrders >= 0 ? '+' : ''}${diffOrders}</td>
-        <td style="font-weight:700;">${achRate.toFixed(1)}%</td>
+        <td>${act.count} ครั้ง</td>
+        <td style="color:#64748b;">${planCount} ครั้ง</td>
+        <td style="font-weight:600; color:${diffOrders >= 0 ? '#10b981' : '#ef4444'}">
+          ${diffOrders >= 0 ? `+${diffOrders}` : diffOrders}
+        </td>
+        <td style="font-weight:700; color:#0f172a;">${achRate.toFixed(1)}%</td>
         <td>
-          <span class="status-tag ${isPass ? 'tag-pass' : 'tag-fail'}">
-            ${isPass ? '▲ ผ่านเป้าครบรอบ' : '▼ ต่ำกว่าเป้า'}
+          <span class="biz-status-pill ${isPass ? 'pill-pass' : 'pill-fail'}">
+            ${isPass ? '▲ ทะลุเป้าหมาย' : '▼ ต้องปรับปรุง'}
           </span>
         </td>
       </tr>
