@@ -68,6 +68,15 @@ function renderRetention(filteredData, rawData) {
       .biz-kpi-value { font-size: 26px; font-weight: 700; color: #0f172a; margin: 6px 0 2px 0; }
       .biz-kpi-desc { font-size: 11.5px; color: #94a3b8; font-weight: 500; }
       .biz-kpi-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+      
+      /* กล่องรายงานด่วนสไตล์สรุปเกรดพรีเมียม */
+      .report-summary-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+      .report-summary-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+      .report-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+      .report-formula-card { padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 8px; background: #f8fafc; }
+      .report-formula-header { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
+      .report-formula-det { font-size: 13px; color: #334155; font-weight: 500; margin: 0; padding-left: 18px; }
+
       .biz-main-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; margin-bottom: 24px; }
       @media (max-width: 1024px) { .biz-main-grid { grid-template-columns: 1fr; } }
       .biz-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
@@ -118,7 +127,7 @@ function renderRetention(filteredData, rawData) {
     return null;
   };
 
-  // --- 3. 🧩 INTEGRATED HIGH-ACCURACY PARSER (จากโค้ดที่คุณส่งมา) ---
+  // --- 3. HIGH-ACCURACY PARSER CONFIG ---
   const FORMULA_MAP = {
     plus: ['PLUS', 'พลัส'],
     gold: ['GOLD', 'โกลด์'],
@@ -146,12 +155,11 @@ function renderRetention(filteredData, rawData) {
         }
       }
       
-      if (!targetFormula) return; // ข้ามของแถมแก้วน้ำ/ขวดเชคตามลอจิกคุณ
+      if (!targetFormula) return; // ข้ามแก้วน้ำ/ขวดเชค
 
       let isSachet = nameUpper.includes('ซอง') || nameUpper.includes('แบบซอง') || nameUpper.includes('SACHET');
       let calculatedQty = orderQty;
 
-      // จัดการเคสระบุจำนวนกล่องในชื่อ (เช่น 3 กล่อง = 1) หรือ 1แถม1
       const boxMatch = nameUpper.match(/(\d+)\s*กล่อง/);
       if (boxMatch) {
         calculatedQty = parseInt(boxMatch[1]) * orderQty;
@@ -160,13 +168,10 @@ function renderRetention(filteredData, rawData) {
         calculatedQty = 2 * orderQty;
       }
 
-      // ปรับคีย์เพื่อเอาไปแสดงผลบน Dashboard (ตามการเลือกแบรนด์หรือรายแพ็กเกจ)
       let displayKey = '';
       if (activeToggle === 'category') {
-        // แสดงชื่อแบรนด์แบบทางการ
         displayKey = targetFormula.toUpperCase();
       } else {
-        // แสดงตามชื่อแพ็กเกจย่อย + ระบุประเภทกล่อง/ซองท้ายชื่อให้อ่านง่าย
         displayKey = `${name.trim()} (${isSachet ? '✉️ ซอง' : '📦 กล่อง'})`;
       }
 
@@ -253,12 +258,19 @@ function renderRetention(filteredData, rawData) {
   const totalRepeatOrdersCount = currentPeriodRepeat.length;
   const repeatBuyerSharePct = totalActiveBuyersInPeriod.size === 0 ? 0 : (periodRepeatBuyers.size / totalActiveBuyersInPeriod.size) * 100;
 
-  // --- 6. CALCULATE HIGHEST ACCURACY PRODUCTS DISTRIBUTION ---
+  // --- 6. 📊 HIGH-ACCURACY FINAL FINAL REPORT CALCULATOR (สำหรับรอบที่เลือก) ---
+  const finalReportSummary = {
+    plus: { boxes: 0, sachets: 0 },
+    gold: { boxes: 0, sachets: 0 },
+    wiss: { boxes: 0, sachets: 0 },
+    kides: { boxes: 0, sachets: 0 },
+    collagen: { boxes: 0, sachets: 0 }
+  };
+
   const productSummaryMap = {};
   const crossMonthProductTracker = {};
   for (let m = 1; m <= 12; m++) crossMonthProductTracker[m] = {};
 
-  // สรุปยอดตามช่วงเวลาที่เลือก
   currentPeriodRepeat.forEach(row => {
     const revStr = getFlexibleValue(row, ['ยอดขาย', 'ยอดโอน', 'Revenue', 'จำนวนเงิน', 'ยอดเงิน']) || '0';
     const orderRev = parseFloat(revStr.toString().replace(/,/g, '')) || 0;
@@ -268,6 +280,16 @@ function renderRetention(filteredData, rawData) {
     const totalItemsInOrder = parsedItems.reduce((acc, p) => acc + p.qty, 0) || 1;
 
     parsedItems.forEach(p => {
+      // 1. บันทึกลงตารางสรุปรายงานด่วนแยกประเภท กล่อง VS ซอง
+      if (finalReportSummary[p.formula]) {
+        if (p.isSachet) {
+          finalReportSummary[p.formula].sachets += p.qty;
+        } else {
+          finalReportSummary[p.formula].boxes += p.qty;
+        }
+      }
+
+      // 2. บันทึกลงชุดข้อมูลของตารางจัดอันดับหลัก
       const distributedRev = orderRev * (p.qty / totalItemsInOrder);
       if (!productSummaryMap[p.key]) {
         productSummaryMap[p.key] = { key: p.key, count: 0, revenue: 0, formula: p.formula };
@@ -277,7 +299,7 @@ function renderRetention(filteredData, rawData) {
     });
   });
 
-  // คำนวณรายเดือนของเทรนด์สินค้าขายดี
+  // คำนวณรายเดือนสำหรับกราฟเทรนด์ยอดนิยม
   repeatOrders.forEach(row => {
     const d = parseDateObj(getFlexibleValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'วันที่', 'Date']));
     if (!d || d.m < 1 || d.m > 12) return;
@@ -338,7 +360,7 @@ function renderRetention(filteredData, rawData) {
   };
 
   const getChannelColor = (ch) => ({ 'Facebook': '#38bdf8', 'Line': '#06c755', 'CRM': '#ea580c', 'Call': '#64748b', 'Other': '#94a3b8' }[ch] || '#94a3b8');
-  const getFormulaColor = (f) => ({ 'plus': '#ea580c', 'gold': '#d97706', 'wiss': '#2563eb', 'collagen': '#ec4899', 'kides': '#059669' }[f] || '#64748b');
+  const getFormulaColor = (f) => ({ 'plus': '#10b981', 'gold': '#eab308', 'wiss': '#3b82f6', 'kides': '#f97316', 'collagen': '#ef4444' }[f] || '#64748b');
 
   // --- 8. BUILD DASHBOARD TEMPLATE ---
   let html = `
@@ -385,6 +407,40 @@ function renderRetention(filteredData, rawData) {
         <div class="biz-kpi-card card-share">
           <div><div class="biz-kpi-label">สัดส่วนลูกค้าซื้อซ้ำ</div><div class="biz-kpi-value">${repeatBuyerSharePct.toFixed(1)}%</div><div class="biz-kpi-desc">สัดส่วนเทียบกับลูกค้าทั้งหมด</div></div>
           <div class="biz-kpi-icon" style="color:#f59e0b; background:#fef3c7;">📊</div>
+        </div>
+      </div>
+
+      <div class="report-summary-box">
+        <div class="report-summary-title">
+          <span>📊 ผลรายงานสรุปปริมาณผลิตภัณฑ์จากการซื้อซ้ำในรอบ (${selMonth})</span>
+          <span style="font-size:12px; font-weight:normal; color:#64748b; margin-left:auto;">คำนวณจากออเดอร์ซื้อซ้ำ: ${totalRepeatOrdersCount.toLocaleString()} รายการ</span>
+        </div>
+        <div class="report-summary-grid">
+          <div class="report-formula-card" style="border-left: 4px solid #10b981;">
+            <div class="report-formula-header" style="color:#10b981;">🟢 สูตร Plus</div>
+            <p class="report-formula-det">📦 กล่อง: <b>${finalReportSummary.plus.boxes.toLocaleString()}</b> กล่อง</p>
+            <p class="report-formula-det">✉️ ซองแยก: <b>${finalReportSummary.plus.sachets.toLocaleString()}</b> ซอง</p>
+          </div>
+          <div class="report-formula-card" style="border-left: 4px solid #eab308;">
+            <div class="report-formula-header" style="color:#eab308;">🟡 สูตร Gold</div>
+            <p class="report-formula-det">📦 กล่อง: <b>${finalReportSummary.gold.boxes.toLocaleString()}</b> กล่อง</p>
+            <p class="report-formula-det">✉️ ซองแยก: <b>${finalReportSummary.gold.sachets.toLocaleString()}</b> ซอง</p>
+          </div>
+          <div class="report-formula-card" style="border-left: 4px solid #3b82f6;">
+            <div class="report-formula-header" style="color:#3b82f6;">🔵 สูตร Wiss</div>
+            <p class="report-formula-det">📦 กล่อง: <b>${finalReportSummary.wiss.boxes.toLocaleString()}</b> กล่อง</p>
+            <p class="report-formula-det">✉️ ซองแยก: <b>${finalReportSummary.wiss.sachets.toLocaleString()}</b> ซอง</p>
+          </div>
+          <div class="report-formula-card" style="border-left: 4px solid #f97316;">
+            <div class="report-formula-header" style="color:#f97316;">🟠 สูตร Kides</div>
+            <p class="report-formula-det">📦 กล่อง: <b>${finalReportSummary.kides.boxes.toLocaleString()}</b> กล่อง</p>
+            <p class="report-formula-det">✉️ ซองแยก: <b>${finalReportSummary.kides.sachets.toLocaleString()}</b> ซอง</p>
+          </div>
+          <div class="report-formula-card" style="border-left: 4px solid #ef4444;">
+            <div class="report-formula-header" style="color:#ef4444;">🔴 สูตร Collagen</div>
+            <p class="report-formula-det">📦 กล่อง: <b>${finalReportSummary.collagen.boxes.toLocaleString()}</b> กล่อง</p>
+            <p class="report-formula-det">✉️ ซองแยก: <b>${finalReportSummary.collagen.sachets.toLocaleString()}</b> ซอง</p>
+          </div>
         </div>
       </div>
 
