@@ -2,7 +2,7 @@
 function renderExecutive2(filteredData, rawData) {
   const container = document.getElementById('view-executive2');
   
-  // ดึงแหล่งข้อมูลดิบหลักจากไฟล์ RAW 2025
+  // ดึงแหล่งข้อมูลดิบหลัก
   const dataSrc = (rawData && rawData.length > 0) ? rawData : (filteredData || []);
 
   if (!dataSrc || dataSrc.length === 0) {
@@ -10,7 +10,7 @@ function renderExecutive2(filteredData, rawData) {
     return;
   }
 
-  // Inject CSS ปรับแต่งดีไซน์และย่อขนาดตัวอักษรตามรูปภาพต้นฉบับ
+  // Inject CSS ปรับแต่งดีไซน์
   if (!document.getElementById('exec2-styles')) {
     const style = document.createElement('style');
     style.id = 'exec2-styles';
@@ -76,15 +76,14 @@ function renderExecutive2(filteredData, rawData) {
   }
 
   function getExec2Group(row) {
-    let rawCh = (getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel') || getValue(row, 'Promotion')).toString().toUpperCase();
-    let rawRemark = (getValue(row, 'Remark') || getValue(row, 'หมายเหตุ')).toString().toUpperCase();
+    let rawCh = (getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel') || getValue(row, 'Promotion') || '').toString().toUpperCase();
+    let rawRemark = (getValue(row, 'Remark') || getValue(row, 'หมายเหตุ') || '').toString().toUpperCase();
     
-    // รวมข้อความแบบปลอดภัย ป้องกันปัญหาเว้นวรรค
     let chStr = `${rawCh} ${rawRemark}`.trim();
     
-    // 💡 ปรับ Logic ดักจับให้รัดกุมที่สุด เรียงตามความสำคัญของ Keyword
+    // 💡 ค้นหาแบบ .includes ดักจับคำสั่งซื้อแพลตฟอร์ม แม้จะมีวันที่พ่วงท้ายมาก็ตาม
     if (chStr.includes('CRM')) return 'CRM';
-    if (chStr.includes('SHOPEE') || chStr.includes('SHP') || chStr.includes('SP ')) return 'Shopee';
+    if (chStr.includes('SHOPEE') || chStr.includes('SHP') || chStr.includes('SP')) return 'Shopee';
     if (chStr.includes('LAZADA') || chStr.includes('LZD') || chStr.includes('LAZ')) return 'Lazada';
     if (chStr.includes('LINE')) return 'Line';
     if (chStr.includes('PHONE') || chStr.includes('CALL') || chStr.includes('โทร')) return 'Call';
@@ -105,6 +104,7 @@ function renderExecutive2(filteredData, rawData) {
     return '';
   }
 
+  // 💡 ปรับปรุงตัวถอดรหัสวันที่ (Date Parser) ให้ฉลาดขึ้น รองรับทั้ง ค.ศ. และ พ.ศ. (แบบ 2 หลัก เช่น /68)
   const parseD = (dateStr) => {
     if (!dateStr) return null;
     const datePart = dateStr.toString().trim().split(' ')[0];
@@ -116,9 +116,20 @@ function renderExecutive2(filteredData, rawData) {
       let p2 = parseInt(parts[2], 10);
       if (isNaN(p0) || isNaN(p1) || isNaN(p2)) return null;
       let y, m, d;
-      if (p0 > 1000) { y = p0; m = p1; d = p2; } 
-      else { d = p0; m = p1; y = p2; if (y < 2000) y += 2000; }
-      if (y > 2500) y -= 543;
+      if (p0 > 1000) { 
+        y = p0; m = p1; d = p2; 
+      } else { 
+        d = p0; m = p1; y = p2; 
+        // ถ้าปีคริสต์ศักราชส่งมาเป็นเลข 2 หลัก เช่น 21 หรือ 25
+        if (y < 100) {
+          if (y >= 60) { // กรณีเป็น พ.ศ. สองหลักย่อ เช่น 68
+            y += 2000 - 543; 
+          } else {
+            y += 2000;
+          }
+        }
+      }
+      if (y > 2500) y -= 543; // แปลง พ.ศ. เต็มให้เป็น ค.ศ.
       return { val: y * 10000 + m * 100 + d };
     }
     return null;
