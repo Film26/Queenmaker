@@ -53,6 +53,9 @@ function renderExecutive2(filteredData, rawData) {
       .badge-retention { color: #ff9900; background: #fff8eb; }
       .badge-cashcow { color: #ff4949; background: #ffebeb; }
       .badge-dot { width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; display: inline-block; }
+
+      /* CSS จัดการข้อความ Remark ไม่ให้ตารางยืดเบี้ยว */
+      .remark-cell { max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #64748b; font-size: 12px; }
     `;
     document.head.appendChild(style);
   }
@@ -68,7 +71,7 @@ function renderExecutive2(filteredData, rawData) {
   }
 
   function extractRevenue(row) {
-    let rawVal = getValue(row, 'ยอดโอน') || getValue(row, 'ยอดขาย') || getValue(row, 'ราคาสินค้ายังไม่รวมภาษี');
+    let rawVal = getValue(row, 'ยอดโอน') || getValue(row, 'ยอดขาย') || getValue(row, 'ราคาสินค้ายังไม่รวมภาษี') || getValue(row, 'Net Sales');
     if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
       let parsed = parseFloat(rawVal.toString().replace(/,/g, '').trim());
       if (!isNaN(parsed)) return parsed;
@@ -77,7 +80,7 @@ function renderExecutive2(filteredData, rawData) {
   }
 
   function getExec2Group(row) {
-    let rawCh = getValue(row, 'ช่องทาง');
+    let rawCh = getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel');
     let chStr = (rawCh || '').toString().trim().toUpperCase(); 
     
     if (chStr.includes('LINE')) return 'Line';
@@ -128,7 +131,7 @@ function renderExecutive2(filteredData, rawData) {
 
     const id = getLocalCustomerId(row);
     if (!id) return;
-    const dateStr = getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง');
+    const dateStr = getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง') || getValue(row, 'OrderData');
     const d = parseD(dateStr);
     if (!d) return;
 
@@ -145,7 +148,8 @@ function renderExecutive2(filteredData, rawData) {
   const allowedChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'];
   const agg = {};
   allowedChannels.forEach(ch => {
-    agg[ch] = { revenue: 0, buyers: new Set(), newCustBuyers: new Set(), migrationBuyers: new Set() };
+    // 💡 เพิ่มอาเรย์สำหรับเก็บข้อความกลุ่ม Remark ประจำช่องทางนั้น ๆ
+    agg[ch] = { revenue: 0, buyers: new Set(), newCustBuyers: new Set(), migrationBuyers: new Set(), remarks: [] };
   });
 
   dataSrc.forEach(row => {
@@ -154,13 +158,19 @@ function renderExecutive2(filteredData, rawData) {
 
     const ch = getExec2Group(row);
     const id = getLocalCustomerId(row);
-    const dateStr = getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง');
+    const dateStr = getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง') || getValue(row, 'OrderData');
     const d = parseD(dateStr);
 
     let targetCh = agg[ch] ? ch : 'Other';
     
     agg[targetCh].revenue += rev;
     if (id) agg[targetCh].buyers.add(id);
+
+    // 💡 ดักดึงค่า Remark หรือ หมายเหตุ ออกมาเก็บสะสมไว้ในลิสต์ประจำช่องทาง
+    const textRemark = (getValue(row, 'Remark') || getValue(row, 'หมายเหตุ')).toString().trim();
+    if (textRemark) {
+      agg[targetCh].remarks.push(textRemark);
+    }
 
     if (id && d) {
       const globalFirst = customerFirstDates[id];
@@ -197,11 +207,16 @@ function renderExecutive2(filteredData, rawData) {
       category = 'Cash Cow (เสือนอนกิน)'; categoryClass = 'badge-cashcow'; dotClass = 'dot-cashcow';
     }
 
+    // 💡 รวบรวมหมายเหตุเด่นๆ มาแสดงผล (เอา 2 รายการแรกมาจับต่อกัน หรือขึ้นเครื่องหมายขีดหากไม่มี)
+    const uniqueRemarks = [...new Set(data.remarks)];
+    const displayRemark = uniqueRemarks.length > 0 ? uniqueRemarks.slice(0, 2).join(', ') : '-';
+
     return {
       channel: ch, revenue: data.revenue, buyers: buyersCount, 
       newCust: newCustCount, newToSub: migrationCount, 
       pctMig: pctMig, pctNew: pctNew,
-      category: category, categoryClass: categoryClass, dotClass: dotClass
+      category: category, categoryClass: categoryClass, dotClass: dotClass,
+      remark: displayRemark // 💡 แนบค่าไปแสดงผล
     };
   });
 
@@ -259,7 +274,7 @@ function renderExecutive2(filteredData, rawData) {
             <th>% Migration</th>
             <th>% New Share</th>
             <th>Category</th>
-          </tr>
+            <th>Remark / หมายเหตุ</th> </tr>
         </thead>
         <tbody>
   `;
@@ -280,6 +295,7 @@ function renderExecutive2(filteredData, rawData) {
             ${r.category}
           </span>
         </td>
+        <td class="remark-cell" title="${r.remark.replace(/"/g, '&quot;')}">${r.remark}</td>
       </tr>
     `;
   });
