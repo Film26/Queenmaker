@@ -53,9 +53,6 @@ function renderExecutive2(filteredData, rawData) {
       .badge-retention { color: #ff9900; background: #fff8eb; }
       .badge-cashcow { color: #ff4949; background: #ffebeb; }
       .badge-dot { width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; display: inline-block; }
-
-      /* CSS จัดการข้อความ Remark ไม่ให้ตารางยืดเบี้ยว */
-      .remark-cell { max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #64748b; font-size: 12px; }
     `;
     document.head.appendChild(style);
   }
@@ -71,7 +68,8 @@ function renderExecutive2(filteredData, rawData) {
   }
 
   function extractRevenue(row) {
-    let rawVal = getValue(row, 'ยอดโอน') || getValue(row, 'ยอดขาย') || getValue(row, 'ราคาสินค้ายังไม่รวมภาษี') || getValue(row, 'Net Sales');
+    // 💡 ปรับให้รองรับ 'Net Sales' จากไฟล์ 2021 ควบคู่ไปกับคีย์เดิมในไฟล์ 2025
+    let rawVal = getValue(row, 'Net Sales') || getValue(row, 'ยอดโอน') || getValue(row, 'ยอดขาย') || getValue(row, 'ราคาสินค้ายังไม่รวมภาษี');
     if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
       let parsed = parseFloat(rawVal.toString().replace(/,/g, '').trim());
       if (!isNaN(parsed)) return parsed;
@@ -80,16 +78,21 @@ function renderExecutive2(filteredData, rawData) {
   }
 
   function getExec2Group(row) {
-    let rawCh = getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel');
-    let chStr = (rawCh || '').toString().trim().toUpperCase(); 
+    // 💡 รวบรวมค่าจากทุกคอลัมน์ที่เป็นไปได้ว่าจะมีข้อมูลช่องทางอยู่
+    let rawCh = getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel') || getValue(row, 'Promotion');
+    let rawRemark = getValue(row, 'Remark') || getValue(row, 'หมายเหตุ');
     
+    // รวมข้อความเข้าด้วยกัน ทำเป็นพิมพ์ใหญ่ และตัดช่องว่างออกเพื่อให้เช็กง่าย
+    let chStr = `${rawCh} ${rawRemark}`.toUpperCase().replace(/\s+/g, ''); 
+    
+    // 💡 เช็ก Keyword ช่องทางแบบดักจับทุกแพลตฟอร์มในคอลัมน์ Remark/หมายเหตุ
+    if (chStr.includes('CRM')) return 'CRM';
     if (chStr.includes('LINE')) return 'Line';
-    if (chStr.includes('PHONE') || chStr.includes('CALL')) return 'Call';
+    if (chStr.includes('PHONE') || chStr.includes('CALL') || chStr.includes('โทร')) return 'Call';
     if (chStr.includes('TIKTOK') || chStr.includes('TT')) return 'Tiktok';
     if (chStr.includes('LAZADA')) return 'Lazada';
     if (chStr.includes('SHOPEE')) return 'Shopee';
-    if (chStr.includes('FACEBOOK') || chStr === 'FB') return 'Facebook';
-    if (chStr.includes('CRM')) return 'CRM';
+    if (chStr.includes('FACEBOOK') || chStr.includes('FB') || chStr.includes('เพจ')) return 'Facebook';
     if (chStr.includes('INSTAGRAM') || chStr === 'IG') return 'Instagram';
     
     return 'Other';
@@ -100,6 +103,9 @@ function renderExecutive2(filteredData, rawData) {
     if (cid) return cid.toString().trim();
     let phone = getValue(row, 'Phone') || getValue(row, 'phone') || getValue(row, 'เบอร์โทร');
     if (phone) return phone.toString().trim();
+    // 💡 ถ้าไฟล์ใหม่ไม่มีทั้งคู่ ให้ใช้ CustomerName เป็น ID แทนเพื่อไม่ให้ข้อมูลหลุดลูป
+    let name = getValue(row, 'CustomerName') || getValue(row, 'ชื่อลูกค้า');
+    if (name) return name.toString().trim();
     return '';
   }
 
@@ -131,7 +137,9 @@ function renderExecutive2(filteredData, rawData) {
 
     const id = getLocalCustomerId(row);
     if (!id) return;
-    const dateStr = getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง') || getValue(row, 'OrderData');
+    
+    // 💡 ดึงวันที่รองรับ 'OrderDate' และ 'OrderData' ของไฟล์ใหม่
+    const dateStr = getValue(row, 'OrderDate') || getValue(row, 'OrderData') || getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง');
     const d = parseD(dateStr);
     if (!d) return;
 
@@ -148,8 +156,7 @@ function renderExecutive2(filteredData, rawData) {
   const allowedChannels = ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'];
   const agg = {};
   allowedChannels.forEach(ch => {
-    // 💡 เพิ่มอาเรย์สำหรับเก็บข้อความกลุ่ม Remark ประจำช่องทางนั้น ๆ
-    agg[ch] = { revenue: 0, buyers: new Set(), newCustBuyers: new Set(), migrationBuyers: new Set(), remarks: [] };
+    agg[ch] = { revenue: 0, buyers: new Set(), newCustBuyers: new Set(), migrationBuyers: new Set() };
   });
 
   dataSrc.forEach(row => {
@@ -158,19 +165,13 @@ function renderExecutive2(filteredData, rawData) {
 
     const ch = getExec2Group(row);
     const id = getLocalCustomerId(row);
-    const dateStr = getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง') || getValue(row, 'OrderData');
+    const dateStr = getValue(row, 'OrderDate') || getValue(row, 'OrderData') || getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง');
     const d = parseD(dateStr);
 
     let targetCh = agg[ch] ? ch : 'Other';
     
     agg[targetCh].revenue += rev;
     if (id) agg[targetCh].buyers.add(id);
-
-    // 💡 ดักดึงค่า Remark หรือ หมายเหตุ ออกมาเก็บสะสมไว้ในลิสต์ประจำช่องทาง
-    const textRemark = (getValue(row, 'Remark') || getValue(row, 'หมายเหตุ')).toString().trim();
-    if (textRemark) {
-      agg[targetCh].remarks.push(textRemark);
-    }
 
     if (id && d) {
       const globalFirst = customerFirstDates[id];
@@ -207,16 +208,11 @@ function renderExecutive2(filteredData, rawData) {
       category = 'Cash Cow (เสือนอนกิน)'; categoryClass = 'badge-cashcow'; dotClass = 'dot-cashcow';
     }
 
-    // 💡 รวบรวมหมายเหตุเด่นๆ มาแสดงผล (เอา 2 รายการแรกมาจับต่อกัน หรือขึ้นเครื่องหมายขีดหากไม่มี)
-    const uniqueRemarks = [...new Set(data.remarks)];
-    const displayRemark = uniqueRemarks.length > 0 ? uniqueRemarks.slice(0, 2).join(', ') : '-';
-
     return {
       channel: ch, revenue: data.revenue, buyers: buyersCount, 
       newCust: newCustCount, newToSub: migrationCount, 
       pctMig: pctMig, pctNew: pctNew,
-      category: category, categoryClass: categoryClass, dotClass: dotClass,
-      remark: displayRemark // 💡 แนบค่าไปแสดงผล
+      category: category, categoryClass: categoryClass, dotClass: dotClass
     };
   });
 
@@ -274,7 +270,7 @@ function renderExecutive2(filteredData, rawData) {
             <th>% Migration</th>
             <th>% New Share</th>
             <th>Category</th>
-            <th>Remark / หมายเหตุ</th> </tr>
+          </tr>
         </thead>
         <tbody>
   `;
@@ -295,7 +291,6 @@ function renderExecutive2(filteredData, rawData) {
             ${r.category}
           </span>
         </td>
-        <td class="remark-cell" title="${r.remark.replace(/"/g, '&quot;')}">${r.remark}</td>
       </tr>
     `;
   });
