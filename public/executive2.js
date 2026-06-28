@@ -42,7 +42,6 @@ function renderExecutive2(filteredData, rawData) {
       .exec2-table-wrapper { background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow-x: auto; }
       .exec2-table { width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif; }
       
-      /* ปรับขนาดตัวอักษรตารางให้เล็กและกระชับตามรูปภาพ */
       .exec2-table th, .exec2-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #f2f2f2; }
       .exec2-table th { color: #666; font-weight: 500; font-size: 13px; background: #fff; white-space: nowrap; }
       .exec2-table td { color: #333; font-size: 13px; font-weight: 400; }
@@ -62,7 +61,7 @@ function renderExecutive2(filteredData, rawData) {
     if (row[keyName] !== undefined && row[keyName] !== null) return row[keyName];
     const keys = Object.keys(row);
     for (let k of keys) {
-      if (k.trim() === keyName.trim()) return row[k];
+      if (k.trim().toLowerCase() === keyName.trim().toLowerCase()) return row[k];
     }
     return '';
   }
@@ -77,15 +76,15 @@ function renderExecutive2(filteredData, rawData) {
   }
 
   function getExec2Group(row) {
-    let rawCh = getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel') || getValue(row, 'Promotion');
-    let rawRemark = getValue(row, 'Remark') || getValue(row, 'หมายเหตุ');
+    let rawCh = (getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel') || getValue(row, 'Promotion')).toString().toUpperCase();
+    let rawRemark = (getValue(row, 'Remark') || getValue(row, 'หมายเหตุ')).toString().toUpperCase();
     
-    // 💡 ปรับการดึงคำค้นหาให้เสถียรขึ้นโดยเปลี่ยนเป็นพิมพ์ใหญ่ทั้งหมด (Upper Case)
-    let chStr = `${rawCh} ${rawRemark}`.toUpperCase(); 
+    // รวมข้อความแบบปลอดภัย ป้องกันปัญหาเว้นวรรค
+    let chStr = `${rawCh} ${rawRemark}`.trim();
     
-    // 💡 ปรับปรุงเงื่อนไขให้ดักจับ Shopee, Lazada และแบรนด์อื่น ๆ ได้แม่นยำขึ้น ไม่ว่าจะพิมพ์เล็ก พิมพ์ใหญ่ หรือเขียนย่อ
+    // 💡 ปรับ Logic ดักจับให้รัดกุมที่สุด เรียงตามความสำคัญของ Keyword
     if (chStr.includes('CRM')) return 'CRM';
-    if (chStr.includes('SHOPEE') || chStr.includes('SP')) return 'Shopee';
+    if (chStr.includes('SHOPEE') || chStr.includes('SHP') || chStr.includes('SP ')) return 'Shopee';
     if (chStr.includes('LAZADA') || chStr.includes('LZD') || chStr.includes('LAZ')) return 'Lazada';
     if (chStr.includes('LINE')) return 'Line';
     if (chStr.includes('PHONE') || chStr.includes('CALL') || chStr.includes('โทร')) return 'Call';
