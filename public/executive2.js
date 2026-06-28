@@ -68,7 +68,6 @@ function renderExecutive2(filteredData, rawData) {
   }
 
   function extractRevenue(row) {
-    // 💡 ปรับให้รองรับ 'Net Sales' จากไฟล์ 2021 ควบคู่ไปกับคีย์เดิมในไฟล์ 2025
     let rawVal = getValue(row, 'Net Sales') || getValue(row, 'ยอดโอน') || getValue(row, 'ยอดขาย') || getValue(row, 'ราคาสินค้ายังไม่รวมภาษี');
     if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
       let parsed = parseFloat(rawVal.toString().replace(/,/g, '').trim());
@@ -78,22 +77,21 @@ function renderExecutive2(filteredData, rawData) {
   }
 
   function getExec2Group(row) {
-    // 💡 รวบรวมค่าจากทุกคอลัมน์ที่เป็นไปได้ว่าจะมีข้อมูลช่องทางอยู่
     let rawCh = getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel') || getValue(row, 'Promotion');
     let rawRemark = getValue(row, 'Remark') || getValue(row, 'หมายเหตุ');
     
-    // รวมข้อความเข้าด้วยกัน ทำเป็นพิมพ์ใหญ่ และตัดช่องว่างออกเพื่อให้เช็กง่าย
-    let chStr = `${rawCh} ${rawRemark}`.toUpperCase().replace(/\s+/g, ''); 
+    // 💡 ปรับการดึงคำค้นหาให้เสถียรขึ้นโดยเปลี่ยนเป็นพิมพ์ใหญ่ทั้งหมด (Upper Case)
+    let chStr = `${rawCh} ${rawRemark}`.toUpperCase(); 
     
-    // 💡 เช็ก Keyword ช่องทางแบบดักจับทุกแพลตฟอร์มในคอลัมน์ Remark/หมายเหตุ
+    // 💡 ปรับปรุงเงื่อนไขให้ดักจับ Shopee, Lazada และแบรนด์อื่น ๆ ได้แม่นยำขึ้น ไม่ว่าจะพิมพ์เล็ก พิมพ์ใหญ่ หรือเขียนย่อ
     if (chStr.includes('CRM')) return 'CRM';
+    if (chStr.includes('SHOPEE') || chStr.includes('SP')) return 'Shopee';
+    if (chStr.includes('LAZADA') || chStr.includes('LZD') || chStr.includes('LAZ')) return 'Lazada';
     if (chStr.includes('LINE')) return 'Line';
     if (chStr.includes('PHONE') || chStr.includes('CALL') || chStr.includes('โทร')) return 'Call';
     if (chStr.includes('TIKTOK') || chStr.includes('TT')) return 'Tiktok';
-    if (chStr.includes('LAZADA')) return 'Lazada';
-    if (chStr.includes('SHOPEE')) return 'Shopee';
     if (chStr.includes('FACEBOOK') || chStr.includes('FB') || chStr.includes('เพจ')) return 'Facebook';
-    if (chStr.includes('INSTAGRAM') || chStr === 'IG') return 'Instagram';
+    if (chStr.includes('INSTAGRAM') || chStr.includes('IG')) return 'Instagram';
     
     return 'Other';
   }
@@ -103,7 +101,6 @@ function renderExecutive2(filteredData, rawData) {
     if (cid) return cid.toString().trim();
     let phone = getValue(row, 'Phone') || getValue(row, 'phone') || getValue(row, 'เบอร์โทร');
     if (phone) return phone.toString().trim();
-    // 💡 ถ้าไฟล์ใหม่ไม่มีทั้งคู่ ให้ใช้ CustomerName เป็น ID แทนเพื่อไม่ให้ข้อมูลหลุดลูป
     let name = getValue(row, 'CustomerName') || getValue(row, 'ชื่อลูกค้า');
     if (name) return name.toString().trim();
     return '';
@@ -138,7 +135,6 @@ function renderExecutive2(filteredData, rawData) {
     const id = getLocalCustomerId(row);
     if (!id) return;
     
-    // 💡 ดึงวันที่รองรับ 'OrderDate' และ 'OrderData' ของไฟล์ใหม่
     const dateStr = getValue(row, 'OrderDate') || getValue(row, 'OrderData') || getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง');
     const d = parseD(dateStr);
     if (!d) return;
