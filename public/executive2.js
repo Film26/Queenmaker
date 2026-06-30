@@ -76,24 +76,27 @@ function renderExecutive2(filteredData, rawData) {
   }
 
   function getExec2Group(row) {
-    let rawCh = (getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel') || getValue(row, 'Promotion') || '').toString().toUpperCase();
-    let rawRemark = (getValue(row, 'Remark') || getValue(row, 'หมายเหตุ') || '').toString().toUpperCase();
-    
-    let chStr = `${rawCh} ${rawRemark}`.trim();
-    
-    // 💡 ค้นหาแบบ .includes ดักจับคำสั่งซื้อแพลตฟอร์ม แม้จะมีวันที่พ่วงท้ายมาก็ตาม
-    if (chStr.includes('CRM')) return 'CRM';
-    if (chStr.includes('SHOPEE') || chStr.includes('SHP') || chStr.includes('SP')) return 'Shopee';
-    if (chStr.includes('LAZADA') || chStr.includes('LZD') || chStr.includes('LAZ')) return 'Lazada';
-    if (chStr.includes('LINE')) return 'Line';
-    if (chStr.includes('PHONE') || chStr.includes('CALL') || chStr.includes('โทร')) return 'Call';
-    if (chStr.includes('TIKTOK') || chStr.includes('TT')) return 'Tiktok';
-    if (chStr.includes('FACEBOOK') || chStr.includes('FB') || chStr.includes('เพจ')) return 'Facebook';
-    if (chStr.includes('INSTAGRAM') || chStr.includes('IG')) return 'Instagram';
-    
-    return 'Other';
-  }
-
+  // ดึงค่าช่องทางหลักและหมายเหตุออกมาแปลงเป็นตัวพิมพ์ใหญ่ทั้งหมด
+  let rawCh = (getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel') || getValue(row, 'Promotion') || '').toString().toUpperCase();
+  let rawRemark = (getValue(row, 'Remark') || getValue(row, 'หมายเหตุ') || '').toString().toUpperCase();
+  
+  // รวมข้อความเข้าด้วยกัน
+  let chStr = `${rawCh} ${rawRemark}`.trim();
+  
+  // 💡 ปรับให้ใช้ .includes() เพื่อตรวจสอบคีย์เวิร์ดแบบยืดหยุ่น 
+  // ต่อให้ในช่องหมายเหตุจะเป็น "SHOPEE 30/10/68" หรือ "LAZADA 22/10/68" ก็จะตรวจเจอแน่นอนค่ะ
+  if (chStr.includes('CRM')) return 'CRM';
+  if (chStr.includes('SHOPEE') || chStr.includes('SHP') || chStr.includes('SP')) return 'Shopee';
+  if (chStr.includes('LAZADA') || chStr.includes('LZD') || chStr.includes('LAZ')) return 'Lazada';
+  if (chStr.includes('LINE')) return 'Line';
+  if (chStr.includes('PHONE') || chStr.includes('CALL') || chStr.includes('โทร')) return 'Call';
+  if (chStr.includes('TIKTOK') || chStr.includes('TT')) return 'Tiktok';
+  if (chStr.includes('FACEBOOK') || chStr.includes('FB') || chStr.includes('เพจ')) return 'Facebook';
+  if (chStr.includes('INSTAGRAM') || chStr.includes('IG')) return 'Instagram';
+  
+  return 'Other';
+}
+  
   function getLocalCustomerId(row) {
     let cid = getValue(row, 'Customer ID') || getValue(row, 'Customer ID ');
     if (cid) return cid.toString().trim();
