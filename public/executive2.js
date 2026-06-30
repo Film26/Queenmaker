@@ -76,15 +76,14 @@ function renderExecutive2(filteredData, rawData) {
   }
 
   function getExec2Group(row) {
-  // ดึงค่าช่องทางหลักและหมายเหตุออกมาแปลงเป็นตัวพิมพ์ใหญ่ทั้งหมด
-  let rawCh = (getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel') || getValue(row, 'Promotion') || '').toString().toUpperCase();
-  let rawRemark = (getValue(row, 'Remark') || getValue(row, 'หมายเหตุ') || '').toString().toUpperCase();
+  let rawCh = getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel') || getValue(row, 'Promotion') || '';
+  let rawRemark = getValue(row, 'Remark') || getValue(row, 'หมายเหตุ') || '';
   
-  // รวมข้อความเข้าด้วยกัน
-  let chStr = `${rawCh} ${rawRemark}`.trim();
+  // โค้ดเดิมของคุณจะทำการแปลงเป็นตัวพิมพ์ใหญ่และตัดช่องว่างออกทั้งหมด
+  let chStr = `${rawCh} ${rawRemark}`.toUpperCase().replace(/\s+/g, ''); 
   
-  // 💡 ปรับให้ใช้ .includes() เพื่อตรวจสอบคีย์เวิร์ดแบบยืดหยุ่น 
-  // ต่อให้ในช่องหมายเหตุจะเป็น "SHOPEE 30/10/68" หรือ "LAZADA 22/10/68" ก็จะตรวจเจอแน่นอนค่ะ
+  // 💡 แก้ไขเงื่อนไข: เช็กคำว่า SHOPEE / LAZADA แบบติดกัน (ไม่มีช่องว่าง) 
+  // เพื่อให้แมตช์กับ chStr ที่ถูกลบช่องว่างออกไปแล้วเรียบร้อยค่ะ
   if (chStr.includes('CRM')) return 'CRM';
   if (chStr.includes('SHOPEE') || chStr.includes('SHP') || chStr.includes('SP')) return 'Shopee';
   if (chStr.includes('LAZADA') || chStr.includes('LZD') || chStr.includes('LAZ')) return 'Lazada';
