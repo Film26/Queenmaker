@@ -76,14 +76,28 @@ function renderExecutive2(filteredData, rawData) {
   }
 
   function getExec2Group(row) {
-  let rawCh = getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel') || getValue(row, 'Promotion') || '';
-  let rawRemark = getValue(row, 'Remark') || getValue(row, 'หมายเหตุ') || '';
-  
-  // โค้ดเดิมของคุณจะทำการแปลงเป็นตัวพิมพ์ใหญ่และตัดช่องว่างออกทั้งหมด
+  let rawCh = "";
+  let rawRemark = "";
+
+  // 💡 วนลูปหาคอลัมน์แบบ "ดักจับคำ" เพื่อป้องกันภาษาไทยเพี้ยนหรือช่องว่างซ่อนตัว
+  if (row) {
+    for (let key in row) {
+      let k = key.trim().toLowerCase();
+      // เช็กช่องทางหลัก
+      if (k.includes('ช่องทาง') || k.includes('platform') || k.includes('channel') || k.includes('promotion')) {
+        rawCh = row[key] || "";
+      }
+      // เช็กช่องหมายเหตุ/Remark (รองรับทั้งคำไทยและอังกฤษ ไม่กลัวเว้นวรรค)
+      if (k.includes('remark') || k.includes('หมายเหตุ')) {
+        rawRemark = row[key] || "";
+      }
+    }
+  }
+
+  // แปลงค่าที่ได้เป็นตัวพิมพ์ใหญ่และลบช่องว่างออกตาม Logic เดิมของคุณ
   let chStr = `${rawCh} ${rawRemark}`.toUpperCase().replace(/\s+/g, ''); 
   
-  // 💡 แก้ไขเงื่อนไข: เช็กคำว่า SHOPEE / LAZADA แบบติดกัน (ไม่มีช่องว่าง) 
-  // เพื่อให้แมตช์กับ chStr ที่ถูกลบช่องว่างออกไปแล้วเรียบร้อยค่ะ
+  // เช็กเงื่อนไขจัดกลุ่ม (ตัดช่องว่างออกแล้ว เช็กคำที่ติดกันได้เลย)
   if (chStr.includes('CRM')) return 'CRM';
   if (chStr.includes('SHOPEE') || chStr.includes('SHP') || chStr.includes('SP')) return 'Shopee';
   if (chStr.includes('LAZADA') || chStr.includes('LZD') || chStr.includes('LAZ')) return 'Lazada';
