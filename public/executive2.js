@@ -56,30 +56,18 @@ function renderExecutive2(filteredData, rawData) {
     document.head.appendChild(style);
   }
 
-  // ฟังก์ชันดึงค่าจาก Object แบบไม่สนใจพิมพ์เล็ก-ใหญ่ หรือช่องว่างหัวท้าย
   function getValue(row, keyName) {
     if (!row) return '';
     if (row[keyName] !== undefined && row[keyName] !== null) return row[keyName];
     const keys = Object.keys(row);
-    const targetKey = keyName.trim().toLowerCase();
     for (let k of keys) {
-      if (k.trim().toLowerCase() === targetKey) return row[k];
+      if (k.trim().toLowerCase() === keyName.trim().toLowerCase()) return row[k];
     }
     return '';
   }
 
-  // เจาะจงดึงคอลัมน์ยอดเงินแบบรองรับทุกไฟล์ดิบ
   function extractRevenue(row) {
-    let rawVal = '';
-    const keys = Object.keys(row);
-    // วนหาคอลัมน์ที่มีคำว่า net sales, ยอดโอน, ยอดขาย
-    for (let k of keys) {
-      const kLow = k.toLowerCase();
-      if (kLow.includes('net') || kLow.includes('โอน') || kLow.includes('ยอดขาย') || kLow.includes('รวมภาษี')) {
-        rawVal = row[k];
-        break;
-      }
-    }
+    let rawVal = getValue(row, 'Net Sales') || getValue(row, 'ยอดโอน') || getValue(row, 'ยอดขาย') || getValue(row, 'ราคาสินค้ายังไม่รวมภาษี');
     if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
       let parsed = parseFloat(rawVal.toString().replace(/,/g, '').trim());
       if (!isNaN(parsed)) return parsed;
@@ -87,13 +75,13 @@ function renderExecutive2(filteredData, rawData) {
     return 0;
   }
 
-  // จัดกลุ่ม Channel จากคอลัมน์ต่างๆ และ Remark
   function getExec2Group(row) {
     let rawCh = (getValue(row, 'ช่องทาง') || getValue(row, 'Platform') || getValue(row, 'Channel') || getValue(row, 'Promotion') || '').toString().toUpperCase();
     let rawRemark = (getValue(row, 'Remark') || getValue(row, 'หมายเหตุ') || '').toString().toUpperCase();
     
     let chStr = `${rawCh} ${rawRemark}`.trim();
     
+    // 💡 ค้นหาแบบ .includes ดักจับคำสั่งซื้อแพลตฟอร์ม แม้จะมีวันที่พ่วงท้ายมาก็ตาม
     if (chStr.includes('CRM')) return 'CRM';
     if (chStr.includes('SHOPEE') || chStr.includes('SHP') || chStr.includes('SP')) return 'Shopee';
     if (chStr.includes('LAZADA') || chStr.includes('LZD') || chStr.includes('LAZ')) return 'Lazada';
@@ -116,6 +104,7 @@ function renderExecutive2(filteredData, rawData) {
     return '';
   }
 
+  // 💡 ปรับปรุงตัวถอดรหัสวันที่ (Date Parser) ให้ฉลาดขึ้น รองรับทั้ง ค.ศ. และ พ.ศ. (แบบ 2 หลัก เช่น /68)
   const parseD = (dateStr) => {
     if (!dateStr) return null;
     const datePart = dateStr.toString().trim().split(' ')[0];
@@ -131,11 +120,16 @@ function renderExecutive2(filteredData, rawData) {
         y = p0; m = p1; d = p2; 
       } else { 
         d = p0; m = p1; y = p2; 
+        // ถ้าปีคริสต์ศักราชส่งมาเป็นเลข 2 หลัก เช่น 21 หรือ 25
         if (y < 100) {
-          if (y >= 60) { y += 2000 - 543; } else { y += 2000; }
+          if (y >= 60) { // กรณีเป็น พ.ศ. สองหลักย่อ เช่น 68
+            y += 2000 - 543; 
+          } else {
+            y += 2000;
+          }
         }
       }
-      if (y > 2500) y -= 543; 
+      if (y > 2500) y -= 543; // แปลง พ.ศ. เต็มให้เป็น ค.ศ.
       return { val: y * 10000 + m * 100 + d };
     }
     return null;
@@ -144,7 +138,6 @@ function renderExecutive2(filteredData, rawData) {
   const customerFirstDates = {};
   const customerChannelFirstDates = {};
 
-  // ลูปที่ 1: หาวันแรกที่ซื้อเพื่อแยกประเภทเก่า/ใหม่
   dataSrc.forEach(row => {
     const rev = extractRevenue(row);
     if (rev <= 0) return;
@@ -152,9 +145,9 @@ function renderExecutive2(filteredData, rawData) {
     const id = getLocalCustomerId(row);
     if (!id) return;
     
-    const dateStr = getValue(row, 'orderdate') || getValue(row, 'orderdata') || getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง');
+    const dateStr = getValue(row, 'OrderDate') || getValue(row, 'OrderData') || getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง');
     const d = parseD(dateStr);
-    if (!d) return; // ข้ามเฉพาะส่วนระบุวันที่หากแกะไม่ได้ แต่ยอดเงินจะไม่พังในลูปถัดไป
+    if (!d) return;
 
     if (!customerFirstDates[id] || d.val < customerFirstDates[id]) {
       customerFirstDates[id] = d.val;
@@ -172,19 +165,17 @@ function renderExecutive2(filteredData, rawData) {
     agg[ch] = { revenue: 0, buyers: new Set(), newCustBuyers: new Set(), migrationBuyers: new Set() };
   });
 
-  // ลูปที่ 2: คำนวณสะสมยอดขายและจำนวนผู้ซื้อ
   dataSrc.forEach(row => {
     const rev = extractRevenue(row);
     if (rev <= 0) return;
 
     const ch = getExec2Group(row);
     const id = getLocalCustomerId(row);
-    const dateStr = getValue(row, 'orderdate') || getValue(row, 'orderdata') || getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง');
+    const dateStr = getValue(row, 'OrderDate') || getValue(row, 'OrderData') || getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง');
     const d = parseD(dateStr);
 
     let targetCh = agg[ch] ? ch : 'Other';
     
-    // 💡 สะสมยอดเงินและจำนวนผู้ซื้อเสมอ แม้ว่าฟังก์ชันวันที่ (d) จะพาร์สไม่ได้ก็ตาม
     agg[targetCh].revenue += rev;
     if (id) agg[targetCh].buyers.add(id);
 
