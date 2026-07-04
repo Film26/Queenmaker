@@ -271,24 +271,26 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script>
+    // --- โครงสร้างตัวแปรหลักดั้งเดิม ---
     const sampleUrl = `/assets/RAW%20\${targetYear}.csv`;
     let rawData = [];
     let filteredData = [];
     
-    // เพิ่มตัวแปรสถานะ 'KPI' เข้าในชุด Filters หลักของโค้ดคุณ
+    // คอยเก็บสถานะ Filter โดยเพิ่ม 'KPI' เข้ามา (ตั้งค่าเริ่มต้นเป็น Off)
     let filters = { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All', KPI: 'Off' };
     let monthlyData = {}; 
     let globalFirstPurchase = {}; 
     let availableMonths = [];
     let charts = {};
     const keyCache = {};
-    
+
+    // 💡 คลังสำหรับรับค่าตัวเลขที่ Manual พิมพ์มาจากหน้า KPI SETTING (เมื่อกดบันทึกแล้วส่งค่ามาใส่ที่นี่ได้เลย)
     window.kpiSettingsData = {
       salesYTD: 5000000,   // เป้าหมายยอดขาย YTD (บาท)
       totalCust: 10000,    // เป้าหมาย Total Customer (คน)
       newCustYTD: 3000     // เป้าหมาย YTD New Customers (คน)
     };
-    
+
     function precomputeGlobalFirstPurchases() {
       globalFirstPurchase = {};
       if (!rawData || rawData.length === 0) return;
@@ -541,14 +543,20 @@
     }
 
     // ==========================================
-    // 🔍 ฟังก์ชันแปลงจำแนกแชนเนลแบบตรวจจับคำครบถ้วน ไม่ตกหล่นไป Other
+    // 🔍 ปรับปรุงใหม่: ฟังก์ชันจำแนกแชนเนล (ให้แอบส่องใน Remark ถ้าหาคอลัมน์หลักไม่เจอ)
     // ==========================================
-    function getNormalizedChannel(rawChannel) {
+    function getNormalizedChannel(rawChannel, row) {
       let ch = (rawChannel || '').toString().trim();
+      
+      // กรณีไฟล์ปี 2021 ที่ไม่มีคอลัมน์ช่องทางโดยตรง ให้เอาค่าจาก Remark/หมายเหตุ มาแกะหาคีย์เวิร์ดแทนค่ะ
+      if (!ch && row) {
+        ch = getRowValue(row, ['หมายเหตุ', 'Remark']);
+      }
+      
       if (!ch) return 'Other';
       let lower = ch.toLowerCase();
       
-      if (lower.includes('facebook') || lower === 'fb' || lower.includes('เพจ')) return 'Facebook';
+      if (lower.includes('facebook') || lower.includes('fb') || lower.includes('เพจ')) return 'Facebook';
       if (lower.includes('line')) return 'Line'; 
       if (lower.includes('tiktok') || lower === 'tt') return 'Tiktok';
       if (lower.includes('shopee') || lower === 'shp' || lower === 'sp') return 'Shopee';
@@ -556,7 +564,6 @@
       if (lower.includes('ig') || lower.includes('instagram')) return 'Instagram';
       if (lower.includes('call') || lower.includes('phone') || lower.includes('โทร')) return 'Call';
       if (lower.includes('crm')) return 'CRM';
-      if (lower.includes('other')) return 'Other';
       
       return 'Other'; 
     }
@@ -567,37 +574,42 @@
       if (!sub || sub.toString().trim() === '') {
         sub = getRowValue(row, ['ช่องทาง', 'Channel']) || 'Other';
       }
+      // ถ้าไม่มีค่าเลย และเป็นไฟล์รูปแบบ Remark ให้ดึงจาก Remark มาส่องดูเบื้องต้น
+      if ((sub === 'Other' || sub === '') && row) {
+        let rem = getRowValue(row, ['หมายเหตุ', 'Remark']);
+        if (rem) sub = rem;
+      }
+
       let cleanSub = sub.toString().trim();
       let lower = cleanSub.toLowerCase();
       if (cleanSub === '865219993' || cleanSub === '986291641') return 'Other';
       
-      if (lower === 'fb' || lower === 'facebook') return 'FB';
-      if (lower === 'fbc') return 'FBC';
-      if (lower === 'fbd') return 'FBD';
-      if (lower === 'fbg') return 'FBG';
-      if (lower === 'fbh') return 'FBH';
-      if (lower === 'fbh-ig' || lower === 'fbh_ig') return 'FBH-IG';
-      if (lower === 'fbk') return 'FBK';
-      if (lower === 'fbm') return 'FBM';
-      if (lower === 'fbp') return 'FBP';
-      if (lower === 'fbp-w' || lower === 'fbp_w') return 'FBP-W';
-      if (lower === 'fbss') return 'FBSS';
-      if (lower === 'fbw') return 'FBW';
-      if (lower === 'ig' || lower === 'instagram') return 'IG';
-      if (lower === 'ig-fbh' || lower === 'ig_fbh') return 'IG-FBH';
-      if (lower === 'ig-fbss' || lower === 'ig_fbss') return 'IG-FBSS';
-      if (lower === 'ig-fbw' || lower === 'ig_fbw') return 'IG-FBW';
+      if (lower.includes('fbc')) return 'FBC';
+      if (lower.includes('fbd')) return 'FBD';
+      if (lower.includes('fbg')) return 'FBG';
+      if (lower.includes('fbh-ig') || lower.includes('fbh_ig')) return 'FBH-IG';
+      if (lower.includes('fbh')) return 'FBH';
+      if (lower.includes('fbk')) return 'FBK';
+      if (lower.includes('fbm')) return 'FBM';
+      if (lower.includes('fbp-w') || lower.includes('fbp_w')) return 'FBP-W';
+      if (lower.includes('fbp')) return 'FBP';
+      if (lower.includes('fbss')) return 'FBSS';
+      if (lower.includes('fbw')) return 'FBW';
+      if (lower.includes('fb') || lower.includes('facebook')) return 'FB';
+      if (lower.includes('ig-fbh') || lower.includes('ig_fbh')) return 'IG-FBH';
+      if (lower.includes('ig-fbss') || lower.includes('ig_fbss')) return 'IG-FBSS';
+      if (lower.includes('ig-fbw') || lower.includes('ig_fbw')) return 'IG-FBW';
+      if (lower.includes('ig') || lower.includes('instagram')) return 'IG';
       if (lower.includes('line')) return 'Line';
-      if (lower === 'lazada') return 'Lazada';
-      if (lower === 'shopee') return 'Shopee';
-      if (lower === 'tiktok') return 'Tiktok';
-      if (lower === 'other') return 'Other';
-      if (lower === 'pc') return 'PC';
-      if (lower === 'telesale') return 'Telesale';
-      if (lower === 'website' || lower === 'web') return 'Website';
-      if (lower === 'email') return 'Email';
-      if (lower === 'crm') return 'CRM';
-      if (lower === 'call' || lower === 'phone') return 'Call';
+      if (lower.includes('lazada')) return 'Lazada';
+      if (lower.includes('shopee')) return 'Shopee';
+      if (lower.includes('tiktok')) return 'Tiktok';
+      if (lower.includes('pc')) return 'PC';
+      if (lower.includes('telesale')) return 'Telesale';
+      if (lower.includes('website') || lower.includes('web')) return 'Website';
+      if (lower.includes('email')) return 'Email';
+      if (lower.includes('crm')) return 'CRM';
+      if (lower.includes('call') || lower.includes('phone')) return 'Call';
       return cleanSub;
     }
 
@@ -634,18 +646,37 @@
       return 'Unknown';
     }
 
+    // ==========================================
+    // 🔍 ปรับปรุงใหม่: ฟังก์ชันแยกชื่อแอดมิน (ให้ดึงจากเศษชื่อหลังเครื่องหมายจุลภาคใน Remark ได้)
+    // ==========================================
     function getNormalizedAdmin(row) {
       if (!row) return 'Unknown';
       let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
       if (!val) val = getRowValue(row, ['หมายเหตุ', 'Remark']);
+      
       let a = (val || '').toString().trim();
       if (!a) return 'Unknown';
       let lower = a.toLowerCase();
+      
       if (lower.includes('may') || lower.includes('เมย์')) return 'May';
       if (lower.includes('บี')) return 'บี';
       if (lower.includes('มิ้ว')) return 'มิ้ว';
       if (lower.includes('แอน')) return 'แอน';
       if (lower.includes('แอล')) return 'แอล';
+      
+      // รองรับเคสข้อความยาว "FBH,แอน" หรือ "FBSS,แอน" ให้ตัดคำหลังจุลภาคมาตรวจจับ
+      if (a.includes(',')) {
+        let parts = a.split(',');
+        let adminPart = parts[parts.length - 1].trim();
+        let lowerPart = adminPart.toLowerCase();
+        if (lowerPart.includes('may') || lowerPart.includes('เมย์')) return 'May';
+        if (lowerPart.includes('บี')) return 'บี';
+        if (lowerPart.includes('มิ้ว')) return 'มิ้ว';
+        if (lowerPart.includes('แอน')) return 'แอน';
+        if (lowerPart.includes('แอล')) return 'แอล';
+        if (adminPart) return adminPart;
+      }
+      
       return a;
     }
 
@@ -737,13 +768,16 @@
         if (!dateStr) return false;
         const d = parseDate(dateStr);
         if (!d) return false;
-        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
+        
+        // 💡 ส่งค่าวัตถุ row เข้าฟังก์ชัน เพื่อให้แกะหาช่องทางจากคอลัมน์สำรองได้ถูกต้อง
+        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
         const subChannel = getNormalizedSubChannel(row);
         
         const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
         const product = getNormalizedProduct(rawProductName);
         const subProduct = getNormalizedSubProduct(rawProductName);
         const admin = getNormalizedAdmin(row);
+        
         if (filters.Year !== 'All' && d.y.toString() !== filters.Year) return false;
         if (filters.Channel !== 'All' && channel !== filters.Channel) return false;
         if (filters.SubChannel !== 'All' && subChannel !== filters.SubChannel) return false;
@@ -771,7 +805,9 @@
         const id = getCustomerUniqueId(row);
         const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']));
+        
+        // 💡 ส่งค่าวัตถุ row เข้าฟังก์ชัน เพื่อให้ระบุ Channel ในขั้นตอนรวบรวมข้อมูลด้วยค่ะ
+        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
         const admin = getNormalizedAdmin(row);
         
         if (!id || !dateStr) return;
@@ -859,7 +895,7 @@
       rawData.forEach(row => {
         if (!isSaleOrder(row)) return;
         const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+        const dateStr = getRowValue(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่', 'Address', 'address', 'วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
         if (d && d.str <= selectedMonthStr) totalEver.add(id);
@@ -869,7 +905,7 @@
         rawData.forEach(row => {
           if (!isSaleOrder(row)) return;
           const id = getCustomerUniqueId(row);
-          const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+          const dateStr = getRowValue(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่', 'Address', 'address', 'วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
           if (!id || !dateStr) return;
           const d = parseDate(dateStr);
           if (d && d.str <= availableMonths[idx - 1]) totalEverPrev.add(id);
