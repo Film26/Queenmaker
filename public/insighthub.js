@@ -746,7 +746,6 @@ function renderInsightHub(filteredData, rawData) {
 
   // 8. ฟังก์ชันสร้างหัวตาราง Th สไตล์ Excel พร้อมกล่องพิมพ์ค้นหาข้อมูลภายในตัวกรอง
   function makeExcelHeaderTh(columnId, displayTitle, extraClass = "") {
-    // ดึงชอยส์ทั้งหมดที่มีในระบบขึ้นมาให้เลือกคัดกรอง
     const uniqueValues = Array.from(new Set(customers.map(c => {
       if (columnId === 'firstPurchaseDate') return c.firstPurchaseStr;
       if (columnId === 'lastPurchaseDate') return c.lastPurchaseStr;
@@ -758,41 +757,57 @@ function renderInsightHub(filteredData, rawData) {
       return String(c[columnId] || "").trim();
     }))).sort();
 
-    const currentSelected = state.excelFilters[columnId] || [];
+    // หากยังไม่มีการฟิลเตอร์ ให้ถือว่าเลือกทั้งหมดเป็นค่าเริ่มต้น
+    if (!state.excelFilters[columnId]) {
+      state.excelFilters[columnId] = [...uniqueValues]; 
+    }
+
+    const currentSelected = state.excelFilters[columnId];
     const isOpen = state.activeDropdown === columnId;
     const filterSearchText = (state.excelSearchTerms[columnId] || "").toLowerCase();
-    
-    // คัดกรองตัวเลือกเช็คบ็อกซ์ตามข้อความที่แอดมินพิมพ์ในดรอปดาวน์
     const visibleOptions = uniqueValues.filter(v => v.toLowerCase().includes(filterSearchText));
-    const hasActiveFilter = currentSelected.length > 0;
+    
+    // ตรวจสอบว่าคอลัมน์นี้ถูกคัดกรองอยู่หรือไม่ (ถ้าเลือกไม่ครบแปลว่ากำลังฟิลเตอร์)
+    const hasActiveFilter = currentSelected.length < uniqueValues.length;
 
     return `
-      <th class="${extraClass}">
+      <th class="${extraClass}" style="position: relative;">
         <div class="th-container">
           <span class="th-label" onclick="setHubSort('${columnId}')">${displayTitle} ${getSortIcon(columnId)}</span>
           <button class="excel-filter-btn ${hasActiveFilter ? 'active-filter' : ''}" onclick="event.stopPropagation(); toggleExcelDropdown('${columnId}')">
             <i class="fas fa-filter"></i>
           </button>
           
-          <div class="excel-dropdown-menu ${isOpen ? 'show' : ''}" onclick="event.stopPropagation();">
-            <input type="text" class="excel-search-input" placeholder="🔍 พิมพ์เพื่อค้นหา..." value="${state.excelSearchTerms[columnId] || ''}" oninput="handleDropdownSearch('${columnId}', this.value)">
+          <!-- หน้าต่าง Dropdown แบบ Google Sheets -->
+          <div class="excel-dropdown-menu ${isOpen ? 'show' : ''}" onclick="event.stopPropagation();" style="width: 260px;">
+            <div style="font-size: 11px; color:#555; margin-bottom: 5px; font-weight: normal;">
+              <span style="color: #2563eb; cursor: pointer; font-weight: bold;" onclick="excelSelectAllRows('${columnId}')">เลือกทั้งหมด</span>
+              <span style="color: #666;"> | </span>
+              <span style="color: #b91c1c; cursor: pointer; font-weight: bold;" onclick="excelClearAllRows('${columnId}')">ล้าง</span>
+              <span style="float: right; color:#999;">แสดง ${visibleOptions.length} รายการ</span>
+            </div>
+
+            <!-- ช่องพิมพ์ค้นหาภายใน Filter -->
+            <div style="position: relative; margin-bottom: 8px;">
+              <input type="text" class="excel-search-input" placeholder="🔍 พิมพ์เพื่อค้นหา..." value="${state.excelSearchTerms[columnId] || ''}" oninput="handleDropdownSearch('${columnId}', this.value)" style="padding-right: 25px;">
+            </div>
             
-            <ul class="excel-options-list">
+            <ul class="excel-options-list" id="list-${columnId}">
               ${visibleOptions.map(opt => {
-                const isChecked = currentSelected.length === 0 || currentSelected.includes(opt);
+                const isChecked = currentSelected.includes(opt);
                 return `
                   <li>
                     <input type="checkbox" id="chk-${columnId}-${opt.replace(/[^a-zA-Z0-9]/g, '_')}" ${isChecked ? 'checked' : ''} onchange="handleDropdownCheck('${columnId}', '${opt.replace(/'/g, "\\'")}', this.checked)">
-                    <label style="cursor:pointer; flex-grow:1;" for="chk-${columnId}-${opt.replace(/[^a-zA-Z0-9]/g, '_')}">${opt || '(ว่าง)'}</label>
+                    <label style="cursor:pointer; flex-grow:1; font-weight: normal;" for="chk-${columnId}-${opt.replace(/[^a-zA-Z0-9]/g, '_')}">${opt || '(ว่าง)'}</label>
                   </li>
                 `;
               }).join('')}
               ${visibleOptions.length === 0 ? '<li style="color:#999; text-align:center; padding: 10px 0;">ไม่พบข้อมูล</li>' : ''}
             </ul>
             
-            <div class="excel-dropdown-actions">
-              <button class="excel-btn-sm" onclick="clearExcelFilter('${columnId}')">Reset</button>
-              <button class="excel-btn-sm confirm" onclick="confirmExcelFilter()">ตกลง</button>
+            <div class="excel-dropdown-actions" style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 8px;">
+              <button class="excel-btn-sm" style="border-radius: 4px; padding: 5px 12px;" onclick="clearExcelFilter('${columnId}')">ยกเลิก</button>
+              <button class="excel-btn-sm confirm" style="background: #15803d; border-color: #15803d; color: white; border-radius: 4px; padding: 5px 15px;" onclick="confirmExcelFilter()">ตกลง</button>
             </div>
           </div>
         </div>
@@ -950,18 +965,17 @@ function renderInsightHub(filteredData, rawData) {
 
 // 10. ฟังก์ชันจัดการพฤติกรรมระบบ Excel Filtering เชื่อมต่อเข้ากับ Window
 window.toggleExcelDropdown = function(colId) {
-  window.insightHubState.activeDropdown = (window.insightHubState.activeDropdown === colId) ? null : colId;
-  if (window.applyFilters) window.applyFilters();
-};
+    window.insightHubState.activeDropdown = (window.insightHubState.activeDropdown === colId) ? null : colId;
+    if (window.applyFilters) window.applyFilters();
+  };
 
-window.handleDropdownSearch = function(colId, value) {
-  window.insightHubState.excelSearchTerms[colId] = value;
-  
-  // จัดการอัปเดตชอยส์ลิสต์ย่อยในกล่อง Dropdown Menu บน DOM โดยตรงทันที เพื่อไม่ให้กระทบตำแหน่ง Cursor โฟกัสเวลากำลังพิมพ์
-  const activeMenu = document.querySelector(`.excel-dropdown-menu.show`);
-  if (activeMenu) {
-    const listContainer = activeMenu.querySelector('.excel-options-list');
+  // พิมพ์ค้นหาแล้วลิสต์ Checkbox ด้านล่างปรับเปลี่ยนทันทีโดยไม่รีเฟรชหน้าเว็บหรือย้าย Focus Cursor
+  window.handleDropdownSearch = function(colId, value) {
+    window.insightHubState.excelSearchTerms[colId] = value;
     
+    const listContainer = document.getElementById(`list-${colId}`);
+    if (!listContainer) return;
+
     const uniqueValues = Array.from(new Set(window.insightHubState.allCustomers.map(c => {
       if (colId === 'firstPurchaseDate') return c.firstPurchaseStr;
       if (colId === 'lastPurchaseDate') return c.lastPurchaseStr;
@@ -977,11 +991,11 @@ window.handleDropdownSearch = function(colId, value) {
     const filteredOpts = uniqueValues.filter(v => v.toLowerCase().includes(value.toLowerCase()));
     
     listContainer.innerHTML = filteredOpts.map(opt => {
-      const isChecked = currentSelected.length === 0 || currentSelected.includes(opt);
+      const isChecked = currentSelected.includes(opt);
       return `
         <li>
           <input type="checkbox" id="chk-${colId}-${opt.replace(/[^a-zA-Z0-9]/g, '_')}" ${isChecked ? 'checked' : ''} onchange="handleDropdownCheck('${colId}', '${opt.replace(/'/g, "\\'")}', this.checked)">
-          <label style="cursor:pointer; flex-grow:1;" for="chk-${colId}-${opt.replace(/[^a-zA-Z0-9]/g, '_')}">${opt || '(ว่าง)'}</label>
+          <label style="cursor:pointer; flex-grow:1; font-weight: normal;" for="chk-${columnId}-${opt.replace(/[^a-zA-Z0-9]/g, '_')}">${opt || '(ว่าง)'}</label>
         </li>
       `;
     }).join('');
@@ -989,13 +1003,24 @@ window.handleDropdownSearch = function(colId, value) {
     if (filteredOpts.length === 0) {
       listContainer.innerHTML = '<li style="color:#999; text-align:center; padding: 10px 0;">ไม่พบข้อมูล</li>';
     }
-  }
-};
+  };
 
-window.handleDropdownCheck = function(colId, value, isChecked) {
-  // หากพึ่งกดเริ่มเลือกเป็นครั้งแรก ให้ใส่ชอยส์ทั้งหมดที่มีตั้งต้นเป็นตัวสแตนด์บายก่อนหักออก
-  if (!window.insightHubState.excelFilters[colId] || window.insightHubState.excelFilters[colId].length === 0) {
-    window.insightHubState.excelFilters[colId] = Array.from(new Set(window.insightHubState.allCustomers.map(c => {
+  window.handleDropdownCheck = function(colId, value, isChecked) {
+    if (!window.insightHubState.excelFilters[colId]) {
+      window.insightHubState.excelFilters[colId] = [];
+    }
+    if (isChecked) {
+      if (!window.insightHubState.excelFilters[colId].includes(value)) {
+        window.insightHubState.excelFilters[colId].push(value);
+      }
+    } else {
+      window.insightHubState.excelFilters[colId] = window.insightHubState.excelFilters[colId].filter(v => v !== value);
+    }
+  };
+
+  // ฟังก์ชันคลิกปุ่ม "เลือกทั้งหมด" ในหน้าต่างย่อย
+  window.excelSelectAllRows = function(colId) {
+    const uniqueValues = Array.from(new Set(window.insightHubState.allCustomers.map(c => {
       if (colId === 'firstPurchaseDate') return c.firstPurchaseStr;
       if (colId === 'lastPurchaseDate') return c.lastPurchaseStr;
       if (colId === 'nextPurchaseDateObj') return c.nextPurchaseStr;
@@ -1005,29 +1030,34 @@ window.handleDropdownCheck = function(colId, value, isChecked) {
       if (colId === 'daysSinceLast') return c.daysSinceLastStr;
       return String(c[colId] || "").trim();
     })));
-  }
-  
-  if (isChecked) {
-    if (!window.insightHubState.excelFilters[colId].includes(value)) {
-      window.insightHubState.excelFilters[colId].push(value);
-    }
-  } else {
-    window.insightHubState.excelFilters[colId] = window.insightHubState.excelFilters[colId].filter(v => v !== value);
-  }
-};
+    
+    window.insightHubState.excelFilters[colId] = [...uniqueValues];
+    const filterSearchText = (window.insightHubState.excelSearchTerms[colId] || "");
+    window.handleDropdownSearch(colId, filterSearchText);
+  };
 
-window.clearExcelFilter = function(colId) {
-  delete window.insightHubState.excelFilters[colId];
-  delete window.insightHubState.excelSearchTerms[colId];
-  window.insightHubState.currentPage = 1;
-  if (window.applyFilters) window.applyFilters();
-};
+  // ฟังก์ชันคลิกปุ่ม "ล้าง" ในหน้าต่างย่อย
+  window.excelClearAllRows = function(colId) {
+    window.insightHubState.excelFilters[colId] = [];
+    const filterSearchText = (window.insightHubState.excelSearchTerms[colId] || "");
+    window.handleDropdownSearch(colId, filterSearchText);
+  };
 
-window.confirmExcelFilter = function() {
-  window.insightHubState.activeDropdown = null;
-  window.insightHubState.currentPage = 1;
-  if (window.applyFilters) window.applyFilters();
-};
+  // กดปุ่มยกเลิก -> ล้างค่าคัดกรองทั้งหมดของคอลัมน์นั้นและปิดดรอปดาวน์ทันที
+  window.clearExcelFilter = function(colId) {
+    delete window.insightHubState.excelFilters[colId];
+    delete window.insightHubState.excelSearchTerms[colId];
+    window.insightHubState.activeDropdown = null;
+    window.insightHubState.currentPage = 1;
+    if (window.applyFilters) window.applyFilters();
+  };
+
+  // กดปุ่มตกลง -> ปิดดรอปดาวน์และอัปเดตตารางหลัก
+  window.confirmExcelFilter = function() {
+    window.insightHubState.activeDropdown = null;
+    window.insightHubState.currentPage = 1;
+    if (window.applyFilters) window.applyFilters();
+  };
 
 window.resetHubFilters = function() {
   window.insightHubState = {
