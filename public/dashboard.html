@@ -496,12 +496,25 @@
       return mappedKey ? (row[mappedKey] || '').toString().trim() : '';
     }
 
+    // ==========================================
+    // 🛠️ แก้ไขประสิทธิภาพการค้นหารหัสลูกค้าให้รองรับทุกโครงสร้างไฟล์ (รวมถึง CustomerName และ Phone)
+    // ==========================================
     function getCustomerUniqueId(row) {
       const addr = getRowValue(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่', 'Address', 'address']);
       if (addr) {
         return addr.toString().toLowerCase().replace(/[\s\r\n\t\-,\.\/\\_]+/g, '');
       }
-      return getRowValue(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+      const phone = getRowValue(row, ['Phone', 'phone', 'เบอร์โทร', 'เบอร์']);
+      if (phone && phone !== 'xxxxxxx') {
+        return phone.toString().trim();
+      }
+      const custId = getRowValue(row, ['Customer ID', 'รหัสลูกค้า']);
+      if (custId) return custId.toString().trim();
+
+      const name = getRowValue(row, ['CustomerName', 'ชื่อลูกค้า', 'ชื่อ']);
+      if (name) return name.toString().toLowerCase().trim();
+
+      return '';
     }
 
     function parseDate(dateStr) {
@@ -542,17 +555,11 @@
       return true;
     }
 
-    // ==========================================
-    // 🔍 ปรับปรุงใหม่: ฟังก์ชันจำแนกแชนเนล (ให้แอบส่องใน Remark ถ้าหาคอลัมน์หลักไม่เจอ)
-    // ==========================================
     function getNormalizedChannel(rawChannel, row) {
       let ch = (rawChannel || '').toString().trim();
-      
-      // กรณีไฟล์ปี 2021 ที่ไม่มีคอลัมน์ช่องทางโดยตรง ให้เอาค่าจาก Remark/หมายเหตุ มาแกะหาคีย์เวิร์ดแทนค่ะ
       if (!ch && row) {
         ch = getRowValue(row, ['หมายเหตุ', 'Remark']);
       }
-      
       if (!ch) return 'Other';
       let lower = ch.toLowerCase();
       
@@ -574,7 +581,6 @@
       if (!sub || sub.toString().trim() === '') {
         sub = getRowValue(row, ['ช่องทาง', 'Channel']) || 'Other';
       }
-      // ถ้าไม่มีค่าเลย และเป็นไฟล์รูปแบบ Remark ให้ดึงจาก Remark มาส่องดูเบื้องต้น
       if ((sub === 'Other' || sub === '') && row) {
         let rem = getRowValue(row, ['หมายเหตุ', 'Remark']);
         if (rem) sub = rem;
@@ -646,9 +652,6 @@
       return 'Unknown';
     }
 
-    // ==========================================
-    // 🔍 ปรับปรุงใหม่: ฟังก์ชันแยกชื่อแอดมิน (ให้ดึงจากเศษชื่อหลังเครื่องหมายจุลภาคใน Remark ได้)
-    // ==========================================
     function getNormalizedAdmin(row) {
       if (!row) return 'Unknown';
       let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
@@ -664,7 +667,6 @@
       if (lower.includes('แอน')) return 'แอน';
       if (lower.includes('แอล')) return 'แอล';
       
-      // รองรับเคสข้อความยาว "FBH,แอน" หรือ "FBSS,แอน" ให้ตัดคำหลังจุลภาคมาตรวจจับ
       if (a.includes(',')) {
         let parts = a.split(',');
         let adminPart = parts[parts.length - 1].trim();
@@ -676,7 +678,6 @@
         if (lowerPart.includes('แอล')) return 'แอล';
         if (adminPart) return adminPart;
       }
-      
       return a;
     }
 
@@ -769,7 +770,6 @@
         const d = parseDate(dateStr);
         if (!d) return false;
         
-        // 💡 ส่งค่าวัตถุ row เข้าฟังก์ชัน เพื่อให้แกะหาช่องทางจากคอลัมน์สำรองได้ถูกต้อง
         const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
         const subChannel = getNormalizedSubChannel(row);
         
@@ -806,7 +806,6 @@
         const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
         
-        // 💡 ส่งค่าวัตถุ row เข้าฟังก์ชัน เพื่อให้ระบุ Channel ในขั้นตอนรวบรวมข้อมูลด้วยค่ะ
         const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
         const admin = getNormalizedAdmin(row);
         
@@ -854,6 +853,9 @@
       Object.values(charts).forEach(c => { if(c && c.data) { c.data.labels = []; c.update(); } });
     }
 
+    // ==========================================
+    // 🛠️ ปรับปรุงความแม่นยำในการนับยอดสะสมของลูกค้าในระบบ Dashboard
+    // ==========================================
     function renderDashboard() {
       if (availableMonths.length === 0) { renderEmpty(); return; }
       let focalMonths = availableMonths;
@@ -891,29 +893,31 @@
           });
         }
       });
+
+      // 🔍 ค้นหาจำนวนสะสมลูกค้าจากตัวแปรกรองข้อมูลจริงให้ตรงตามเงื่อนไข
       let totalEver = new Set();
-      rawData.forEach(row => {
-        if (!isSaleOrder(row)) return;
+      filteredData.forEach(row => {
         const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่', 'Address', 'address', 'วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
         if (d && d.str <= selectedMonthStr) totalEver.add(id);
       });
+
       let totalEverPrev = new Set();
       if (prev) {
-        rawData.forEach(row => {
-          if (!isSaleOrder(row)) return;
+        filteredData.forEach(row => {
           const id = getCustomerUniqueId(row);
-          const dateStr = getRowValue(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่', 'Address', 'address', 'วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+          const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
           if (!id || !dateStr) return;
           const d = parseDate(dateStr);
           if (d && d.str <= availableMonths[idx - 1]) totalEverPrev.add(id);
         });
       }
+
       const totalCust = totalEver.size;
       const activeCustThisMonth = curr.buyers.size;
-      const activePct = totalEver.size > 0 ? (activeCustThisMonth / totalEver.size) : 0;
+      const activePct = totalCust > 0 ? (activeCustThisMonth / totalCust) : 0;
       const prevActivePct = (prev && totalEverPrev.size > 0) ? (prevBuyers / totalEverPrev.size) : 0;
       const aov = curr.orders > 0 ? curr.sales / curr.orders : 0;
       const sph = activeCustThisMonth > 0 ? curr.sales / activeCustThisMonth : 0;
@@ -951,24 +955,18 @@
       const changeYTDNewEl = document.getElementById('change-ytd-new');
 
       if (filters.KPI === 'On') {
-        // เมื่อกด ON: แสดงแถบเปอร์เซ็นต์สีเขียว/แดง เพื่อเทียบกับข้อมูล Manual ที่พิมพ์มาจากหน้า KPI SETTING
         changeYTDSalesEl.style.display = 'inline-flex';
         changeYTDNewEl.style.display = 'inline-flex';
-        
-        // วิ่งไปเทียบข้อมูลจากตัวแปร window.kpiSettingsData ที่จะถูกส่งข้ามหน้ามาในอนาคตค่ะ
         updateChangeUI('change-ytd-sales', ytdSales, window.kpiSettingsData.salesYTD);
         updateChangeUI('change-total-cust', totalCust, window.kpiSettingsData.totalCust);
         updateChangeUI('change-ytd-new', ytdNew, window.kpiSettingsData.newCustYTD);
       } else {
-        // เมื่อเป็น OFF (ไม่ได้กดเลือก): ซ่อนแถบเปอร์เซ็นต์การเทียบเป้าหมายบนการ์ด YTD ออกไปทั้งหมดตามบรีฟ
         changeYTDSalesEl.style.display = 'none';
         changeYTDNewEl.style.display = 'none';
-        
-        // สำหรับการ์ด Total Customer คืนค่ากลับไปคำนวณเปรียบเทียบประวัติของเดือนก่อนหน้าตามโค้ดเดิมของคุณค่ะ
         updateChangeUI('change-total-cust', totalCust, prev ? totalEverPrev.size : 0);
       }
 
-      // --- ชุดโค้ดการจัดการโครงสร้างและข้อมูลของกราฟ 6 ตัวด้านล่างทำงานปกติ 100% ---
+      // --- ชุดโค้ดการจัดการโครงสร้างและข้อมูลของกราฟทำงานปกติ 100% ---
       const trendMonths = focalMonths.slice(-12);
       const salesData = trendMonths.map(m => monthlyData[m].sales);
       const newCustArr = [], retCustArr = [];
