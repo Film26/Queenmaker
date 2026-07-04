@@ -71,7 +71,6 @@
 <body>
   <div id="sidebarOverlay" class="sidebar-overlay" onclick="document.querySelector('.sidebar').classList.remove('active'); document.getElementById('sidebarOverlay').classList.remove('active');"></div>
   <div class="app-container">
-    <!-- Sidebar -->
     <aside class="sidebar">
       <button id="closeSidebar" class="close-sidebar" onclick="document.querySelector('.sidebar').classList.remove('active'); document.getElementById('sidebarOverlay').classList.remove('active');">
         <i class="fas fa-times"></i>
@@ -94,7 +93,6 @@
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-cog"></i>SETTINGS</a></li>
       </ul>
     </aside>
-    <!-- Main Content -->
     <main class="main-content" style="padding:0;">
       <header class="top-bar" style="background: transparent; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center;">
         <div style="display: flex; align-items: center; gap: 20px;">
@@ -121,7 +119,6 @@
           <button id="tab-retention" class="tab-btn" onclick="switchTab('retention')">Retention</button>
           <button id="tab-cohort" class="tab-btn" onclick="switchTab('cohort')">Cohort Heatmap</button>
         </div>
-        <!-- Global Filters Bar -->
         <div class="filters-bar">
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Month" onclick="toggleFilter('menu-Month')">Month: <span id="lbl-Month">All</span> <i class="fas fa-caret-down"></i></button>
@@ -151,15 +148,21 @@
             <button class="filter-btn-new" id="btn-Admin" onclick="toggleFilter('menu-Admin')">Admin: <span id="lbl-Admin">All</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Admin" class="filter-content"></div>
           </div>
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-KPI" onclick="toggleFilter('menu-KPI')">KPI Compare: <span id="lbl-KPI">Off</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-KPI" class="filter-content">
+              <div onclick="setFilter('KPI', 'Off')">Off (ไม่เปรียบเทียบ)</div>
+              <div onclick="setFilter('KPI', 'On')">On (เปิดเทียบ KPI)</div>
+            </div>
+          </div>
           <button id="clearFiltersBtn" class="clear-filters-btn" onclick="clearFilters()">Clear Filters</button>
         </div>
-        <!-- Main Overview View -->
         <div id="view-overview">
           <div class="cards-grid">
-            <!-- Row 1 -->
             <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title" id="title-ytd-sales">ยอดขาย YTD (บาท)</div></div>
               <div class="kpi-val" id="val-ytd-sales">฿0</div>
+              <div><span class="kpi-change-new neutral" id="change-ytd-sales" style="display:none;">-</span></div>
             </div>
             
             <div class="kpi-card grid-span-1">
@@ -171,6 +174,7 @@
             <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title">YTD New Customers (คน)</div></div>
               <div class="kpi-val" id="val-ytd-new">0</div>
+              <div><span class="kpi-change-new neutral" id="change-ytd-new" style="display:none;">-</span></div>
             </div>
 
             <div class="kpi-card grid-span-1">
@@ -179,7 +183,6 @@
               <div><span class="kpi-change-new neutral" id="change-aov">-</span></div>
             </div>
 
-            <!-- Row 2 -->
             <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title" id="title-sales">ยอดขายประจำเดือน (บาท)</div></div>
               <div class="kpi-val" id="val-sales">฿0</div>
@@ -204,7 +207,6 @@
               <div><span class="kpi-change-new neutral" id="change-ret-cust">-</span></div>
             </div>
 
-            <!-- Row 3 -->
             <div class="kpi-card grid-span-2">
               <div class="kpi-header"><div class="kpi-title">Spending per Head (ยอดเฉลี่ยต่อคน)</div></div>
               <div class="kpi-val" id="val-sph">฿0</div>
@@ -219,7 +221,6 @@
           </div>
 
           <div class="charts-grid">
-            <!-- Row 1 -->
             <div class="chart-box grid-span-1">
               <div class="chart-title">ยอดขาย (บาท)</div>
               <div class="chart-container"><canvas id="chart-sales"></canvas></div>
@@ -230,7 +231,6 @@
               <div class="chart-container"><canvas id="chart-ret-new-stacked"></canvas></div>
             </div>
 
-            <!-- Row 2 -->
             <div class="chart-box grid-span-1">
               <div class="chart-title">ลูกค้าใหม่ (คน)</div>
               <div class="chart-container"><canvas id="chart-new"></canvas></div>
@@ -241,7 +241,6 @@
               <div class="chart-container"><canvas id="chart-ret"></canvas></div>
             </div>
 
-            <!-- Row 3 -->
             <div class="chart-box grid-span-1">
               <div class="chart-title">สัดส่วนยอดขายแต่ละ Channel (บาท)</div>
               <div class="chart-container"><canvas id="chart-channel"></canvas></div>
@@ -253,19 +252,13 @@
             </div>
           </div>
         </div>
-        <!-- Cohort Heatmap View -->
         <div id="view-cohort" style="display:none; padding: 20px; background: #fff; border-radius: 16px; margin-top: 20px; overflow-x: auto; min-height: 500px;">
-          <!-- Cohort table will be injected here by cohort.js -->
-        </div>
-        <!-- Executive1 View -->
+          </div>
         <div id="view-executive1" class="view-content" style="display:none; padding: 20px;"></div>
       
-        <!-- Executive2 View -->
         <div id="view-executive2" class="view-content" style="display:none; padding: 20px; background-color: #f8f9fa;"></div>
       
-        <!-- Retention View -->
         <div id="view-retention" class="view-content" style="display:none; padding: 20px;"></div>
-        <!-- Customer Insight Hub View -->
         <div id="view-insighthub" class="view-content" style="display:none; padding: 20px;"></div>
       
       </div>
@@ -282,12 +275,16 @@
     let rawData = [];
     let filteredData = [];
     
-    let filters = { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All' };
+    // เพิ่มตัวแปรสถานะ 'KPI' เข้าในชุด Filters หลักของโค้ดคุณ
+    let filters = { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All', KPI: 'Off' };
     let monthlyData = {}; 
     let globalFirstPurchase = {}; 
     let availableMonths = [];
     let charts = {};
     const keyCache = {};
+
+    // คลังเก็บข้อมูลจำลองเป้าหมาย KPI สำหรับคำนวณเปรียบเทียบในอนาคต
+    const kpiTargets = { salesYTD: 5000000, totalCust: 10000, newCustYTD: 3000 };
 
     function precomputeGlobalFirstPurchases() {
       globalFirstPurchase = {};
@@ -323,14 +320,13 @@
             showLoading(true);
             Papa.parse(file, {
               header: true,
-              skipEmptyLines: true, // ตัดแถวว่างตั้งแต่ตอนโหลด
+              skipEmptyLines: true, 
               complete: (results) => {
                 try {
                   for (let k in keyCache) delete keyCache[k];
                   window.userCohorts = null;
                   window.scFirstPurchase = null;
                   
-                  // คลีนแถวขยะออกให้หมดก่อนประมวลผล
                   rawData = results.data.filter(row => {
                     if (!row) return false;
                     return Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
@@ -342,7 +338,7 @@
                   console.error(err);
                   alert('เกิดข้อผิดพลาดในการประมวลผลข้อมูล');
                 } finally {
-                  showLoading(false); // การันตีว่าตัวหมุนต้องปิดเสมอ
+                  showLoading(false); 
                 }
               },
               error: (err) => { console.error(err); showLoading(false); alert('Error parsing CSV'); }
@@ -520,7 +516,7 @@
           d = p0; m = p1; y = p2;
           if (y < 2000) y += 2000;
         }
-        if (y > 2500) y -= 543; // แปลง พ.ศ. เป็น ค.ศ. ถ้าจำเป็น
+        if (y > 2500) y -= 543; 
         return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
       }
       return null;
@@ -541,20 +537,22 @@
       return true;
     }
 
-    // --- Normalization functions ---
+    // ==========================================
+    // 🔍 ปรับปรุงฟังก์ชันการดึงข้อมูลและจำแนกกลุ่ม Channel ให้สมบูรณ์แบบ
+    // ==========================================
     function getNormalizedChannel(rawChannel) {
       let ch = (rawChannel || '').toString().trim();
       if (!ch) return 'Other';
       let lower = ch.toLowerCase();
       
-      // ตรวจสอบเช็กคำหลัก
-      if (lower.includes('facebook') || lower === 'fb') return 'Facebook';
-      if (lower.includes('line')) return 'Line'; // รวบ Line และ Line OA ไว้ด้วยกัน
-      if (lower.includes('tiktok')) return 'Tiktok';
-      if (lower.includes('shopee')) return 'Shopee';
-      if (lower.includes('lazada')) return 'Lazada';
+      // ดักจับคำหลักแบบ .includes ป้องกันกรณีคำมีตัวอักษรพิเศษหรือชื่อยาวต่อท้าย
+      if (lower.includes('facebook') || lower === 'fb' || lower.includes('เพจ')) return 'Facebook';
+      if (lower.includes('line')) return 'Line'; 
+      if (lower.includes('tiktok') || lower === 'tt') return 'Tiktok';
+      if (lower.includes('shopee') || lower === 'shp' || lower === 'sp') return 'Shopee';
+      if (lower.includes('lazada') || lower === 'lzd' || lower === 'laz') return 'Lazada';
       if (lower.includes('ig') || lower.includes('instagram')) return 'Instagram';
-      if (lower.includes('call') || lower.includes('phone')) return 'Call';
+      if (lower.includes('call') || lower.includes('phone') || lower.includes('โทร')) return 'Call';
       if (lower.includes('crm')) return 'CRM';
       if (lower.includes('other')) return 'Other';
       
@@ -606,14 +604,13 @@
       if (!p) return 'Unknown';
       let lower = p.toLowerCase();
 
-      // เช็กตามเงื่อนไข FORMULA_MAP และคีย์เวิร์ดภาษาไทย
       if (lower.includes('plus') || lower.includes('พลัส')) return 'Plus';
       if (lower.includes('gold') || lower.includes('โกลด์')) return 'Gold';
       if (lower.includes('wiss') || lower.includes('วิสส์')) return 'Wiss';
       if (lower.includes('kides') || lower.includes('คิดส์')) return 'Kides';
       if (lower.includes('collagen') || lower.includes('คลอลาเจน') || lower.includes('คอลลาเจน')) return 'Collagen';
 
-      return 'Unknown'; // หากไม่ตรงกับกลุ่มไหนเลยให้ปัดเป็น Unknown
+      return 'Unknown'; 
     }
     
     function getNormalizedSubProduct(rawProductName) {
@@ -630,7 +627,7 @@
       if (lower.includes('plus') || lower.includes('พลัส')) return 'Plus';
       if (lower.includes('gold') || lower.includes('โกลด์')) return 'Gold';
       if (lower.includes('wiss') || lower.includes('วิสส์')) return 'Wiss';
-      if (lower.includes('collagen') || lower.includes('คลอลาเจน') || lower.includes('คอลลาเจน')) return 'Callagen'; // ใช้ตัวสะกด Callagen ตามที่แจ้งมาค่ะ
+      if (lower.includes('collagen') || lower.includes('คลอลาเจน') || lower.includes('คอลลาเจน')) return 'Callagen'; 
 
       return 'Unknown';
     }
@@ -649,6 +646,7 @@
       if (lower.includes('แอล')) return 'แอล';
       return a;
     }
+
     // --- Dropdowns & Filters Logic ---
     function populateDropdowns() {
       const yearsSet = new Set();
@@ -669,7 +667,7 @@
         SubProduct: ['Plus', 'Gold', 'Wiss', 'Kides original', 'Kidesส้ม', 'Kides แตงโม', 'Callagen'],
         Admin: ['May', 'บี', 'มิ้ว', 'แอน', 'แอล']
      };
-     // 3. สร้างปุ่มตัวเลือกสำหรับ Year
+
       const yearMenu = document.getElementById('menu-Year');
       if (yearMenu) {
         yearMenu.innerHTML = `<div onclick="setFilter('Year', 'All')">All</div>`;
@@ -697,12 +695,13 @@
         });
       });
     }
+
     function setFilter(type, val) {
       filters[type] = val;
       document.getElementById('lbl-' + type).textContent = val;
       document.getElementById('menu-' + type).classList.remove('show');
       
-      if (val !== 'All') {
+      if (val !== 'All' && val !== 'Off') {
         document.getElementById('btn-' + type).classList.add('active');
         if(document.getElementById('clearFilterBtn')) {
           document.getElementById('clearFilterBtn').style.display = 'inline-block';
@@ -720,6 +719,11 @@
         document.getElementById('btn-' + type).classList.remove('active');
       });
       
+      // รีเซ็ตค่า KPI เสมอเมื่อกดล้าง
+      filters['KPI'] = 'Off';
+      document.getElementById('lbl-KPI').textContent = 'Off';
+      document.getElementById('btn-KPI').classList.remove('active');
+
       if(document.getElementById('clearFilterBtn')) {
         document.getElementById('clearFilterBtn').style.display = 'none';
       }
@@ -885,10 +889,10 @@
       const titleSalesEl = document.getElementById('title-sales');
       if (titleSalesEl) titleSalesEl.textContent = `ยอดขายประจำเดือน ${monthName}`;
 
+      // เรนเดอร์ข้อมูลค่าหลักแสดงผลปกติบน Dashboard
       document.getElementById('val-sales').textContent = formatCurrency(curr.sales);
       updateChangeUI('change-sales', curr.sales, prevSales);
       document.getElementById('val-total-cust').textContent = totalCust.toLocaleString() + ' คน';
-      updateChangeUI('change-total-cust', totalCust, prev ? totalEverPrev.size : 0);
       document.getElementById('val-active-cust').textContent = (activePct * 100).toFixed(1) + '%';
       updateChangeUI('change-active-cust', activePct, prevActivePct);
       document.getElementById('val-ytd-sales').textContent = formatCurrency(ytdSales);
@@ -904,6 +908,29 @@
       document.getElementById('val-repeat').textContent = repeat.toFixed(2) + ' ครั้ง';
       updateChangeUI('change-repeat', repeat, prevRepeat);
       
+      // ==========================================
+      // 💡 โลจิกควบคุมการแสดงผลและเปรียบเทียบ KPI ตามเงื่อนไขของตัวเลือก
+      // ==========================================
+      const changeYTDSalesEl = document.getElementById('change-ytd-sales');
+      const changeTotalCustEl = document.getElementById('change-total-cust');
+      const changeYTDNewEl = document.getElementById('change-ytd-new');
+
+      if (filters.KPI === 'On') {
+        // เมื่อเปิดใช้งาน KPI: คำนวณความคืบหน้าเทียบเป้าหมาย และแสดงแถบเปอร์เซ็นต์
+        changeYTDSalesEl.style.display = 'inline-flex';
+        changeYTDNewEl.style.display = 'inline-flex';
+        
+        updateChangeUI('change-ytd-sales', ytdSales, kpiTargets.salesYTD);
+        updateChangeUI('change-total-cust', totalCust, kpiTargets.totalCust);
+        updateChangeUI('change-ytd-new', ytdNew, kpiTargets.newCustYTD);
+      } else {
+        // เมื่อปิดใช้งาน KPI: ซ่อนแถบเปอร์เซ็นต์บนการ์ด YTD และคืนค่า Total Customer เทียบเดือนก่อนหน้าแบบดั้งเดิม
+        changeYTDSalesEl.style.display = 'none';
+        changeYTDNewEl.style.display = 'none';
+        
+        updateChangeUI('change-total-cust', totalCust, prev ? totalEverPrev.size : 0);
+      }
+
       const trendMonths = focalMonths.slice(-12);
       const salesData = trendMonths.map(m => monthlyData[m].sales);
       const newCustArr = [], retCustArr = [];
