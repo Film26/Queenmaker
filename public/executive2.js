@@ -133,14 +133,42 @@ function renderExecutive2(filteredData, rawData) {
     let chStr = normalizeKey(`${rawCh} ${rawRemark}`).toUpperCase().replace(/\s+/g, '');
 
     // เช็กเงื่อนไขจัดกลุ่ม (ตัดช่องว่างออกแล้ว เช็กคำที่ติดกันได้เลย)
+    // 💡 รองรับทั้งคำภาษาอังกฤษ (brand name ตรงๆ) และคำไทย/คำทับศัพท์ที่มักพิมพ์ในคอลัมน์หมายเหตุ
     if (chStr.includes('CRM')) return 'CRM';
-    if (chStr.includes('SHOPEE') || chStr.includes('SHP') || chStr.includes('SP')) return 'Shopee';
-    if (chStr.includes('LAZADA') || chStr.includes('LZD') || chStr.includes('LAZ')) return 'Lazada';
-    if (chStr.includes('LINE')) return 'Line';
-    if (chStr.includes('PHONE') || chStr.includes('CALL') || chStr.includes('โทร')) return 'Call';
-    if (chStr.includes('TIKTOK') || chStr.includes('TT')) return 'Tiktok';
-    if (chStr.includes('FACEBOOK') || chStr.includes('FB') || chStr.includes('เพจ')) return 'Facebook';
-    if (chStr.includes('INSTAGRAM') || chStr.includes('IG')) return 'Instagram';
+
+    if (chStr.includes('SHOPEE') || chStr.includes('SHP') || chStr.includes('SP') ||
+        chStr.includes('ช้อปปี้') || chStr.includes('ช็อปปี้') || chStr.includes('ชอปปี้') || chStr.includes('ช้อป')) {
+      return 'Shopee';
+    }
+
+    if (chStr.includes('LAZADA') || chStr.includes('LZD') || chStr.includes('LAZ') ||
+        chStr.includes('ลาซาด้า') || chStr.includes('ลาซด้า') || chStr.includes('ลาซาด้า') || chStr.includes('ลาซ')) {
+      return 'Lazada';
+    }
+
+    if (chStr.includes('LINE') || chStr.includes('ไลน์') || chStr.includes('ไลน')) {
+      return 'Line';
+    }
+
+    if (chStr.includes('PHONE') || chStr.includes('CALL') ||
+        chStr.includes('โทร') || chStr.includes('โทรศัพท์') || chStr.includes('โทรเข้า') || chStr.includes('โทรสั่ง')) {
+      return 'Call';
+    }
+
+    if (chStr.includes('TIKTOK') || chStr.includes('TT') ||
+        chStr.includes('ติ๊กต๊อก') || chStr.includes('ติ๊กต็อก') || chStr.includes('ติ้กต็อก')) {
+      return 'Tiktok';
+    }
+
+    if (chStr.includes('FACEBOOK') || chStr.includes('FB') ||
+        chStr.includes('เพจ') || chStr.includes('เฟส') || chStr.includes('เฟสบุ๊ค') || chStr.includes('เฟซบุ๊ก') || chStr.includes('เฟซบุค')) {
+      return 'Facebook';
+    }
+
+    if (chStr.includes('INSTAGRAM') || chStr.includes('IG') ||
+        chStr.includes('ไอจี') || chStr.includes('อินสตาแกรม') || chStr.includes('อินสตราแกรม') || chStr.includes('อินสตาร์แกรม')) {
+      return 'Instagram';
+    }
 
     return 'Other';
   }
@@ -190,9 +218,9 @@ function renderExecutive2(filteredData, rawData) {
   const customerChannelFirstDates = {};
 
   dataSrc.forEach(row => {
-    const rev = extractRevenue(row);
-    if (rev <= 0) return;
-
+    // 💡 ไม่กรองด้วยยอดขายอีกต่อไป เพราะออเดอร์ Shopee/Lazada ในไฟล์ Raw Data
+    // มักไม่มียอดเงินบันทึกมาด้วย (มีแค่รายการ/จำนวนสินค้า) แต่ยังถือเป็นออเดอร์ที่เกิดขึ้นจริง
+    // เกณฑ์การนับแถวจึงใช้แค่ "มี Customer ID" และ "มีวันที่ใช้ได้" เท่านั้น
     const id = getLocalCustomerId(row);
     if (!id) return;
     
@@ -217,18 +245,21 @@ function renderExecutive2(filteredData, rawData) {
   });
 
   dataSrc.forEach(row => {
-    const rev = extractRevenue(row);
-    if (rev <= 0) return;
-
-    const ch = getExec2Group(row);
+    // 💡 เช่นเดียวกับ loop ด้านบน: ไม่ตัดแถวทิ้งเพราะยอดขาย = 0
+    // เกณฑ์การนับว่าเป็น "ออเดอร์/ผู้ซื้อ" ใช้แค่ต้องมี Customer ID
+    // ส่วนยอดขาย (revenue) จะบวกเท่าที่มีข้อมูลจริง — ถ้าไม่มีก็บวก 0 ไม่กระทบยอดรวม
     const id = getLocalCustomerId(row);
+    if (!id) return;
+
+    const rev = extractRevenue(row);
+    const ch = getExec2Group(row);
     const dateStr = getValue(row, 'OrderDate') || getValue(row, 'OrderData') || getValue(row, 'วันที่โอนเงิน') || getValue(row, 'วันที่สร้าง');
     const d = parseD(dateStr);
 
     let targetCh = agg[ch] ? ch : 'Other';
     
     agg[targetCh].revenue += rev;
-    if (id) agg[targetCh].buyers.add(id);
+    agg[targetCh].buyers.add(id);
 
     if (id && d) {
       const globalFirst = customerFirstDates[id];
