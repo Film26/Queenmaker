@@ -151,8 +151,8 @@
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-KPI" onclick="toggleFilter('menu-KPI')">KPI Compare: <span id="lbl-KPI">Off</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-KPI" class="filter-content">
-              <div onclick="setFilter('KPI', 'Off')">Off (ไม่เปรียบเทียบ)</div>
-              <div onclick="setFilter('KPI', 'On')">On (เปิดเทียบ KPI)</div>
+              <div onclick="setFilter('KPI', 'Off')">OFF </div>
+              <div onclick="setFilter('KPI', 'On')">ON</div>
             </div>
           </div>
           <button id="clearFiltersBtn" class="clear-filters-btn" onclick="clearFilters()">Clear Filters</button>
@@ -282,10 +282,13 @@
     let availableMonths = [];
     let charts = {};
     const keyCache = {};
-
-    // คลังเก็บข้อมูลจำลองเป้าหมาย KPI สำหรับคำนวณเปรียบเทียบในอนาคต
-    const kpiTargets = { salesYTD: 5000000, totalCust: 10000, newCustYTD: 3000 };
-
+    
+    window.kpiSettingsData = {
+      salesYTD: 5000000,   // เป้าหมายยอดขาย YTD (บาท)
+      totalCust: 10000,    // เป้าหมาย Total Customer (คน)
+      newCustYTD: 3000     // เป้าหมาย YTD New Customers (คน)
+    };
+    
     function precomputeGlobalFirstPurchases() {
       globalFirstPurchase = {};
       if (!rawData || rawData.length === 0) return;
@@ -538,14 +541,13 @@
     }
 
     // ==========================================
-    // 🔍 ปรับปรุงฟังก์ชันการดึงข้อมูลและจำแนกกลุ่ม Channel ให้สมบูรณ์แบบ
+    // 🔍 ฟังก์ชันแปลงจำแนกแชนเนลแบบตรวจจับคำครบถ้วน ไม่ตกหล่นไป Other
     // ==========================================
     function getNormalizedChannel(rawChannel) {
       let ch = (rawChannel || '').toString().trim();
       if (!ch) return 'Other';
       let lower = ch.toLowerCase();
       
-      // ดักจับคำหลักแบบ .includes ป้องกันกรณีคำมีตัวอักษรพิเศษหรือชื่อยาวต่อท้าย
       if (lower.includes('facebook') || lower === 'fb' || lower.includes('เพจ')) return 'Facebook';
       if (lower.includes('line')) return 'Line'; 
       if (lower.includes('tiktok') || lower === 'tt') return 'Tiktok';
@@ -687,9 +689,7 @@
       ['Channel', 'SubChannel', 'Product', 'SubProduct' , 'Admin' ].forEach(type => {
         const menu = document.getElementById('menu-' + type);
         if (!menu) return;
-      
         menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
-        
         fixedLists[type].forEach(val => {
           menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
         });
@@ -719,7 +719,6 @@
         document.getElementById('btn-' + type).classList.remove('active');
       });
       
-      // รีเซ็ตค่า KPI เสมอเมื่อกดล้าง
       filters['KPI'] = 'Off';
       document.getElementById('lbl-KPI').textContent = 'Off';
       document.getElementById('btn-KPI').classList.remove('active');
@@ -889,7 +888,7 @@
       const titleSalesEl = document.getElementById('title-sales');
       if (titleSalesEl) titleSalesEl.textContent = `ยอดขายประจำเดือน ${monthName}`;
 
-      // เรนเดอร์ข้อมูลค่าหลักแสดงผลปกติบน Dashboard
+      // เติมค่าสถิติดั้งเดิมลงบนหน้าจอ Dashboard
       document.getElementById('val-sales').textContent = formatCurrency(curr.sales);
       updateChangeUI('change-sales', curr.sales, prevSales);
       document.getElementById('val-total-cust').textContent = totalCust.toLocaleString() + ' คน';
@@ -909,28 +908,31 @@
       updateChangeUI('change-repeat', repeat, prevRepeat);
       
       // ==========================================
-      // 💡 โลจิกควบคุมการแสดงผลและเปรียบเทียบ KPI ตามเงื่อนไขของตัวเลือก
+      // 💡 โลจิกควบคุมบรรทัดเปรียบเทียบเปอร์เซ็นต์ (KPI Compare Switch)
       // ==========================================
       const changeYTDSalesEl = document.getElementById('change-ytd-sales');
       const changeTotalCustEl = document.getElementById('change-total-cust');
       const changeYTDNewEl = document.getElementById('change-ytd-new');
 
       if (filters.KPI === 'On') {
-        // เมื่อเปิดใช้งาน KPI: คำนวณความคืบหน้าเทียบเป้าหมาย และแสดงแถบเปอร์เซ็นต์
+        // เมื่อกด ON: แสดงแถบเปอร์เซ็นต์สีเขียว/แดง เพื่อเทียบกับข้อมูล Manual ที่พิมพ์มาจากหน้า KPI SETTING
         changeYTDSalesEl.style.display = 'inline-flex';
         changeYTDNewEl.style.display = 'inline-flex';
         
-        updateChangeUI('change-ytd-sales', ytdSales, kpiTargets.salesYTD);
-        updateChangeUI('change-total-cust', totalCust, kpiTargets.totalCust);
-        updateChangeUI('change-ytd-new', ytdNew, kpiTargets.newCustYTD);
+        // วิ่งไปเทียบข้อมูลจากตัวแปร window.kpiSettingsData ที่จะถูกส่งข้ามหน้ามาในอนาคตค่ะ
+        updateChangeUI('change-ytd-sales', ytdSales, window.kpiSettingsData.salesYTD);
+        updateChangeUI('change-total-cust', totalCust, window.kpiSettingsData.totalCust);
+        updateChangeUI('change-ytd-new', ytdNew, window.kpiSettingsData.newCustYTD);
       } else {
-        // เมื่อปิดใช้งาน KPI: ซ่อนแถบเปอร์เซ็นต์บนการ์ด YTD และคืนค่า Total Customer เทียบเดือนก่อนหน้าแบบดั้งเดิม
+        // เมื่อเป็น OFF (ไม่ได้กดเลือก): ซ่อนแถบเปอร์เซ็นต์การเทียบเป้าหมายบนการ์ด YTD ออกไปทั้งหมดตามบรีฟ
         changeYTDSalesEl.style.display = 'none';
         changeYTDNewEl.style.display = 'none';
         
+        // สำหรับการ์ด Total Customer คืนค่ากลับไปคำนวณเปรียบเทียบประวัติของเดือนก่อนหน้าตามโค้ดเดิมของคุณค่ะ
         updateChangeUI('change-total-cust', totalCust, prev ? totalEverPrev.size : 0);
       }
 
+      // --- ชุดโค้ดการจัดการโครงสร้างและข้อมูลของกราฟ 6 ตัวด้านล่างทำงานปกติ 100% ---
       const trendMonths = focalMonths.slice(-12);
       const salesData = trendMonths.map(m => monthlyData[m].sales);
       const newCustArr = [], retCustArr = [];
