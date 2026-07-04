@@ -7,7 +7,7 @@ if (!window.insightHubState) {
     searchTerm: "",
     sortColumn: "totalRevenue",
     sortAsc: false,
-    // ระบบ Excel-Style Filter สำหรับเก็บค่าที่เลือกในแต่ละคอลัมน์เดิม
+    // ระบบ Excel-Style Filter สำหรับผูกเข้ากับคอลัมน์เวอร์ชันดั้งเดิมของคุณ
     excelFilters: {
       customerName: [],
       phone: [],
@@ -25,7 +25,7 @@ if (!window.insightHubState) {
   };
 }
 
-// Product Refill Window Day lookup จากโครงสร้างเดิม
+// Product Refill Window Day จากเวอร์ชันเดิมของคุณ
 const productConfig = {
   "COLLAGEN = 3": 21, "COLLAGEN = 4": 28, "COLLAGEN = 6": 42, "COLLAGEN = 9": 63, "COLLAGEN = 50": 350,
   "GOLD = 2": 20, "GOLD = 3": 30, "GOLD = 6": 60, "GOLD = 9": 90, "GOLD=10": 100, "GOLD = 10": 100, "GOLD = 50": 500,
@@ -48,7 +48,6 @@ function getRefillDays(productStr) {
   return 30;
 }
 
-// ฟังก์ชันดึงค่าแถวแบบยืดหยุ่นภาษาดั้งเดิม
 function getInsightRowValue(row, possibleKeys) {
   if (!row) return '';
   const rowKeys = Object.keys(row);
@@ -94,7 +93,7 @@ function parseInsightDate(dateStr) {
   return null;
 }
 
-// ฟังก์ชันคำนวณข้อมูลตามโครงสร้างเดิมทั้งหมด
+// Logic ประมวลผลจากเวอร์ชันดั้งเดิมของคุณทั้งหมด
 function renderInsightHub(filteredData, rawData) {
   const targetData = (filteredData && filteredData.length > 0) ? filteredData : rawData;
   if (!targetData || targetData.length === 0) {
@@ -186,31 +185,32 @@ function renderInsightHub(filteredData, rawData) {
   buildInsightHubLayout();
 }
 
-// ยึด Layout และสไตล์เดิมกลับมาทั้งหมด 100%
+// โครงสร้างหน้าตาและ Layout เวอร์ชันดั้งเดิมของคุณ 100%
 function buildInsightHubLayout() {
   const container = document.getElementById('view-insighthub');
   if (!container) return;
 
   container.innerHTML = `
-    <div class="insight-hub-container" style="background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
-      <div class="insight-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div class="insight-hub-container" style="background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+      <div class="insight-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
         <div>
-          <h2 style="margin: 0; font-size: 18px; color: #1e293b; font-weight: 600;">Customer Insight Hub</h2>
-          <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b;">วิเคราะห์และแบ่งกลุ่มพฤติกรรมลูกค้าสำหรับการทำ CRM เจาะลึก</p>
+          <h2 style="margin: 0; font-size: 18px; color: #333;">Customer Insight Hub</h2>
+          <p style="margin: 2px 0 0 0; font-size: 12px; color: #666;">วิเคราะห์และแบ่งกลุ่มพฤติกรรมลูกค้าสำหรับการทำ CRM เจาะลึก</p>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center;">
+        <div style="display: flex; gap: 8px; align-items: center;">
           <input type="text" id="insightGlobalSearch" placeholder="ค้นหาชื่อลูกค้า, เบอร์โทร..." value="${window.insightHubState.searchTerm}" 
-            style="padding: 6px 12px; font-size: 13px; border: 1px solid #ddd; border-radius: 6px; width: 220px;" />
-          <button onclick="clearAllExcelFilters()" style="padding: 6px 12px; font-size: 13px; background: #f1f5f9; border: none; border-radius: 6px; color: #475569; cursor: pointer;">
+            style="padding: 5px 10px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; width: 200px;" />
+          <button onclick="clearAllExcelFilters()" style="padding: 5px 10px; font-size: 12px; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; color: #333; cursor: pointer;">
             ล้างการกรองทั้งหมด
           </button>
         </div>
       </div>
 
-      <div style="overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 8px;" id="excelTableContainer">
-         </div>
+      <div style="overflow-x: auto; border: 1px solid #ddd; border-radius: 4px;" id="excelTableContainer">
+         <!-- ตารางรูปแบบดั้งเดิมของคุณจะวาดตรงนี้ -->
+      </div>
 
-      <div id="insightPagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; font-size: 13px; color: #64748b;"></div>
+      <div id="insightPagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; font-size: 12px; color: #666;"></div>
     </div>
     <div id="customerProfileModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); z-index:9999; justify-content:center; align-items:center;"></div>
   `;
@@ -240,7 +240,7 @@ function applyExcelFiltersAndRender() {
     );
   }
 
-  // ใช้ Excel Filter คัดกรองรายคอลัมน์ดั้งเดิม
+  // นำเงื่อนไข Excel Filter มาร่วมคัดกรองข้อมูลรายคอลัมน์ดั้งเดิม
   Object.keys(state.excelFilters).forEach(colKey => {
     const selectedValues = state.excelFilters[colKey];
     if (selectedValues && selectedValues.length > 0) {
@@ -270,12 +270,12 @@ function applyExcelFiltersAndRender() {
   renderInsightPaginationUI(totalRows, totalPages, startIdx, pageData.length);
 }
 
-// คืนค่าหัวตารางเดิมและโครงสร้างเดิมทั้งหมด เพิ่มเฉพาะปุ่มกรอง Filter รูปกรวย (Excel Style) 
+// ตารางเวอร์ชันดั้งเดิมของคุณทุกคอลัมน์ (ยึดตามเวอร์ชันที่คุณส่งมาเป๊ะๆ) เพิ่มแค่ปุ่มไอคอนกรองฟิลเตอร์สไตล์ Excel บนหัวตาราง
 function renderExcelTable(pageData) {
   const container = document.getElementById('excelTableContainer');
   if (!container) return;
 
-  // โครงสร้างคอลัมน์เดิมของ Insight Hub เป๊ะ ๆ
+  // โครงสร้างลำดับคอลัมน์ดั้งเดิมเวอร์ชันคุณเป๊ะๆ 100%
   const columns = [
     { key: "customerName", label: "ชื่อลูกค้า" },
     { key: "phone", label: "เบอร์โทรศัพท์" },
@@ -290,17 +290,17 @@ function renderExcelTable(pageData) {
   ];
 
   let html = `
-    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
       <thead>
-        <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+        <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
   `;
 
   columns.forEach(col => {
     const isFiltered = window.insightHubState.excelFilters[col.key].length > 0;
-    const filterColor = isFiltered ? "#d95f1d" : "#94a3b8";
+    const filterColor = isFiltered ? "#ff6b00" : "#999";
     
     html += `
-      <th style="padding: 12px 10px; color: #475569; font-weight: 600; white-space: nowrap; border-right: 1px solid #e2e8f0; position: relative;">
+      <th style="padding: 10px; color: #333; font-weight: bold; white-space: nowrap; border-right: 1px solid #ddd; position: relative;">
         <span onclick="toggleInsightSort('${col.key}')" style="cursor: pointer; user-select: none; margin-right: 3px;">
           ${col.label} ${window.insightHubState.sortColumn === col.key ? (window.insightHubState.sortAsc ? '🔼' : '🔽') : ''}
         </span>
@@ -308,7 +308,8 @@ function renderExcelTable(pageData) {
           <i class="fas fa-filter"></i>
         </button>
         
-        <div id="excelDrop-${col.key}" class="excel-filter-menu" style="display: none; position: absolute; top: 35px; left: 5px; background: #fff; border: 1px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 6px; z-index: 9999; min-width: 170px; max-height: 250px; overflow-y: auto; padding: 8px; font-weight: normal;">
+        <!-- กล่องเมนูป๊อปอัพตัวเลือกในการกรอง Filter รายคอลัมน์สไตล์ตาราง Excel -->
+        <div id="excelDrop-${col.key}" class="excel-filter-menu" style="display: none; position: absolute; top: 32px; left: 5px; background: #fff; border: 1px solid #ccc; box-shadow: 0 2px 10px rgba(0,0,0,0.15); border-radius: 4px; z-index: 9999; min-width: 160px; max-height: 240px; overflow-y: auto; padding: 8px; font-weight: normal; text-align: left;">
         </div>
       </th>
     `;
@@ -321,33 +322,33 @@ function renderExcelTable(pageData) {
   `;
 
   if (pageData.length === 0) {
-    html += `<tr><td colspan="${columns.length}" style="padding: 30px; text-align: center; color: #94a3b8;">ไม่พบข้อมูลรายการที่ค้นหาหรือตัวกรอง</td></tr>`;
+    html += `<tr><td colspan="${columns.length}" style="padding: 20px; text-align: center; color: #999;">ไม่พบข้อมูลรายการที่คุณเลือกค้นหาหรือกรองไว้</td></tr>`;
   } else {
     pageData.forEach((c, idx) => {
-      const rowBg = idx % 2 === 0 ? "#ffffff" : "#f8fafc";
+      const rowBg = idx % 2 === 0 ? "#ffffff" : "#fafafa";
       
-      // ดึงสีแท็บสไตล์เดิมกลับมาทั้งหมด
-      let badgeStyle = "background: #e2e8f0; color: #475569;";
-      if (c.recencyStatus === "Active") badgeStyle = "background: #ecfdf5; color: #059669; font-weight: 600;";
-      if (c.recencyStatus === "Snooze") badgeStyle = "background: #fff7ed; color: #d97706; font-weight: 600;";
-      if (c.recencyStatus === "Churn") badgeStyle = "background: #fef2f2; color: #dc2626; font-weight: 600;";
+      // การแสดงสียึดตามเงื่อนไขเดิมในไฟล์เวอร์ชันดั้งเดิมของคุณทั้งหมด 100%
+      let badgeStyle = "background: #e0e0e0; color: #333;";
+      if (c.recencyStatus === "Active") badgeStyle = "background: #e6f4ea; color: #137333; font-weight: bold;";
+      if (c.recencyStatus === "Snooze") badgeStyle = "background: #fef7e0; color: #b06000; font-weight: bold;";
+      if (c.recencyStatus === "Churn") badgeStyle = "background: #fce8e6; color: #c5221f; font-weight: bold;";
 
-      let priorityStyle = "color: #334155;";
-      if (c.adminPriority.includes("High")) priorityStyle = "color: #dc2626; font-weight: 600;";
-      if (c.adminPriority.includes("Medium")) priorityStyle = "color: #d97706; font-weight: 600;";
+      let priorityStyle = "color: #333;";
+      if (c.adminPriority.includes("High")) priorityStyle = "color: #c5221f; font-weight: bold;";
+      if (c.adminPriority.includes("Medium")) priorityStyle = "color: #b06000; font-weight: bold;";
 
       html += `
-        <tr style="background: ${rowBg}; border-bottom: 1px solid #f1f5f9; cursor: pointer;" onclick="showCustomerDetailModal('${c.phone}')" class="insight-row-hover">
-          <td style="padding: 12px 10px; font-weight: 500; color: #1e293b; border-right: 1px solid #e2e8f0;">${c.customerName}</td>
-          <td style="padding: 12px 10px; color: #475569; border-right: 1px solid #e2e8f0;">${c.phone}</td>
-          <td style="padding: 12px 10px; text-align: center; border-right: 1px solid #e2e8f0;">${c.daysSinceLast} วัน</td>
-          <td style="padding: 12px 10px; color: #475569; border-right: 1px solid #e2e8f0; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${c.lastProductStr}">${c.lastProductStr || '-'}</td>
-          <td style="padding: 12px 10px; border-right: 1px solid #e2e8f0;"><span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 12px;">${c.firstChannel}</span></td>
-          <td style="padding: 12px 10px; text-align: center; border-right: 1px solid #e2e8f0;">${c.totalOrders}</td>
-          <td style="padding: 12px 10px; text-align: right; font-weight: 600; color: #0f172a; border-right: 1px solid #e2e8f0;">฿${c.totalRevenue.toLocaleString()}</td>
-          <td style="padding: 12px 10px; text-align: center; border-right: 1px solid #e2e8f0;"><span style="padding: 3px 8px; border-radius: 12px; font-size: 11px; ${badgeStyle}">${c.recencyStatus}</span></td>
-          <td style="padding: 12px 10px; text-align: center; border-right: 1px solid #e2e8f0; ${priorityStyle}">${c.adminPriority}</td>
-          <td style="padding: 12px 10px; color: #64748b; font-size: 12px;">${c.actionNeeded}</td>
+        <tr style="background: ${rowBg}; border-bottom: 1px solid #eee; cursor: pointer;" onclick="showCustomerDetailModal('${c.phone}')">
+          <td style="padding: 10px; font-weight: bold; color: #333; border-right: 1px solid #eee;">${c.customerName}</td>
+          <td style="padding: 10px; color: #555; border-right: 1px solid #eee;">${c.phone}</td>
+          <td style="padding: 10px; text-align: center; border-right: 1px solid #eee;">${c.daysSinceLast} วัน</td>
+          <td style="padding: 10px; color: #444; border-right: 1px solid #eee; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${c.lastProductStr}">${c.lastProductStr || '-'}</td>
+          <td style="padding: 10px; border-right: 1px solid #eee;"><span style="background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 11px;">${c.firstChannel}</span></td>
+          <td style="padding: 10px; text-align: center; border-right: 1px solid #eee;">${c.totalOrders}</td>
+          <td style="padding: 10px; text-align: right; font-weight: bold; color: #111; border-right: 1px solid #eee;">฿${c.totalRevenue.toLocaleString()}</td>
+          <td style="padding: 10px; text-align: center; border-right: 1px solid #eee;"><span style="padding: 2px 6px; border-radius: 10px; font-size: 11px; ${badgeStyle}">${c.recencyStatus}</span></td>
+          <td style="padding: 10px; text-align: center; border-right: 1px solid #eee; ${priorityStyle}">${c.adminPriority}</td>
+          <td style="padding: 10px; color: #666;">${c.actionNeeded}</td>
         </tr>
       `;
     });
@@ -361,7 +362,7 @@ function renderExcelTable(pageData) {
   container.innerHTML = html;
 }
 
-// ตัวดึงและจัดการ Logic เช็กบ็อกซ์รายคอลัมน์สไตล์ Excel
+// ตัวสร้างเมนูกล่องตัวเลือกกรองข้อมูลอัจฉริยะ (Excel Filter) รายคอลัมน์
 function toggleExcelDropdown(event, colKey) {
   event.stopPropagation();
   const menu = document.getElementById(`excelDrop-${colKey}`);
@@ -377,14 +378,14 @@ function toggleExcelDropdown(event, colKey) {
     const selectedValues = window.insightHubState.excelFilters[colKey];
 
     let menuHtml = `
-      <div style="font-weight: 600; font-size: 11px; margin-bottom: 4px; border-bottom: 1px solid #eee; padding-bottom: 3px; color: #334155;">ตัวเลือกตัวกรอง</div>
-      <div style="max-height: 140px; overflow-y: auto; margin-bottom: 6px;">
+      <div style="font-weight: bold; font-size: 11px; margin-bottom: 4px; border-bottom: 1px solid #eee; padding-bottom: 3px; color: #333;">ตัวเลือกตัวกรอง</div>
+      <div style="max-height: 130px; overflow-y: auto; margin-bottom: 6px;">
     `;
 
     distinctValues.forEach(val => {
       const isChecked = selectedValues.includes(val) ? 'checked' : '';
       menuHtml += `
-        <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; padding: 2px 0; cursor: pointer; color: #475569;">
+        <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 0; cursor: pointer; color: #444;">
           <input type="checkbox" value="${val}" ${isChecked} onchange="handleExcelCheckboxChange('${colKey}', this)" style="cursor: pointer;" />
           ${val === '' || val === 'undefined' ? '(ว่าง)' : val}
         </label>
@@ -394,8 +395,8 @@ function toggleExcelDropdown(event, colKey) {
     menuHtml += `
       </div>
       <div style="display: flex; justify-content: space-between; gap: 4px; border-top: 1px solid #eee; padding-top: 4px;">
-        <button onclick="clearSpecificExcelFilter(event, '${colKey}')" style="background: none; border: none; color: #dc2626; font-size: 11px; cursor: pointer;">ล้างค่า</button>
-        <button onclick="closeExcelDropdown(event)" style="background: #1e293b; border: none; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 3px; cursor: pointer;">ตกลง</button>
+        <button onclick="clearSpecificExcelFilter(event, '${colKey}')" style="background: none; border: none; color: #c5221f; font-size: 11px; cursor: pointer;">ล้างค่า</button>
+        <button onclick="closeExcelDropdown(event)" style="background: #333; border: none; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 3px; cursor: pointer;">ตกลง</button>
       </div>
     `;
     menu.innerHTML = menuHtml;
@@ -442,7 +443,7 @@ function closeExcelDropdown(event) {
   document.querySelectorAll('.excel-filter-menu').forEach(m => m.style.display = 'none');
 }
 
-// ปิดป๊อปอัพตัวกรองอัตโนมัติเมื่อคลิกพื้นที่ด้านนอกตาราง
+// ปิดป๊อปอัพตัวเลือกกรองคอลลัมน์อัตโนมัติเมื่อกดข้างนอกตาราง
 document.addEventListener('click', () => closeExcelDropdown());
 
 function toggleInsightSort(columnKey) {
@@ -466,9 +467,9 @@ function renderInsightPaginationUI(totalRows, totalPages, startIdx, pDataLength)
   el.innerHTML = `
     <div>แสดงรายการที่ <b>${totalRows > 0 ? startIdx + 1 : 0}</b> ถึง <b>${endIdx}</b> จากทั้งหมด <b>${totalRows.toLocaleString()}</b> รายการ</div>
     <div style="display: flex; gap: 5px; align-items: center;">
-      <button onclick="changeInsightPage(${state.currentPage - 1})" ${state.currentPage === 1 ? 'disabled' : ''} style="padding: 3px 6px; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer;">ก่อนหน้า</button>
-      <span style="padding: 0 5px;">หน้า <b>${state.currentPage}</b> / ${totalPages}</span>
-      <button onclick="changeInsightPage(${state.currentPage + 1})" ${state.currentPage === totalPages ? 'disabled' : ''} style="padding: 3px 6px; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; cursor: pointer;">ถัดไป</button>
+      <button onclick="changeInsightPage(${state.currentPage - 1})" ${state.currentPage === 1 ? 'disabled' : ''} style="padding: 3px 6px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer;">ก่อนหน้า</button>
+      <span style="padding: 0 4px;">หน้า <b>${state.currentPage}</b> / ${totalPages}</span>
+      <button onclick="changeInsightPage(${state.currentPage + 1})" ${state.currentPage === totalPages ? 'disabled' : ''} style="padding: 3px 6px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer;">ถัดไป</button>
     </div>
   `;
 }
@@ -478,7 +479,7 @@ function changeInsightPage(targetPage) {
   applyExcelFiltersAndRender();
 }
 
-// --- โครงสร้าง Modal ป๊อปอัพรายบุคคลดีไซน์เดิม 100% ---
+// Modal Timeline รายบุคคลดีไซน์ดั้งเดิมของคุณ 100%
 function showCustomerDetailModal(phone) {
   const c = window.insightHubState.allCustomers.find(item => item.phone === phone);
   if (!c) return;
@@ -489,30 +490,30 @@ function showCustomerDetailModal(phone) {
   let orderRowsHtml = "";
   c.allOrders.forEach(o => {
     orderRowsHtml += `
-      <tr style="border-bottom:1px solid #f1f5f9;">
-        <td style="padding: 8px 0; color: #475569;">${o.date ? o.date.toLocaleDateString('th-TH') : '-'}</td>
-        <td style="padding: 8px 0; color: #1e293b; font-weight: 500;">${o.product || '-'}</td>
-        <td style="padding: 8px 0; text-align: right; font-weight: 600; color: #0f172a;">฿${o.revenue.toLocaleString()}</td>
+      <tr style="border-bottom:1px solid #eee;">
+        <td style="padding: 8px 0; color: #666;">${o.date ? o.date.toLocaleDateString('th-TH') : '-'}</td>
+        <td style="padding: 8px 0; color: #333; font-weight: bold;">${o.product || '-'}</td>
+        <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #111;">฿${o.revenue.toLocaleString()}</td>
       </tr>
     `;
   });
 
   modal.innerHTML = `
-    <div style="background: #fff; width: 90%; max-width: 500px; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);" onclick="event.stopPropagation()">
-      <div style="background: #1e293b; color: #fff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
-        <h3 style="margin: 0; font-size: 15px; font-weight: 600;"><i class="fas fa-user-circle" style="margin-right: 8px;"></i>Customer Timeline Profile</h3>
+    <div style="background: #fff; width: 90%; max-width: 500px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
+      <div style="background: #333; color: #fff; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="margin: 0; font-size: 15px; font-weight: bold;"><i class="fas fa-user-circle" style="margin-right: 8px;"></i>Customer Timeline Profile</h3>
         <button onclick="closeCustomerModal()" style="background: none; border: none; color: #fff; cursor: pointer; font-size: 18px;"><i class="fas fa-times"></i></button>
       </div>
-      <div style="padding: 20px; max-height: 400px; overflow-y: auto;">
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
-          <div style="font-size: 14px; font-weight: 600; color: #0f172a; margin-bottom: 4px;">${c.customerName}</div>
-          <div style="font-size: 12px; color: #475569;">เบอร์โทรศัพท์: ${c.phone}</div>
-          <div style="font-size: 12px; color: #475569; margin-top: 2px;">First Order Channel: ${c.firstChannel} (${c.firstDateStr})</div>
+      <div style="padding: 20px; max-height: 380px; overflow-y: auto;">
+        <div style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 12px; margin-bottom: 15px;">
+          <div style="font-size: 14px; font-weight: bold; color: #222; margin-bottom: 4px;">${c.customerName}</div>
+          <div style="font-size: 12px; color: #555;">เบอร์โทรศัพท์: ${c.phone}</div>
+          <div style="font-size: 12px; color: #555; margin-top: 2px;">First Order Channel: ${c.firstChannel} (${c.firstDateStr})</div>
         </div>
-        <div style="font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;">ประวัติใบสั่งซื้อทั้งหมด</div>
+        <div style="font-size: 12px; font-weight: bold; color: #555; margin-bottom: 6px;">ประวัติใบสั่งซื้อทั้งหมด</div>
         <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
           <thead>
-            <tr style="border-bottom: 2px solid #e2e8f0; text-align: left; color: #64748b;">
+            <tr style="border-bottom: 2px solid #ddd; text-align: left; color: #666;">
               <th style="padding: 4px 0;">วันที่สั่งซื้อ</th>
               <th style="padding: 4px 0;">รายการสินค้า</th>
               <th style="padding: 4px 0; text-align: right;">ยอดโอน</th>
@@ -523,8 +524,8 @@ function showCustomerDetailModal(phone) {
           </tbody>
         </table>
       </div>
-      <div style="background: #f8fafc; padding: 10px 20px; text-align: right; border-top: 1px solid #e2e8f0;">
-        <button onclick="closeCustomerModal()" style="background: #64748b; color: #fff; border: none; padding: 5px 12px; border-radius: 4px; font-size: 12px; cursor: pointer;">ปิดหน้าต่าง</button>
+      <div style="background: #f5f5f5; padding: 10px 20px; text-align: right; border-top: 1px solid #ddd;">
+        <button onclick="closeCustomerModal()" style="background: #666; color: #fff; border: none; padding: 5px 12px; border-radius: 4px; font-size: 12px; cursor: pointer;">ปิดหน้าต่าง</button>
       </div>
     </div>
   `;
