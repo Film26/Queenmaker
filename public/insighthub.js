@@ -59,7 +59,6 @@ const productConfig = {
 
 function getProductDays(prodName) {
   if (!prodName) return 30;
-  // Normalize string: uppercase, trim, replace multiple spaces with single space
   const key = prodName.trim().toUpperCase().replace(/\s+/g, ' ');
   return productConfig[key] !== undefined ? productConfig[key] : 30;
 }
@@ -182,42 +181,6 @@ function renderInsightHub(filteredData, rawData) {
         font-weight: bold;
         color: #d95f1d;
       }
-
-      .table-filter-bar {
-        background: #fff;
-        border-radius: 16px;
-        padding: 20px;
-        margin-bottom: 25px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
-        border: 1px solid #f0e6df;
-      }
-      .filter-row {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 15px;
-        margin-top: 15px;
-      }
-      .filter-input-group {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-      }
-      .filter-input-group label {
-        font-size: 11px;
-        font-weight: 700;
-        color: #7a665e;
-      }
-      .filter-select, .search-bar-input {
-        padding: 8px 12px;
-        font-size: 13px;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        outline: none;
-        background: white;
-      }
-      .search-bar-input {
-        flex-grow: 1;
-      }
       
       .table-card {
         background: #fff;
@@ -241,16 +204,12 @@ function renderInsightHub(filteredData, rawData) {
       }
       .customer-table th {
         font-weight: 600;
-        padding: 10px 12px;
+        padding: 12px 14px;
         border-bottom: 2px solid #ddd;
         white-space: nowrap;
         background-color: #fafafa;
         color: #444;
-        cursor: pointer;
         user-select: none;
-      }
-      .customer-table th:hover {
-        background-color: #f1f1f1;
       }
       .customer-table td {
         padding: 8px 12px;
@@ -262,7 +221,32 @@ function renderInsightHub(filteredData, rawData) {
         background-color: #fafafa;
       }
       
-      /* Column groups colors */
+      /* Excel Filter Header Layout */
+      .th-content-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .th-title-span {
+        cursor: pointer;
+        flex-grow: 1;
+      }
+      .excel-filter-select {
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 2px 4px;
+        font-size: 11px;
+        background: #fff;
+        cursor: pointer;
+        color: #333;
+        outline: none;
+        max-width: 90px;
+      }
+      .excel-filter-select:focus {
+        border-color: #d95f1d;
+      }
+      
       .th-insight { background-color: #e2f0fd !important; }
       .th-action { background-color: #fcebeb !important; }
       .th-tiers { background-color: #e2fbe2 !important; }
@@ -300,7 +284,6 @@ function renderInsightHub(filteredData, rawData) {
       .seg-new { color: #1e40af; font-weight: 700; }
       .seg-refill { color: #0891b2; font-weight: 700; }
       
-      /* Actions colors */
       .act-strategy {
         display: inline-flex;
         align-items: center;
@@ -348,95 +331,9 @@ function renderInsightHub(filteredData, rawData) {
       }
       
       .sorting-icon {
-        margin-left: 5px;
+        margin-left: 3px;
         font-size: 10px;
         color: #999;
-      }
-      
-      /* Profile View Styles */
-      .profile-kpi-grid-4 {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 20px;
-        margin-bottom: 20px;
-      }
-      .profile-kpi-grid-3 {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 20px;
-        margin-bottom: 25px;
-      }
-      @media (max-width: 1024px) {
-        .profile-kpi-grid-4 {
-          grid-template-columns: repeat(2, 1fr);
-        }
-        .profile-kpi-grid-3 {
-          grid-template-columns: repeat(2, 1fr);
-        }
-      }
-      @media (max-width: 600px) {
-        .profile-kpi-grid-4 {
-          grid-template-columns: 1fr;
-        }
-        .profile-kpi-grid-3 {
-          grid-template-columns: 1fr;
-        }
-      }
-      .profile-kpi-card {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 18px 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.01);
-      }
-      .profile-kpi-info {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-      .profile-kpi-lbl {
-        font-size: 11px;
-        font-weight: 600;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-      .profile-kpi-val {
-        font-size: 22px;
-        font-weight: 700;
-        color: #0f172a;
-      }
-      .profile-kpi-icon {
-        font-size: 20px;
-        color: #2563eb;
-        background: #eff6ff;
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .profile-detail-card h3 {
-        font-size: 16px;
-        font-weight: 700;
-        color: #1e293b;
-        margin: 0 0 15px 0;
-        border-bottom: 1px solid #f1f5f9;
-        padding-bottom: 10px;
-      }
-      .profile-detail-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px 0;
-        border-bottom: 1px solid #f8fafc;
-      }
-      .profile-detail-row:last-child {
-        border-bottom: none;
       }
     `;
     document.head.appendChild(style);
@@ -447,7 +344,6 @@ function renderInsightHub(filteredData, rawData) {
   // 2. Pre-aggregate ALL transaction history from rawData by customer phone
   const rawSaleOrders = rawData.filter(row => window.isSaleOrder(row));
   
-  // Find max date dynamically for "today" reference and gather available years
   let maxTime = 0;
   const availableYearsSet = new Set();
   
@@ -465,7 +361,6 @@ function renderInsightHub(filteredData, rawData) {
   window.insightHubState.availableYears = availableYears;
 
   const customerHistoryMap = {};
-  
   rawSaleOrders.forEach(row => {
     const phone = window.getRowValue(row, ['Phone']).toString().trim();
     if (!phone) return;
@@ -475,7 +370,6 @@ function renderInsightHub(filteredData, rawData) {
     customerHistoryMap[phone].push(row);
   });
 
-  // Calculate unique customer stats (Phone-based) from rawData
   const filteredCustomerPhones = new Set();
   rawData.forEach(row => {
     const phone = window.getRowValue(row, ['Phone']).toString().trim();
@@ -487,20 +381,13 @@ function renderInsightHub(filteredData, rawData) {
     return;
   }
 
-  // 3. Compile customer records (calculating Excel formulas dynamically)
+  // 3. Compile customer records
   const customers = Array.from(filteredCustomerPhones).map(phone => {
-    // History is parsed globally from rawData to get true lifetime metrics
     const historyRows = customerHistoryMap[phone] || [];
-    
-    // Sort history chronologically by order date
     const sortedHistory = historyRows.map(row => {
       const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-      return {
-        row: row,
-        dateObj: parseToDateObj(dateStr)
-      };
-    }).filter(item => item.dateObj !== null)
-      .sort((a, b) => a.dateObj - b.dateObj);
+      return { row: row, dateObj: parseToDateObj(dateStr) };
+    }).filter(item => item.dateObj !== null).sort((a, b) => a.dateObj - b.dateObj);
 
     if (sortedHistory.length === 0) return null;
 
@@ -511,7 +398,6 @@ function renderInsightHub(filteredData, rawData) {
     const lastPurchaseDate = lastOrder.dateObj;
     const totalOrders = sortedHistory.length;
     
-    // Sum total revenue
     let totalRevenue = 0;
     sortedHistory.forEach(o => {
       const revStr = window.getRowValue(o.row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
@@ -520,34 +406,28 @@ function renderInsightHub(filteredData, rawData) {
     });
 
     const aov = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-    
-    // Days since last purchase to reference date (May 15, 2026)
     const diffTime = today - lastPurchaseDate;
     const daysSinceLast = Math.max(0, diffTime / (1000 * 60 * 60 * 24));
     
     const lastProductStr = window.getRowValue(lastOrder.row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']);
-    
-    // Next purchase date refill window lookup
     const refillWindow = getRefillWindow(lastProductStr);
     const nextPurchaseDateObj = new Date(lastPurchaseDate.getTime() + refillWindow * 24 * 60 * 60 * 1000);
 
-    // 11. Life Time Value Tier
+    // Life Time Value Tier
     let ltvTier = "🐚 4. General";
     if (totalRevenue >= 25000) ltvTier = "💎 1. VVIP Whale (>25k)";
     else if (totalRevenue >= 12000) ltvTier = "🐳 2. VIP Dolphin (>12k)";
     else if (totalRevenue >= 4500) ltvTier = "🐟 3. Regular Minnow (>4.5k)";
 
-    // 12. Loyalty Index (tenure)
+    // Loyalty Index
     const tenureDays = Math.max(0, (lastPurchaseDate - firstPurchaseDate) / (1000 * 60 * 60 * 24));
     let loyaltyTier = "🌱 Seedling";
     if (tenureDays > 365) loyaltyTier = "🏅 Legendary (1Y+)";
     else if (tenureDays > 180) loyaltyTier = "🥈 Veteran (6M+)";
     else if (tenureDays > 45) loyaltyTier = "🥉 Regular";
 
-    // 13. Entry Product
     const entryProduct = window.getRowValue(firstOrder.row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']);
     
-    // 14. Current Favorite
     const prodCounts = {};
     sortedHistory.forEach(o => {
       const p = window.getRowValue(o.row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']);
@@ -562,20 +442,17 @@ function renderInsightHub(filteredData, rawData) {
       }
     }
 
-    // 15. Segment 1: Standard Period
     let segment1 = "CHURN";
     if (daysSinceLast <= 30) segment1 = "NEW";
     else if (daysSinceLast <= 90) segment1 = "ACTIVE";
     else if (daysSinceLast <= 120) segment1 = "RISK";
 
-    // 16. Segment 2: Dynamic Refill
     let segment2 = "CHURN";
     if (daysSinceLast <= 7) segment2 = "NEW";
     else if (daysSinceLast <= refillWindow - 8) segment2 = "ACTIVE";
     else if (daysSinceLast <= refillWindow + 3) segment2 = "REFILL";
     else if (daysSinceLast <= refillWindow + 59) segment2 = "RISK";
 
-    // 17. Admin Priority
     let adminPriority = "4. 🔴 Win-back (กู้สถานะ)";
     if (segment2 === "REFILL") {
       adminPriority = "1. 🟢 High (ยอดขาย)";
@@ -589,7 +466,6 @@ function renderInsightHub(filteredData, rawData) {
       adminPriority = "3. 🟠 Low (ดูแลสัมพันธ์)";
     }
 
-    // 18. Action Strategy Guideline
     let actionStrategy = "✅ Healthy Care: ดูแลตามปกติ";
     if (segment1 === "ACTIVE" && segment2 === "REFILL") actionStrategy = "🎯 Golden Period: ทักปิดยอดด่วน!";
     else if (segment1 === "RISK" && segment2 === "REFILL") actionStrategy = "⚡ Urgent Opportunity: ทักดึงกลับด้วยโปร";
@@ -602,11 +478,9 @@ function renderInsightHub(filteredData, rawData) {
     else if (segment1 === "NEW" && segment2 === "NEW") actionStrategy = "💖 Welcome: ติดตามผล/สอนวิธีใช้";
     else if ((segment1 === "RISK" || segment1 === "CHURN") && segment2 === "CHURN") actionStrategy = "😴 Dead Churn: ส่งโปรแรงดึงกลับ";
 
-    // First and last channels
     const firstChannel = window.getRowValue(firstOrder.row, ['ช่องทาง', 'Channel']) || "-";
     const lastChannel = window.getRowValue(lastOrder.row, ['ช่องทาง', 'Channel']) || "-";
     
-    // Last Admin normalized
     let lastAdmin = "-";
     if (window.getNormalizedAdmin) {
       lastAdmin = window.getNormalizedAdmin(lastOrder.row);
@@ -614,10 +488,8 @@ function renderInsightHub(filteredData, rawData) {
       lastAdmin = window.getRowValue(lastOrder.row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']) || "-";
     }
 
-    // Annual Tiers
     const annualSpending = {};
     availableYears.forEach(y => annualSpending[y] = 0);
-    
     sortedHistory.forEach(o => {
       const year = o.dateObj.getFullYear();
       if (annualSpending[year] !== undefined) {
@@ -668,7 +540,6 @@ function renderInsightHub(filteredData, rawData) {
 
   window.insightHubState.allCustomers = customers;
 
-  // Check if a single customer profile is selected
   if (state.selectedCustomerPhone) {
     const customer = customers.find(c => c.phone === state.selectedCustomerPhone);
     if (customer) {
@@ -695,14 +566,12 @@ function renderInsightHub(filteredData, rawData) {
 
   const getPctStr = (count) => totalCount > 0 ? ((count / totalCount) * 100).toFixed(0) + '%' : '0%';
 
-  // 5. Filter list based on search term and local dropdown selectors (เชื่อมต่อตัวกรองแดชบอร์ดจริง)
+  // 5. Filter list based on search term and Local Excel Excel Column Headers Dropdowns
   let displayedCustomers = customers.filter(c => {
-    // Search filter
-    const matchesSearch = c.name.toLowerCase().includes(state.searchTerm.toLowerCase()) || 
-                          c.phone.includes(state.searchTerm);
+    const matchesSearch = c.name.toLowerCase().includes(state.searchTerm.toLowerCase()) || c.phone.includes(state.searchTerm);
     if (!matchesSearch) return false;
 
-    // Advanced filters
+    // Excel Inline Filters
     if (state.filterLTV !== "All" && !c.ltvTier.includes(state.filterLTV)) return false;
     if (state.filterLoyalty !== "All" && !c.loyaltyTier.includes(state.filterLoyalty)) return false;
     if (state.filterSeg1 !== "All" && c.segment1 !== state.filterSeg1) return false;
@@ -713,7 +582,6 @@ function renderInsightHub(filteredData, rawData) {
     return true;
   });
 
-  // เก็บอาร์เรย์ที่ถูกคัดกรองแล้วเอาไว้ให้ฟังก์ชัน Export เรียกใช้งาน
   window.insightHubState.currentFilteredList = displayedCustomers;
 
   // 6. Sort displayed list
@@ -743,14 +611,11 @@ function renderInsightHub(filteredData, rawData) {
 
   // 8. Render Dashboard UI Template
   let html = `
-    <!-- Top banner -->
     <div class="hub-header">
       <h2>Customer Insight Hub</h2>
     </div>
 
-    <!-- Summary KPI cards -->
     <div class="hub-summary-sections">
-      <!-- Section: LTV & Advanced -->
       <div class="summary-section-box">
         <h3>LTV & Advanced</h3>
         <div class="kpi-cards-row">
@@ -782,7 +647,6 @@ function renderInsightHub(filteredData, rawData) {
         </div>
       </div>
       
-      <!-- Section: Segment 1 Standard Period -->
       <div class="summary-section-box">
         <h3>Segment 1 : Standard Period</h3>
         <div class="kpi-cards-row">
@@ -805,40 +669,117 @@ function renderInsightHub(filteredData, rawData) {
       </div>
     </div>
 
-    <!-- Scrollable Customers Table Card -->
     <div class="table-card">
       <div class="table-wrapper">
         <table class="customer-table">
           <thead>
             <tr>
-              <th onclick="setHubSort('phone')">CustomerKey (Phone) ${getSortIcon('phone')}</th>
-              <th onclick="setHubSort('name')">CustomerName (Latest) ${getSortIcon('name')}</th>
-              <th onclick="setHubSort('firstPurchaseDate')">FirstPurchaseDate ${getSortIcon('firstPurchaseDate')}</th>
-              <th onclick="setHubSort('lastPurchaseDate')">LastPurchaseDate ${getSortIcon('lastPurchaseDate')}</th>
-              <th onclick="setHubSort('totalOrders')">TotalOrders (SALE only) ${getSortIcon('totalOrders')}</th>
-              <th onclick="setHubSort('totalRevenue')">TotalRevenue (SALE only) ${getSortIcon('totalRevenue')}</th>
-              <th onclick="setHubSort('aov')">AOV ${getSortIcon('aov')}</th>
-              <th onclick="setHubSort('daysSinceLast')">DaysSinceLast ${getSortIcon('daysSinceLast')}</th>
-              <th onclick="setHubSort('lastProductStr')">Last Product ${getSortIcon('lastProductStr')}</th>
-              <th onclick="setHubSort('nextPurchaseDateObj')">Next Purchase Date ${getSortIcon('nextPurchaseDateObj')}</th>
+              <th>
+                <div class="th-content-wrapper">
+                  <span class="th-title-span" onclick="setHubSort('phone')">CustomerKey (Phone) ${getSortIcon('phone')}</span>
+                </div>
+              </th>
+              <th>
+                <div class="th-content-wrapper">
+                  <span class="th-title-span" onclick="setHubSort('name')">CustomerName ${getSortIcon('name')}</span>
+                </div>
+              </th>
+              <th><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('firstPurchaseDate')">FirstPurchase ${getSortIcon('firstPurchaseDate')}</span></div></th>
+              <th><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('lastPurchaseDate')">LastPurchase ${getSortIcon('lastPurchaseDate')}</span></div></th>
+              <th><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('totalOrders')">TotalOrders ${getSortIcon('totalOrders')}</span></div></th>
+              <th><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('totalRevenue')">TotalRevenue ${getSortIcon('totalRevenue')}</span></div></th>
+              <th><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('aov')">AOV ${getSortIcon('aov')}</span></div></th>
+              <th><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('daysSinceLast')">DaysSinceLast ${getSortIcon('daysSinceLast')}</span></div></th>
+              <th><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('lastProductStr')">Last Product ${getSortIcon('lastProductStr')}</span></div></th>
+              <th><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('nextPurchaseDateObj')">Next Purchase ${getSortIcon('nextPurchaseDateObj')}</span></div></th>
               
-              <!-- Segmentations (Blue Headers) -->
-              <th class="th-insight" onclick="setHubSort('ltvTier')">Life time value ${getSortIcon('ltvTier')}</th>
-              <th class="th-insight" onclick="setHubSort('loyaltyTier')">Loyalty Index ${getSortIcon('loyaltyTier')}</th>
-              <th class="th-insight" onclick="setHubSort('entryProduct')">Entry Product (สินค้าแรกเริ่ม) ${getSortIcon('entryProduct')}</th>
-              <th class="th-insight" onclick="setHubSort('currentFavorite')">Current Favorite (สินค้าโปรดล่าสุด) ${getSortIcon('currentFavorite')}</th>
+              <th class="th-insight">
+                <div class="th-content-wrapper">
+                  <span class="th-title-span" onclick="setHubSort('ltvTier')">Life time value ${getSortIcon('ltvTier')}</span>
+                  <select class="excel-filter-select" onchange="setHubInlineFilter('filterLTV', this.value)">
+                    <option value="All" ${state.filterLTV === 'All' ? 'selected' : ''}>⏳ ทั้งหมด</option>
+                    <option value="Whale" ${state.filterLTV === 'Whale' ? 'selected' : ''}>Whale</option>
+                    <option value="Dolphin" ${state.filterLTV === 'Dolphin' ? 'selected' : ''}>Dolphin</option>
+                    <option value="Minnow" ${state.filterLTV === 'Minnow' ? 'selected' : ''}>Minnow</option>
+                    <option value="General" ${state.filterLTV === 'General' ? 'selected' : ''}>General</option>
+                  </select>
+                </div>
+              </th>
+              <th class="th-insight">
+                <div class="th-content-wrapper">
+                  <span class="th-title-span" onclick="setHubSort('loyaltyTier')">Loyalty Index ${getSortIcon('loyaltyTier')}</span>
+                  <select class="excel-filter-select" onchange="setHubInlineFilter('filterLoyalty', this.value)">
+                    <option value="All" ${state.filterLoyalty === 'All' ? 'selected' : ''}>⏳ ทั้งหมด</option>
+                    <option value="Legendary" ${state.filterLoyalty === 'Legendary' ? 'selected' : ''}>Legendary</option>
+                    <option value="Veteran" ${state.filterLoyalty === 'Veteran' ? 'selected' : ''}>Veteran</option>
+                    <option value="Regular" ${state.filterLoyalty === 'Regular' ? 'selected' : ''}>Regular</option>
+                    <option value="Seedling" ${state.filterLoyalty === 'Seedling' ? 'selected' : ''}>Seedling</option>
+                  </select>
+                </div>
+              </th>
+              <th class="th-insight"><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('entryProduct')">Entry Product ${getSortIcon('entryProduct')}</span></div></th>
+              <th class="th-insight"><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('currentFavorite')">Current Favorite ${getSortIcon('currentFavorite')}</span></div></th>
               
-              <!-- Sales Actions (Pink Headers) -->
-              <th class="th-action" onclick="setHubSort('adminPriority')">Admin Priority ${getSortIcon('adminPriority')}</th>
-              <th class="th-action" onclick="setHubSort('segment1')">Segment 1 : Standard Period ${getSortIcon('segment1')}</th>
-              <th class="th-action" onclick="setHubSort('segment2')">Segment 2 : Dynamic Refill ${getSortIcon('segment2')}</th>
-              <th class="th-action" onclick="setHubSort('actionStrategy')">Action Strategy Guideline ${getSortIcon('actionStrategy')}</th>
-              <th class="th-action" onclick="setHubSort('firstChannel')">FirstChannel (Main) ${getSortIcon('firstChannel')}</th>
-              <th class="th-action" onclick="setHubSort('lastChannel')">LastChannel (Main) ${getSortIcon('lastChannel')}</th>
-              <th class="th-action" onclick="setHubSort('lastAdmin')">Last Admin ${getSortIcon('lastAdmin')}</th>
+              <th class="th-action">
+                <div class="th-content-wrapper">
+                  <span class="th-title-span" onclick="setHubSort('adminPriority')">Admin Priority ${getSortIcon('adminPriority')}</span>
+                  <select class="excel-filter-select" onchange="setHubInlineFilter('filterAdminPriority', this.value)">
+                    <option value="All" ${state.filterAdminPriority === 'All' ? 'selected' : ''}>⏳ ทั้งหมด</option>
+                    <option value="High" ${state.filterAdminPriority === 'High' ? 'selected' : ''}>High</option>
+                    <option value="Medium" ${state.filterAdminPriority === 'Medium' ? 'selected' : ''}>Medium</option>
+                    <option value="Low" ${state.filterAdminPriority === 'Low' ? 'selected' : ''}>Low</option>
+                    <option value="Win-back" ${state.filterAdminPriority === 'Win-back' ? 'selected' : ''}>Win-back</option>
+                  </select>
+                </div>
+              </th>
+              <th class="th-action">
+                <div class="th-content-wrapper">
+                  <span class="th-title-span" onclick="setHubSort('segment1')">Segment 1 ${getSortIcon('segment1')}</span>
+                  <select class="excel-filter-select" onchange="setHubInlineFilter('filterSeg1', this.value)">
+                    <option value="All" ${state.filterSeg1 === 'All' ? 'selected' : ''}>⏳ ทั้งหมด</option>
+                    <option value="NEW" ${state.filterSeg1 === 'NEW' ? 'selected' : ''}>NEW</option>
+                    <option value="ACTIVE" ${state.filterSeg1 === 'ACTIVE' ? 'selected' : ''}>ACTIVE</option>
+                    <option value="RISK" ${state.filterSeg1 === 'RISK' ? 'selected' : ''}>RISK</option>
+                    <option value="CHURN" ${state.filterSeg1 === 'CHURN' ? 'selected' : ''}>CHURN</option>
+                  </select>
+                </div>
+              </th>
+              <th class="th-action">
+                <div class="th-content-wrapper">
+                  <span class="th-title-span" onclick="setHubSort('segment2')">Segment 2 ${getSortIcon('segment2')}</span>
+                  <select class="excel-filter-select" onchange="setHubInlineFilter('filterSeg2', this.value)">
+                    <option value="All" ${state.filterSeg2 === 'All' ? 'selected' : ''}>⏳ ทั้งหมด</option>
+                    <option value="NEW" ${state.filterSeg2 === 'NEW' ? 'selected' : ''}>NEW</option>
+                    <option value="ACTIVE" ${state.filterSeg2 === 'ACTIVE' ? 'selected' : ''}>ACTIVE</option>
+                    <option value="REFILL" ${state.filterSeg2 === 'REFILL' ? 'selected' : ''}>REFILL</option>
+                    <option value="RISK" ${state.filterSeg2 === 'RISK' ? 'selected' : ''}>RISK</option>
+                    <option value="CHURN" ${state.filterSeg2 === 'CHURN' ? 'selected' : ''}>CHURN</option>
+                  </select>
+                </div>
+              </th>
+              <th class="th-action">
+                <div class="th-content-wrapper">
+                  <span class="th-title-span" onclick="setHubSort('actionStrategy')">Action Strategy ${getSortIcon('actionStrategy')}</span>
+                  <select class="excel-filter-select" onchange="setHubInlineFilter('filterAction', this.value)">
+                    <option value="All" ${state.filterAction === 'All' ? 'selected' : ''}>⏳ ทั้งหมด</option>
+                    <option value="Healthy Care" ${state.filterAction === 'Healthy Care' ? 'selected' : ''}>Healthy Care</option>
+                    <option value="Golden Period" ${state.filterAction === 'Golden Period' ? 'selected' : ''}>Golden Period</option>
+                    <option value="Urgent" ${state.filterAction === 'Urgent' ? 'selected' : ''}>Urgent</option>
+                    <option value="Legacy" ${state.filterAction === 'Legacy' ? 'selected' : ''}>Legacy Refill</option>
+                    <option value="High LTV" ${state.filterAction === 'High LTV' ? 'selected' : ''}>High LTV</option>
+                    <option value="Risk Alert" ${state.filterAction === 'Risk Alert' ? 'selected' : ''}>Risk Alert</option>
+                    <option value="Slow User" ${state.filterAction === 'Slow User' ? 'selected' : ''}>Slow User</option>
+                    <option value="Speed Churn" ${state.filterAction === 'Speed Churn' ? 'selected' : ''}>Speed Churn</option>
+                    <option value="Welcome" ${state.filterAction === 'Welcome' ? 'selected' : ''}>Welcome</option>
+                    <option value="Dead Churn" ${state.filterAction === 'Dead Churn' ? 'selected' : ''}>Dead Churn</option>
+                  </select>
+                </div>
+              </th>
+              <th class="th-action"><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('firstChannel')">FirstChannel ${getSortIcon('firstChannel')}</span></div></th>
+              <th class="th-action"><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('lastChannel')">LastChannel ${getSortIcon('lastChannel')}</span></div></th>
+              <th class="th-action"><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('lastAdmin')">Last Admin ${getSortIcon('lastAdmin')}</span></div></th>
               
-              <!-- Annual Tiers (Green Headers) -->
-              ${state.availableYears.map(y => `<th class="th-tiers" onclick="setHubSort('tier${y}')">Tier ${y} \${getSortIcon('tier' + y)}</th>`).join('')}
+              ${state.availableYears.map(y => `<th class="th-tiers"><div class="th-content-wrapper"><span class="th-title-span" onclick="setHubSort('tier${y}')">Tier ${y} ${getSortIcon('tier' + y)}</span></div></th>`).join('')}
             </tr>
           </thead>
           <tbody>
@@ -855,13 +796,11 @@ function renderInsightHub(filteredData, rawData) {
                 <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis;" title="${c.lastProductStr}">${c.lastProductStr || "-"}</td>
                 <td style="font-weight: 600; color: #0269a1;">${formatDateDisplay(c.nextPurchaseDateObj)}</td>
                 
-                <!-- Insight Columns -->
                 <td><span class="badge-span ${getLtvClass(c.ltvTier)}">${c.ltvTier}</span></td>
                 <td><span class="badge-span ${getLoyaltyClass(c.loyaltyTier)}">${c.loyaltyTier}</span></td>
                 <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${c.entryProduct}">${c.entryProduct || "-"}</td>
                 <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${c.currentFavorite}">${c.currentFavorite || "-"}</td>
                 
-                <!-- Sales Action Columns -->
                 <td><span class="${getAdminPriClass(c.adminPriority)}">${c.adminPriority}</span></td>
                 <td><span class="${getSegClass(c.segment1)}">${c.segment1}</span></td>
                 <td><span class="${getSegClass(c.segment2)}">${c.segment2}</span></td>
@@ -870,15 +809,13 @@ function renderInsightHub(filteredData, rawData) {
                 <td>${c.lastChannel}</td>
                 <td>${c.lastAdmin}</td>
                 
-                <!-- Tiers Columns -->
-                ${state.availableYears.map(y => `<td style="text-align: center;">\${c['tier' + y]}</td>`).join('')}
+                ${state.availableYears.map(y => `<td style="text-align: center;">${c['tier' + y]}</td>`).join('')}
               </tr>
             `).join('')}
           </tbody>
         </table>
       </div>
 
-      <!-- Pagination Footer -->
       <div class="pagination-controls">
         <div>
           Showing <b>${totalEntries === 0 ? 0 : startIndex + 1}</b> to <b>${endIndex}</b> of <b>${totalEntries.toLocaleString()}</b> entries
@@ -901,29 +838,10 @@ function renderInsightHub(filteredData, rawData) {
   container.innerHTML = html;
 }
 
-// Global actions connected to window to support HTML onclick events
-window.setHubFilter = function(filterKey, val) {
+// Global actions connected to window to support Inline Excel drop-down changes
+window.setHubInlineFilter = function(filterKey, val) {
   window.insightHubState[filterKey] = val;
   window.insightHubState.currentPage = 1;
-  if (window.applyFilters) window.applyFilters();
-};
-
-window.resetHubFilters = function() {
-  window.insightHubState = {
-    currentPage: 1,
-    rowsPerPage: 50,
-    searchTerm: "",
-    sortColumn: "totalRevenue",
-    sortAsc: false,
-    filterLTV: "All",
-    filterLoyalty: "All",
-    filterSeg1: "All",
-    filterSeg2: "All",
-    filterAdminPriority: "All",
-    filterAction: "All",
-    selectedCustomerPhone: null,
-    allCustomers: window.insightHubState.allCustomers || []
-  };
   if (window.applyFilters) window.applyFilters();
 };
 
@@ -943,7 +861,7 @@ window.setHubPage = function(pageNumber) {
   if (window.applyFilters) window.applyFilters();
 };
 
-// ฟังก์ชันสำหรับดึงชุดข้อมูลที่ถูกกรองและเรียงลำดับอยู่ ณ ปัจจุบัน เพื่อใช้ Export ไปเป็นไฟล์
+// สำหรับใช้ดึงชุดข้อมูลที่กำลังถูกคัดกรองอยู่ปัจจุบันเพื่อทำฟังก์ชัน Export ไร้ขีดจำกัดหน้า (Pagination)
 window.getInsightHubFilteredData = function() {
   if (window.insightHubState && window.insightHubState.currentFilteredList) {
     return window.insightHubState.currentFilteredList;
@@ -951,7 +869,6 @@ window.getInsightHubFilteredData = function() {
   return window.insightHubState ? window.insightHubState.allCustomers : [];
 };
 
-// Styling helper mappings
 function getLtvClass(tier) {
   if (tier.includes("Whale")) return "ltv-whale";
   if (tier.includes("Dolphin")) return "ltv-dolphin";
@@ -992,9 +909,7 @@ function getPageRange(current, total) {
   const range = [];
   const start = Math.max(1, current - 2);
   const end = Math.min(total, current + 2);
-  for (let i = start; i <= end; i++) {
-    range.push(i);
-  }
+  for (let i = start; i <= end; i++) { range.push(i); }
   return range;
 }
 
@@ -1041,20 +956,15 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
   const lastPurchaseStr = formatDateDisplay(c.lastPurchaseDate);
   
   const html = `
-    <!-- Back button and Navigation -->
     <div style="margin-bottom: 20px;">
       <button class="pag-btn" onclick="closeCustomerProfile()" style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer;">
         <i class="fas fa-arrow-left"></i> ย้อนกลับไปหน้ารายการ
       </button>
     </div>
-
-    <!-- Title and Subtitle -->
     <div style="text-align: center; margin-bottom: 30px;">
       <h2 style="font-size: 26px; font-weight: 700; color: #0f172a; margin: 0 0 8px 0; font-family: 'Outfit', sans-serif;">Customer Profile</h2>
       <p style="color: #64748b; font-size: 14px; margin: 0;">Enter a customer key to view their complete profile</p>
     </div>
-
-    <!-- Profile search bar -->
     <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 35px; max-width: 600px; margin-left: auto; margin-right: auto;">
       <div style="position: relative; flex-grow: 1;">
         <i class="fas fa-search" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #999;"></i>
@@ -1062,163 +972,49 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
       </div>
       <button class="btn" style="background: #2563eb; color: white; border: none; padding: 0 25px; border-radius: 8px; font-weight: 600; cursor: pointer; height: 45px; font-size: 14px;" onclick="searchProfileKey()">Search</button>
     </div>
-
-    <!-- Profile Header Card -->
     <div style="display: flex; justify-content: space-between; align-items: center; background: white; border: 1px solid #f0e6df; padding: 25px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.02);">
       <div style="display: flex; align-items: center; gap: 20px;">
-        <div style="width: 60px; height: 60px; border-radius: 12px; background: #eff6ff; display: flex; align-items: center; justify-content: center; color: #2563eb; font-size: 24px;">
-          <i class="fas fa-user"></i>
-        </div>
+        <div style="width: 60px; height: 60px; border-radius: 12px; background: #eff6ff; display: flex; align-items: center; justify-content: center; color: #2563eb; font-size: 24px;"><i class="fas fa-user"></i></div>
         <div>
           <h3 style="margin: 0 0 5px 0; font-size: 22px; font-weight: 700; color: #1e293b;">${c.name}</h3>
           <p style="margin: 0; color: #64748b; font-size: 13px;">Customer Profile (Key: ${c.phone})</p>
         </div>
       </div>
-      <div>
-        <span class="badge-span ${getLtvClass(c.ltvTier)}" style="font-size: 12px; padding: 6px 15px; border-radius: 20px;">${c.ltvTier}</span>
-      </div>
+      <div><span class="badge-span ${getLtvClass(c.ltvTier)}" style="font-size: 12px; padding: 6px 15px; border-radius: 20px;">${c.ltvTier}</span></div>
     </div>
-
-    <!-- AI Summary Box -->
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; margin-bottom: 25px; line-height: 1.6; font-size: 14px; color: #334155;">
       ${generateAiSummary(c)}
     </div>
-
-    <!-- 7 KPI Cards Grid -->
-    <!-- Row 1: 4 cards -->
     <div class="profile-kpi-grid-4">
       <div class="profile-kpi-card">
-        <div class="profile-kpi-info">
-          <span class="profile-kpi-lbl">Total Revenue</span>
-          <span class="profile-kpi-val">฿${c.totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</span>
-        </div>
-        <div class="profile-kpi-icon" style="color: #2563eb; background: #eff6ff;">
-          <i class="fas fa-dollar-sign"></i>
-        </div>
+        <div class="profile-kpi-info"><span class="profile-kpi-lbl">Total Revenue</span><span class="profile-kpi-val">฿${c.totalRevenue.toLocaleString()}</span></div>
+        <div class="profile-kpi-icon"><i class="fas fa-dollar-sign"></i></div>
       </div>
-      
       <div class="profile-kpi-card">
-        <div class="profile-kpi-info">
-          <span class="profile-kpi-lbl">Loyalty Index</span>
-          <span class="profile-kpi-val" style="font-size: 16px;">${c.loyaltyTier}</span>
-        </div>
-        <div class="profile-kpi-icon" style="color: #ec4899; background: #fdf2f8;">
-          <i class="fas fa-heart"></i>
-        </div>
+        <div class="profile-kpi-info"><span class="profile-kpi-lbl">Loyalty Index</span><span class="profile-kpi-val" style="font-size: 16px;">${c.loyaltyTier}</span></div>
+        <div class="profile-kpi-icon" style="color: #ec4899; background: #fdf2f8;"><i class="fas fa-heart"></i></div>
       </div>
-      
       <div class="profile-kpi-card">
-        <div class="profile-kpi-info">
-          <span class="profile-kpi-lbl">Next Purchase</span>
-          <span class="profile-kpi-val" style="font-size: 18px; color: #0269a1;">${nextPurchaseStr}</span>
-        </div>
-        <div class="profile-kpi-icon" style="color: #0ea5e9; background: #f0f9ff;">
-          <i class="fas fa-chart-line"></i>
-        </div>
+        <div class="profile-kpi-info"><span class="profile-kpi-lbl">Next Purchase</span><span class="profile-kpi-val" style="font-size: 18px; color: #0269a1;">${nextPurchaseStr}</span></div>
+        <div class="profile-kpi-icon" style="color: #0ea5e9; background: #f0f9ff;"><i class="fas fa-chart-line"></i></div>
       </div>
-      
       <div class="profile-kpi-card">
-        <div class="profile-kpi-info">
-          <span class="profile-kpi-lbl">Avg. Order Value</span>
-          <span class="profile-kpi-val">฿${c.aov.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</span>
-        </div>
-        <div class="profile-kpi-icon" style="color: #10b981; background: #ecfdf5;">
-          <i class="fas fa-shopping-cart"></i>
-        </div>
+        <div class="profile-kpi-info"><span class="profile-kpi-lbl">Avg. Order Value</span><span class="profile-kpi-val">฿${c.aov.toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>
+        <div class="profile-kpi-icon" style="color: #10b981; background: #ecfdf5;"><i class="fas fa-shopping-cart"></i></div>
       </div>
     </div>
-
-    <!-- Row 2: 3 cards -->
     <div class="profile-kpi-grid-3">
       <div class="profile-kpi-card">
-        <div class="profile-kpi-info">
-          <span class="profile-kpi-lbl">First Purchase Date</span>
-          <span class="profile-kpi-val" style="font-size: 18px;">${firstPurchaseStr}</span>
-        </div>
-        <div class="profile-kpi-icon" style="color: #6366f1; background: #eef2ff;">
-          <i class="fas fa-calendar"></i>
-        </div>
+        <div class="profile-kpi-info"><span class="profile-kpi-lbl">First Purchase Date</span><span class="profile-kpi-val" style="font-size: 18px;">${firstPurchaseStr}</span></div>
+        <div class="profile-kpi-icon" style="color: #6366f1; background: #eef2ff;"><i class="fas fa-calendar"></i></div>
       </div>
-      
       <div class="profile-kpi-card">
-        <div class="profile-kpi-info">
-          <span class="profile-kpi-lbl">Last Purchase Date</span>
-          <span class="profile-kpi-val" style="font-size: 18px;">${lastPurchaseStr}</span>
-        </div>
-        <div class="profile-kpi-icon" style="color: #8b5cf6; background: #f5f3ff;">
-          <i class="fas fa-calendar-alt"></i>
-        </div>
+        <div class="profile-kpi-info"><span class="profile-kpi-lbl">Last Purchase Date</span><span class="profile-kpi-val" style="font-size: 18px;">${lastPurchaseStr}</span></div>
+        <div class="profile-kpi-icon" style="color: #8b5cf6; background: #f5f3ff;"><i class="fas fa-calendar-alt"></i></div>
       </div>
-      
       <div class="profile-kpi-card">
-        <div class="profile-kpi-info">
-          <span class="profile-kpi-lbl">Total Orders</span>
-          <span class="profile-kpi-val">${c.totalOrders}</span>
-        </div>
-        <div class="profile-kpi-icon" style="color: #f59e0b; background: #fffbeb;">
-          <i class="fas fa-hashtag"></i>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2 Detail Columns -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 40px;">
-      <!-- Status & Segmentation -->
-      <div class="profile-detail-card" style="background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.02);">
-        <h3 style="font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 15px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">Status & Segmentation</h3>
-        <div style="display: flex; flex-direction: column; gap: 5px;">
-          <div class="profile-detail-row">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-flag" style="margin-right: 8px; width: 15px;"></i> Priority</span>
-            <span style="font-size: 13px;"><span class="badge-span ${getAdminPriClass(c.adminPriority)}">${c.adminPriority}</span></span>
-          </div>
-          <div class="profile-detail-row">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-layer-group" style="margin-right: 8px; width: 15px;"></i> Segment 1</span>
-            <span style="font-size: 13px;"><span class="badge-span ${getSegClass(c.segment1)}">${c.segment1}</span></span>
-          </div>
-          <div class="profile-detail-row">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-tag" style="margin-right: 8px; width: 15px;"></i> Segment 2</span>
-            <span style="font-size: 13px;"><span class="badge-span ${getSegClass(c.segment2)}">${c.segment2}</span></span>
-          </div>
-          <div class="profile-detail-row" style="flex-direction: column; gap: 5px; align-items: flex-start; border-bottom: none;">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-book" style="margin-right: 8px; width: 15px;"></i> Action Strategy Guideline</span>
-            <span style="font-size: 13px; color: #334155; font-weight: 500; margin-left: 23px; padding-top: 5px;">${c.actionStrategy || 'No guideline available.'}</span>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Purchase History -->
-      <div class="profile-detail-card" style="background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.02);">
-        <h3 style="font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 15px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">Purchase History</h3>
-        <div style="display: flex; flex-direction: column; gap: 2px;">
-          <div class="profile-detail-row">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-box" style="margin-right: 8px; width: 15px;"></i> First Product</span>
-            <span style="font-size: 13px; font-weight: 600; color: #334155;">${c.entryProduct || '-'}</span>
-          </div>
-          <div class="profile-detail-row">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-star" style="margin-right: 8px; width: 15px;"></i> Most Frequent Product</span>
-            <span style="font-size: 13px; font-weight: 600; color: #334155;">${c.currentFavorite || '-'}</span>
-          </div>
-          <div class="profile-detail-row">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-calendar-alt" style="margin-right: 8px; width: 15px;"></i> Last Purchase Date</span>
-            <span style="font-size: 13px; font-weight: 600; color: #334155;">${lastPurchaseStr}</span>
-          </div>
-          <div class="profile-detail-row">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-clock" style="margin-right: 8px; width: 15px;"></i> Days Since Last</span>
-            <span style="font-size: 13px; font-weight: 600; color: #334155;">${c.daysSinceLast.toFixed(0)} วัน</span>
-          </div>
-          <div class="profile-detail-row">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-shopping-basket" style="margin-right: 8px; width: 15px;"></i> Last Product</span>
-            <span style="font-size: 13px; font-weight: 600; color: #334155; max-width: 250px; overflow: hidden; text-overflow: ellipsis;" title="${c.lastProductStr}">${c.lastProductStr || '-'}</span>
-          </div>
-          <div class="profile-detail-row">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-sign-in-alt" style="margin-right: 8px; width: 15px;"></i> First Channel</span>
-            <span style="font-size: 13px; font-weight: 600; color: #334155;">${c.firstChannel || '-'}</span>
-          </div>
-          <div class="profile-detail-row">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-sign-out-alt" style="margin-right: 8px; width: 15px;"></i> Last Channel</span>
-            <span style="font-size: 13px; font-weight: 600; color: #334155;">${c.lastChannel || '-'}</span>
-          </div>
-        </div>
+        <div class="profile-kpi-info"><span class="profile-kpi-lbl">Total Orders</span><span class="profile-kpi-val">${c.totalOrders}</span></div>
+        <div class="profile-kpi-icon" style="color: #f59e0b; background: #fffbeb;"><i class="fas fa-hashtag"></i></div>
       </div>
     </div>
   `;
