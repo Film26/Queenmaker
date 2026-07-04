@@ -75,40 +75,75 @@ function renderExecutive2(filteredData, rawData) {
     return 0;
   }
 
-  function getExec2Group(row) {
-  let rawCh = "";
-  let rawRemark = "";
-
-  // 💡 วนลูปหาคอลัมน์แบบ "ดักจับคำ" เพื่อป้องกันภาษาไทยเพี้ยนหรือช่องว่างซ่อนตัว
-  if (row) {
-    for (let key in row) {
-      let k = key.trim().toLowerCase();
-      // เช็กช่องทางหลัก
-      if (k.includes('ช่องทาง') || k.includes('platform') || k.includes('channel') || k.includes('promotion')) {
-        rawCh = row[key] || "";
-      }
-      // เช็กช่องหมายเหตุ/Remark (รองรับทั้งคำไทยและอังกฤษ ไม่กลัวเว้นวรรค)
-      if (k.includes('remark') || k.includes('หมายเหตุ')) {
-        rawRemark = row[key] || "";
-      }
-    }
+  // 💡 ตัวช่วย "ทำความสะอาด" ชื่อคอลัมน์ก่อนเทียบ
+  // - ตัดตัวอักษรที่มองไม่เห็น (zero-width space, BOM, non-breaking space)
+  // - normalize('NFC') แก้ปัญหาสระ/วรรณยุกต์ไทยที่เก็บ Unicode คนละรูปแบบ (NFC vs NFD)
+  //   ทำให้ข้อความหน้าตาเหมือนกันแต่เทียบสตริงไม่ตรงกัน
+  function normalizeKey(key) {
+    return key
+      .toString()
+      .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '')
+      .trim()
+      .normalize('NFC')
+      .toLowerCase();
   }
 
-  // แปลงค่าที่ได้เป็นตัวพิมพ์ใหญ่และลบช่องว่างออกตาม Logic เดิมของคุณ
-  let chStr = `${rawCh} ${rawRemark}`.toUpperCase().replace(/\s+/g, ''); 
-  
-  // เช็กเงื่อนไขจัดกลุ่ม (ตัดช่องว่างออกแล้ว เช็กคำที่ติดกันได้เลย)
-  if (chStr.includes('CRM')) return 'CRM';
-  if (chStr.includes('SHOPEE') || chStr.includes('SHP') || chStr.includes('SP')) return 'Shopee';
-  if (chStr.includes('LAZADA') || chStr.includes('LZD') || chStr.includes('LAZ')) return 'Lazada';
-  if (chStr.includes('LINE')) return 'Line';
-  if (chStr.includes('PHONE') || chStr.includes('CALL') || chStr.includes('โทร')) return 'Call';
-  if (chStr.includes('TIKTOK') || chStr.includes('TT')) return 'Tiktok';
-  if (chStr.includes('FACEBOOK') || chStr.includes('FB') || chStr.includes('เพจ')) return 'Facebook';
-  if (chStr.includes('INSTAGRAM') || chStr.includes('IG')) return 'Instagram';
-  
-  return 'Other';
-}
+  function getExec2Group(row) {
+    let rawCh = "";
+    let rawRemark = "";
+    // priority: 0 = ตรงชื่อเป๊ะ, 1 = จับคู่แบบ includes, 99 = ยังไม่เจอ
+    // ยิ่งเลขน้อย = แม่นยำกว่า และเมื่อเจอ priority เท่ากัน จะไม่ทับของเดิมถ้าค่าเดิมไม่ว่าง
+    let chPriority = 99;
+    let remarkPriority = 99;
+
+    const channelExact = ['ช่องทาง', 'channel', 'platform'];
+    const remarkExact = ['หมายเหตุ', 'remark', 'note', 'คอมเมนต์', 'comment'];
+
+    if (row) {
+      for (let key in row) {
+        const val = row[key];
+        // ข้ามคอลัมน์ที่ค่าว่าง เพื่อไม่ให้ทับข้อมูลดีๆ ที่เจอไปแล้ว
+        if (val === undefined || val === null || val === '') continue;
+
+        const k = normalizeKey(key);
+
+        // ---- คอลัมน์ช่องทาง ----
+        if (channelExact.includes(k)) {
+          if (chPriority > 0) { rawCh = val; chPriority = 0; }
+        } else if (
+          (k.includes('ช่องทาง') || k.includes('platform') || k.includes('channel') || k.includes('promotion')) &&
+          chPriority > 1
+        ) {
+          rawCh = val; chPriority = 1;
+        }
+
+        // ---- คอลัมน์หมายเหตุ ----
+        if (remarkExact.includes(k)) {
+          if (remarkPriority > 0) { rawRemark = val; remarkPriority = 0; }
+        } else if (
+          (k.includes('remark') || k.includes('หมายเหตุ') || k.includes('note') || k.includes('คอมเมนต์')) &&
+          remarkPriority > 1
+        ) {
+          rawRemark = val; remarkPriority = 1;
+        }
+      }
+    }
+
+    // แปลงค่าที่ได้เป็นตัวพิมพ์ใหญ่และลบช่องว่างออกตาม Logic เดิม
+    let chStr = normalizeKey(`${rawCh} ${rawRemark}`).toUpperCase().replace(/\s+/g, '');
+
+    // เช็กเงื่อนไขจัดกลุ่ม (ตัดช่องว่างออกแล้ว เช็กคำที่ติดกันได้เลย)
+    if (chStr.includes('CRM')) return 'CRM';
+    if (chStr.includes('SHOPEE') || chStr.includes('SHP') || chStr.includes('SP')) return 'Shopee';
+    if (chStr.includes('LAZADA') || chStr.includes('LZD') || chStr.includes('LAZ')) return 'Lazada';
+    if (chStr.includes('LINE')) return 'Line';
+    if (chStr.includes('PHONE') || chStr.includes('CALL') || chStr.includes('โทร')) return 'Call';
+    if (chStr.includes('TIKTOK') || chStr.includes('TT')) return 'Tiktok';
+    if (chStr.includes('FACEBOOK') || chStr.includes('FB') || chStr.includes('เพจ')) return 'Facebook';
+    if (chStr.includes('INSTAGRAM') || chStr.includes('IG')) return 'Instagram';
+
+    return 'Other';
+  }
   
   function getLocalCustomerId(row) {
     let cid = getValue(row, 'Customer ID') || getValue(row, 'Customer ID ');
