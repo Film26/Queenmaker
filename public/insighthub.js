@@ -605,7 +605,7 @@ function renderInsightHub(filteredData, rawData) {
       lastAdmin = window.getRowValue(lastOrder.row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']) || "-";
     }
 
-    // Annual Tiers
+    // Annual Spending [ปรับแก้จุดที่ 1.1: ปรับเปลี่ยนการเก็บข้อมูลยอดเงินสะสมรายปีแทนการแปลงเป็นระดับข้อความ Tier]
     const annualSpending = {};
     availableYears.forEach(y => annualSpending[y] = 0);
     sortedHistory.forEach(o => {
@@ -616,14 +616,6 @@ function renderInsightHub(filteredData, rawData) {
         if (!isNaN(rev)) annualSpending[year] += rev;
       }
     });
-
-    const getYearTier = (amt) => {
-      if (amt <= 0) return "-";
-      if (amt >= 25000) return "💎 Whale";
-      if (amt >= 12000) return "🐳 Dolphin";
-      if (amt >= 4500) return "🐟 Minnow";
-      return "🐚 General";
-    };
 
     const customerObj = {
       phone,
@@ -647,6 +639,7 @@ function renderInsightHub(filteredData, rawData) {
       firstChannel,
       lastChannel,
       lastAdmin,
+      annualSpending, // ส่งต่อยอดซื้อรายปีดิบไปประมวลผลต่อใน Profile และฟิลเตอร์
       // แปลงฟอร์แมตวันที่เป็นข้อความไว้สำหรับแสดงผลและเสิร์ชใน Filter ของ Excel
       firstPurchaseStr: formatDateDisplay(firstPurchaseDate),
       lastPurchaseStr: formatDateDisplay(lastPurchaseDate),
@@ -657,8 +650,10 @@ function renderInsightHub(filteredData, rawData) {
       daysSinceLastStr: daysSinceLast.toFixed(1)
     };
     
+    // [ปรับแก้จุดที่ 1.2: คอลัมน์ที่ไปแสดงบนตารางหน้าหลักเปลี่ยนสูตรให้แสดงยอดขาย ฿ แท้จริงแทนคำว่า Whale/Dolphin]
     availableYears.forEach(y => {
-      customerObj['tier' + y] = getYearTier(annualSpending[y] || 0);
+      const amt = annualSpending[y] || 0;
+      customerObj['tier' + y] = amt > 0 ? "฿" + amt.toLocaleString(undefined, {maximumFractionDigits:0}) : "-";
     });
     
     return customerObj;
@@ -906,7 +901,7 @@ function renderInsightHub(filteredData, rawData) {
               ${makeExcelHeaderTh('lastChannel', 'LastChannel (Main)', 'th-action')}
               ${makeExcelHeaderTh('lastAdmin', 'Last Admin', 'th-action')}
               
-              ${state.availableYears.map(y => makeExcelHeaderTh('tier' + y, `Tier ${y}`, 'th-tiers')).join('')}
+              ${state.availableYears.map(y => makeExcelHeaderTh('tier' + y, `ยอดซื้อปี ${y}`, 'th-tiers')).join('')}
             </tr>
           </thead>
           <tbody>
@@ -936,7 +931,7 @@ function renderInsightHub(filteredData, rawData) {
                 <td>${c.lastChannel}</td>
                 <td>${c.lastAdmin}</td>
                 
-                ${state.availableYears.map(y => `<td style="text-align: center;">${c['tier' + y]}</td>`).join('')}
+                ${state.availableYears.map(y => `<td style="text-align: right; font-weight: 500;">${c['tier' + y]}</td>`).join('')}
               </tr>
             `).join('')}
           </tbody>
@@ -977,7 +972,6 @@ window.toggleExcelDropdown = function(colId) {
   if (window.applyFilters) window.applyFilters();
 };
 
-// แก้บัคข้อ 1 & 2: เมื่อพิมพ์เสิร์ช จะเปลี่ยนเฉพาะลิสต์กล่องเช็คบ็อกซ์ภายใน โดยไม่ยุ่งกับตารางด้านหลัง โฟกัสไม่หลุดแน่นอน
 window.handleDropdownSearch = function(colId, value) {
   window.insightHubState.excelSearchTerms[colId] = value;
   
@@ -1026,7 +1020,6 @@ window.handleDropdownCheck = function(colId, value, isChecked) {
   }
 };
 
-// แก้บัคข้อ 3: ฟังก์ชันคลิกปุ่ม "เลือกทั้งหมด" 
 window.excelSelectAllRows = function(colId) {
   const uniqueValues = Array.from(new Set(window.insightHubState.allCustomers.map(c => {
     if (colId === 'firstPurchaseDate') return c.firstPurchaseStr;
@@ -1044,14 +1037,12 @@ window.excelSelectAllRows = function(colId) {
   window.handleDropdownSearch(colId, filterSearchText);
 };
 
-// แก้บัคข้อ 3: ฟังก์ชันคลิกปุ่ม "ล้าง"
 window.excelClearAllRows = function(colId) {
   window.insightHubState.excelFilters[colId] = [];
   const filterSearchText = (window.insightHubState.excelSearchTerms[colId] || "");
   window.handleDropdownSearch(colId, filterSearchText);
 };
 
-// ปุ่มยกเลิกฟิลเตอร์ -> รีเซ็ตกลับไปเป็นเลือกทั้งหมดของคอลัมน์นั้นและอัปเดตตารางหลัก
 window.clearExcelFilter = function(colId) {
   delete window.insightHubState.excelFilters[colId];
   delete window.insightHubState.excelSearchTerms[colId];
@@ -1060,7 +1051,6 @@ window.clearExcelFilter = function(colId) {
   if (window.applyFilters) window.applyFilters();
 };
 
-// ปุ่มตกลง -> ทำการคำนวณและปรับเปลี่ยนผลลัพธ์บนตารางหลักตามชอยส์ที่เลือกทันที (แก้บัคข้อ 2)
 window.confirmExcelFilter = function() {
   window.insightHubState.activeDropdown = null;
   window.insightHubState.currentPage = 1;
@@ -1330,6 +1320,22 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
             <span style="color: #64748b; font-size: 13px;"><i class="fas fa-sign-out-alt" style="margin-right: 8px; width: 15px;"></i> Last Channel</span>
             <span style="font-size: 13px; font-weight: 600; color: #334155;">${c.lastChannel || '-'}</span>
           </div>
+
+          <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #e2e8f0;">
+            <span style="font-size: 12px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">ยอดซื้อสะสมรายปี (2021 - 2026)</span>
+          </div>
+          ${[2021, 2022, 2023, 2024, 2025, 2026].map(year => {
+            const amount = c.annualSpending[year] || 0;
+            return `
+              <div class="profile-detail-row" style="padding: 6px 0;">
+                <span style="color: #64748b; font-size: 13px;"><i class="fas fa-coins" style="margin-right: 8px; width: 15px; color: #f59e0b;"></i> ยอดซื้อปี ${year}</span>
+                <span style="font-size: 13px; font-weight: bold; color: ${amount > 0 ? '#1e293b' : '#94a3b8'};">
+                  ${amount > 0 ? '฿' + amount.toLocaleString() : '-'}
+                </span>
+              </div>
+            `;
+          }).join('')}
+
         </div>
       </div>
     </div>
