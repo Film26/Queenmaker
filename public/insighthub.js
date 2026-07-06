@@ -7,11 +7,8 @@ if (!window.insightHubState) {
     searchTerm: "",
     sortColumn: "totalRevenue",
     sortAsc: false,
-    // เก็บค่าคัดกรอง (ตัวเลือกที่เลือกไว้) ของแต่ละคอลัมน์ [columnId]: [ array ของค่าที่ถูกเลือก ]
     excelFilters: {}, 
-    // เก็บคำค้นหาภายในแต่ละช่อง Search ของ Dropdown [columnId]: "คำที่พิมพ์"
     excelSearchTerms: {}, 
-    // ควบคุมการเปิด/ปิด Dropdown ของแต่ละคอลัมน์ (เก็บ id คอลัมน์ที่เปิดอยู่)
     activeDropdown: null, 
     selectedCustomerPhone: null,
     allCustomers: []
@@ -103,7 +100,6 @@ function renderInsightHub(filteredData, rawData) {
     return;
   }
 
-  // 1. Inject Premium Styles + Excel Filter Component Styles
   if (!document.getElementById('insighthub-styles')) {
     const style = document.createElement('style');
     style.id = 'insighthub-styles';
@@ -187,7 +183,7 @@ function renderInsightHub(filteredData, rawData) {
         border-radius: 16px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.02);
         border: 1px solid #f0e6df;
-        overflow: visible; /* เปลี่ยนเป็น visible เพื่อป้องกันดรอปดาวน์โดนขอบตารางตัดขาด */
+        overflow: visible;
         margin-bottom: 40px;
         position: relative;
       }
@@ -223,7 +219,6 @@ function renderInsightHub(filteredData, rawData) {
         background-color: #fafafa;
       }
       
-      /* Layout สำหรับปุ่ม Filter และการ Sort บนหัวตาราง */
       .th-container {
         display: flex;
         align-items: center;
@@ -249,7 +244,6 @@ function renderInsightHub(filteredData, rawData) {
         background: #f0e6df;
       }
       
-      /* หน้าต่าง Excel Dropdown Box */
       .excel-dropdown-menu {
         position: absolute;
         top: 100%;
@@ -335,25 +329,21 @@ function renderInsightHub(filteredData, rawData) {
         font-weight: 700;
       }
       
-      /* Life Time Value colors */
       .ltv-whale { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
       .ltv-dolphin { background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; }
       .ltv-minnow { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
       .ltv-general { background: #f5f5f5; color: #555555; border: 1px solid #e5e5e5; }
       
-      /* Loyalty Index colors */
       .loy-legendary { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
       .loy-veteran { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
       .loy-regular { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
       .loy-seedling { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
       
-      /* Admin Priority colors */
       .pri-high { color: #15803d; font-weight: bold; }
       .pri-medium { color: #b45309; font-weight: bold; }
       .pri-low { color: #d97706; font-weight: bold; }
       .pri-winback { color: #b91c1c; font-weight: bold; }
       
-      /* Segments colors */
       .seg-active { color: #166534; font-weight: 700; }
       .seg-risk { color: #d97706; font-weight: 700; }
       .seg-churn { color: #991b1b; font-weight: 700; }
@@ -412,7 +402,6 @@ function renderInsightHub(filteredData, rawData) {
         color: #999;
       }
       
-      /* Profile View Styles */
       .profile-kpi-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 20px; }
       .profile-kpi-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; }
       @media (max-width: 1024px) {
@@ -440,7 +429,6 @@ function renderInsightHub(filteredData, rawData) {
     `;
     document.head.appendChild(style);
 
-    // ปิดหน้าต่าง Filter Dropdown เมื่อคลิกนอกพื้นที่ควบคุม
     document.addEventListener('click', function(e) {
       if (!e.target.closest('.th-container') && !e.target.closest('.excel-dropdown-menu')) {
         if (window.insightHubState.activeDropdown) {
@@ -452,8 +440,6 @@ function renderInsightHub(filteredData, rawData) {
   }
 
   const state = window.insightHubState;
-
-  // 2. Pre-aggregate ALL transaction history from rawData by customer phone
   const rawSaleOrders = rawData.filter(row => window.isSaleOrder(row));
   
   let maxTime = 0;
@@ -494,7 +480,6 @@ function renderInsightHub(filteredData, rawData) {
     return;
   }
 
-  // 3. Compile customer records (calculating Excel formulas dynamically)
   const customers = Array.from(filteredCustomerPhones).map(phone => {
     const historyRows = customerHistoryMap[phone] || [];
     const sortedHistory = historyRows.map(row => {
@@ -526,13 +511,11 @@ function renderInsightHub(filteredData, rawData) {
     const refillWindow = getRefillWindow(lastProductStr);
     const nextPurchaseDateObj = new Date(lastPurchaseDate.getTime() + refillWindow * 24 * 60 * 60 * 1000);
 
-    // Life Time Value Tier
     let ltvTier = "🐚 4. General";
     if (totalRevenue >= 25000) ltvTier = "💎 1. VVIP Whale (>25k)";
     else if (totalRevenue >= 12000) ltvTier = "🐳 2. VIP Dolphin (>12k)";
     else if (totalRevenue >= 4500) ltvTier = "🐟 3. Regular Minnow (>4.5k)";
 
-    // Loyalty Index
     const tenureDays = Math.max(0, (lastPurchaseDate - firstPurchaseDate) / (1000 * 60 * 60 * 24));
     let loyaltyTier = "🌱 Seedling";
     if (tenureDays > 365) loyaltyTier = "🏅 Legendary (1Y+)";
@@ -555,20 +538,17 @@ function renderInsightHub(filteredData, rawData) {
       }
     }
 
-    // Segment 1
     let segment1 = "CHURN";
     if (daysSinceLast <= 30) segment1 = "NEW";
     else if (daysSinceLast <= 90) segment1 = "ACTIVE";
     else if (daysSinceLast <= 120) segment1 = "RISK";
 
-    // Segment 2
     let segment2 = "CHURN";
     if (daysSinceLast <= 7) segment2 = "NEW";
     else if (daysSinceLast <= refillWindow - 8) segment2 = "ACTIVE";
     else if (daysSinceLast <= refillWindow + 3) segment2 = "REFILL";
     else if (daysSinceLast <= refillWindow + 59) segment2 = "RISK";
 
-    // Admin Priority
     let adminPriority = "4. 🔴 Win-back (กู้สถานะ)";
     if (segment2 === "REFILL") {
       adminPriority = "1. 🟢 High (ยอดขาย)";
@@ -582,7 +562,6 @@ function renderInsightHub(filteredData, rawData) {
       adminPriority = "3. 🟠 Low (ดูแลสัมพันธ์)";
     }
 
-    // Action Strategy Guideline
     let actionStrategy = "✅ Healthy Care: ดูแลตามปกติ";
     if (segment1 === "ACTIVE" && segment2 === "REFILL") actionStrategy = "🎯 Golden Period: ทักปิดยอดด่วน!";
     else if (segment1 === "RISK" && segment2 === "REFILL") actionStrategy = "⚡ Urgent Opportunity: ทักดึงกลับด้วยโปร";
@@ -605,7 +584,7 @@ function renderInsightHub(filteredData, rawData) {
       lastAdmin = window.getRowValue(lastOrder.row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']) || "-";
     }
 
-    // Annual Tiers
+    // คำนวณยอดเงินสะสมจริงแยกรายปี
     const annualSpending = {};
     availableYears.forEach(y => annualSpending[y] = 0);
     sortedHistory.forEach(o => {
@@ -616,14 +595,6 @@ function renderInsightHub(filteredData, rawData) {
         if (!isNaN(rev)) annualSpending[year] += rev;
       }
     });
-
-    const getYearTier = (amt) => {
-      if (amt <= 0) return "-";
-      if (amt >= 25000) return "💎 Whale";
-      if (amt >= 12000) return "🐳 Dolphin";
-      if (amt >= 4500) return "🐟 Minnow";
-      return "🐚 General";
-    };
 
     const customerObj = {
       phone,
@@ -647,7 +618,7 @@ function renderInsightHub(filteredData, rawData) {
       firstChannel,
       lastChannel,
       lastAdmin,
-      // แปลงฟอร์แมตวันที่เป็นข้อความไว้สำหรับแสดงผลและเสิร์ชใน Filter ของ Excel
+      annualSpending,
       firstPurchaseStr: formatDateDisplay(firstPurchaseDate),
       lastPurchaseStr: formatDateDisplay(lastPurchaseDate),
       nextPurchaseStr: formatDateDisplay(nextPurchaseDateObj),
@@ -657,8 +628,10 @@ function renderInsightHub(filteredData, rawData) {
       daysSinceLastStr: daysSinceLast.toFixed(1)
     };
     
+    // ตั้งค่าแสดงผลบนตารางตารางหน้าหลักเป็น ยอดเงินบาท
     availableYears.forEach(y => {
-      customerObj['tier' + y] = getYearTier(annualSpending[y] || 0);
+      const amt = annualSpending[y] || 0;
+      customerObj['tier' + y] = amt > 0 ? "฿" + amt.toLocaleString(undefined, {maximumFractionDigits:0}) : "-";
     });
     
     return customerObj;
@@ -674,7 +647,6 @@ function renderInsightHub(filteredData, rawData) {
     }
   }
 
-  // 4. Calculate KPI aggregation counts
   let countWhale = 0, countDolphin = 0, countMinnow = 0, countGeneral = 0;
   let countActive = 0, countRisk = 0, countChurn = 0;
   const totalCount = customers.length;
@@ -692,17 +664,13 @@ function renderInsightHub(filteredData, rawData) {
 
   const getPctStr = (count) => totalCount > 0 ? ((count / totalCount) * 100).toFixed(0) + '%' : '0%';
 
-  // 5. คัดกรองข้อมูลหลักตาม Global Search และ Excel Multi-Checkbox Dropdown ทุกฟิลด์แบบไดนามิก
   let displayedCustomers = customers.filter(c => {
-    // แถบค้นหาหลัก (Global Search) ค้นชื่อหรือเบอร์
     const matchesSearch = c.name.toLowerCase().includes(state.searchTerm.toLowerCase()) || c.phone.includes(state.searchTerm);
     if (!matchesSearch) return false;
 
-    // ตรวจสอบเงื่อนไขคัดกรองของคอลัมน์ Excel Dropdowns ทั้งหมด
     for (const colId in state.excelFilters) {
       const allowedValues = state.excelFilters[colId];
       if (allowedValues && allowedValues.length > 0) {
-        // ดึงค่าของฟิลด์นั้นมาตรวจสอบ (ใช้ฟิลด์สำหรับเช็คข้อความแสดงผล)
         let itemValue = String(c[colId] || "").trim();
         if (colId === 'firstPurchaseDate') itemValue = c.firstPurchaseStr;
         if (colId === 'lastPurchaseDate') itemValue = c.lastPurchaseStr;
@@ -715,11 +683,9 @@ function renderInsightHub(filteredData, rawData) {
         if (!allowedValues.includes(itemValue)) return false;
       }
     }
-
     return true;
   });
 
-  // 6. จัดเรียงข้อมูล (Sorting)
   displayedCustomers.sort((a, b) => {
     let valA = a[state.sortColumn];
     let valB = b[state.sortColumn];
@@ -736,7 +702,6 @@ function renderInsightHub(filteredData, rawData) {
     }
   });
 
-  // 7. Pagination แบ่งหน้า
   const totalEntries = displayedCustomers.length;
   const totalPages = Math.ceil(totalEntries / state.rowsPerPage) || 1;
   if (state.currentPage > totalPages) state.currentPage = totalPages;
@@ -744,80 +709,68 @@ function renderInsightHub(filteredData, rawData) {
   const endIndex = Math.min(startIndex + state.rowsPerPage, totalEntries);
   const pageEntries = displayedCustomers.slice(startIndex, endIndex);
 
-  // 8. ฟังก์ชันสร้างหัวตาราง Th สไตล์ Excel พร้อมกล่องพิมพ์ค้นหาข้อมูลภายในตัวกรอง
   function makeExcelHeaderTh(columnId, displayTitle, extraClass = "") {
-  // 1. ดึงค่า Unique ทั้งหมดของคอลัมน์นี้ออกมาทำรายการตัวเลือก
-  const uniqueValues = Array.from(new Set(window.insightHubState.allCustomers.map(c => {
-    if (columnId === 'firstPurchaseDate') return c.firstPurchaseStr;
-    if (columnId === 'lastPurchaseDate') return c.lastPurchaseStr;
-    if (columnId === 'nextPurchaseDateObj') return c.nextPurchaseStr;
-    if (columnId === 'totalOrders') return c.totalOrdersStr;
-    if (columnId === 'totalRevenue') return c.totalRevenueStr;
-    if (columnId === 'aov') return c.aovStr;
-    if (columnId === 'daysSinceLast') return c.daysSinceLastStr;
-    return String(c[columnId] || "").trim();
-  }))).sort();
+    const uniqueValues = Array.from(new Set(window.insightHubState.allCustomers.map(c => {
+      if (columnId === 'firstPurchaseDate') return c.firstPurchaseStr;
+      if (columnId === 'lastPurchaseDate') return c.lastPurchaseStr;
+      if (columnId === 'nextPurchaseDateObj') return c.nextPurchaseStr;
+      if (columnId === 'totalOrders') return c.totalOrdersStr;
+      if (columnId === 'totalRevenue') return c.totalRevenueStr;
+      if (columnId === 'aov') return c.aovStr;
+      if (columnId === 'daysSinceLast') return c.daysSinceLastStr;
+      return String(c[columnId] || "").trim();
+    }))).sort();
 
-  // หากคอลัมน์นี้ยังไม่มีการตั้งค่าฟิลเตอร์ ให้ตั้งต้นเลือกทั้งหมดไว้ก่อน
-  if (!window.insightHubState.excelFilters[columnId]) {
-    window.insightHubState.excelFilters[columnId] = [...uniqueValues];
-  }
+    if (!window.insightHubState.excelFilters[columnId]) {
+      window.insightHubState.excelFilters[columnId] = [...uniqueValues];
+    }
 
-  const currentSelected = window.insightHubState.excelFilters[columnId];
-  const isOpen = window.insightHubState.activeDropdown === columnId;
-  const filterSearchText = (window.insightHubState.excelSearchTerms[columnId] || "").toLowerCase();
-  
-  // คัดกรองตัวเลือกในลิสต์ตามคำค้นหาที่พิมพ์
-  const visibleOptions = uniqueValues.filter(v => v.toLowerCase().includes(filterSearchText));
-  
-  // เช็คว่าคอลัมน์นี้มีการคัดกรองอยู่หรือไม่ (ถ้าจำนวนที่เลือกน้อยกว่าค่าทั้งหมด แปลว่ากำลังฟิลเตอร์)
-  const hasActiveFilter = currentSelected.length < uniqueValues.length;
+    const currentSelected = window.insightHubState.excelFilters[columnId];
+    const isOpen = window.insightHubState.activeDropdown === columnId;
+    const filterSearchText = (window.insightHubState.excelSearchTerms[columnId] || "").toLowerCase();
+    const visibleOptions = uniqueValues.filter(v => v.toLowerCase().includes(filterSearchText));
+    const hasActiveFilter = currentSelected.length < uniqueValues.length;
 
-  return `
-    <th class="${extraClass}" style="position: relative;">
-      <div class="th-container">
-        <span class="th-label" onclick="setHubSort('${columnId}')">${displayTitle} ${getSortIcon(columnId)}</span>
-        <button class="excel-filter-btn ${hasActiveFilter ? 'active-filter' : ''}" onclick="event.stopPropagation(); toggleExcelDropdown('${columnId}')">
-          <i class="fas fa-filter"></i>
-        </button>
-        
-        <div class="excel-dropdown-menu ${isOpen ? 'show' : ''}" onclick="event.stopPropagation();" style="width: 260px; position: absolute; background:#fff; border:1px solid #ccc; padding:10px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.15); z-index:9999;">
+    return `
+      <th class="${extraClass}" style="position: relative;">
+        <div class="th-container">
+          <span class="th-label" onclick="setHubSort('${columnId}')">${displayTitle} ${getSortIcon(columnId)}</span>
+          <button class="excel-filter-btn ${hasActiveFilter ? 'active-filter' : ''}" onclick="event.stopPropagation(); toggleExcelDropdown('${columnId}')">
+            <i class="fas fa-filter"></i>
+          </button>
           
-          <div style="font-size: 11px; margin-bottom: 8px; font-weight: normal; text-align: left;">
-            <a href="javascript:void(0);" style="color: #2563eb; font-weight: bold; text-decoration: none;" onclick="excelSelectAllRows('${columnId}')">เลือกทั้งหมด</a>
-            <span style="color: #ccc;"> | </span>
-            <a href="javascript:void(0);" style="color: #b91c1c; font-weight: bold; text-decoration: none;" onclick="excelClearAllRows('${columnId}')">ล้าง</a>
-            <span style="float: right; color:#999;">พบ ${visibleOptions.length} รายการ</span>
-          </div>
-
-          <div style="margin-bottom: 8px;">
-            <input type="text" class="excel-search-input" placeholder="🔍 พิมพ์คำค้นหาตัวเลือก..." value="${window.insightHubState.excelSearchTerms[columnId] || ''}" oninput="handleDropdownSearch('${columnId}', this.value)" style="width:100%; padding:6px; font-size:11px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
-          </div>
-          
-          <ul class="excel-options-list" id="list-${columnId}" style="max-height: 160px; overflow-y: auto; list-style: none; padding: 0; margin: 0; text-align: left;">
-            ${visibleOptions.map(opt => {
-              const isChecked = currentSelected.includes(opt);
-              return `
-                <li style="padding: 4px 0; display: flex; align-items: center; gap: 6px; font-size:11px;">
-                  <input type="checkbox" id="chk-${columnId}-${opt.replace(/[^a-zA-Z0-9]/g, '_')}" ${isChecked ? 'checked' : ''} onchange="handleDropdownCheck('${columnId}', '${opt.replace(/'/g, "\\'")}', this.checked)">
-                  <label style="cursor:pointer; flex-grow:1; font-weight: normal; margin:0;" for="chk-${columnId}-${opt.replace(/[^a-zA-Z0-9]/g, '_')}">${opt || '(ว่าง)'}</label>
-                </li>
-              `;
-            }).join('')}
-            ${visibleOptions.length === 0 ? '<li style="color:#999; text-align:center; padding: 10px 0;">ไม่พบผลลัพธ์</li>' : ''}
-          </ul>
-          
-          <div class="excel-dropdown-actions" style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 8px; display: flex; justify-content: space-between;">
-            <button class="excel-btn-sm" style="border-radius: 4px; padding: 4px 10px; border:1px solid #ddd; background:#fff; cursor:pointer; font-size:11px;" onclick="clearExcelFilter('${columnId}')">ยกเลิกฟิลเตอร์</button>
-            <button class="excel-btn-sm confirm" style="background: #15803d; border-color: #15803d; color: white; border-radius: 4px; padding: 4px 12px; cursor:pointer; font-size:11px; font-weight:bold;" onclick="confirmExcelFilter()">ตกลง</button>
+          <div class="excel-dropdown-menu ${isOpen ? 'show' : ''}" onclick="event.stopPropagation();" style="width: 260px; position: absolute; background:#fff; border:1px solid #ccc; padding:10px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.15); z-index:9999;">
+            <div style="font-size: 11px; margin-bottom: 8px; font-weight: normal; text-align: left;">
+              <a href="javascript:void(0);" style="color: #2563eb; font-weight: bold; text-decoration: none;" onclick="excelSelectAllRows('${columnId}')">เลือกทั้งหมด</a>
+              <span style="color: #ccc;"> | </span>
+              <a href="javascript:void(0);" style="color: #b91c1c; font-weight: bold; text-decoration: none;" onclick="excelClearAllRows('${columnId}')">ล้าง</a>
+              <span style="float: right; color:#999;">พบ ${visibleOptions.length} รายการ</span>
+            </div>
+            <div style="margin-bottom: 8px;">
+              <input type="text" class="excel-search-input" placeholder="🔍 พิมพ์คำค้นหาตัวเลือก..." value="${window.insightHubState.excelSearchTerms[columnId] || ''}" oninput="handleDropdownSearch('${columnId}', this.value)" style="width:100%; padding:6px; font-size:11px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
+            </div>
+            <ul class="excel-options-list" id="list-${columnId}" style="max-height: 160px; overflow-y: auto; list-style: none; padding: 0; margin: 0; text-align: left;">
+              ${visibleOptions.map(opt => {
+                const isChecked = currentSelected.includes(opt);
+                return `
+                  <li style="padding: 4px 0; display: flex; align-items: center; gap: 6px; font-size:11px;">
+                    <input type="checkbox" id="chk-${columnId}-${opt.replace(/[^a-zA-Z0-9]/g, '_')}" ${isChecked ? 'checked' : ''} onchange="handleDropdownCheck('${columnId}', '${opt.replace(/'/g, "\\'")}', this.checked)">
+                    <label style="cursor:pointer; flex-grow:1; font-weight: normal; margin:0;" for="chk-${columnId}-${opt.replace(/[^a-zA-Z0-9]/g, '_')}">${opt || '(ว่าง)'}</label>
+                  </li>
+                `;
+              }).join('')}
+              ${visibleOptions.length === 0 ? '<li style="color:#999; text-align:center; padding: 10px 0;">ไม่พบผลลัพธ์</li>' : ''}
+            </ul>
+            <div class="excel-dropdown-actions" style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 8px; display: flex; justify-content: space-between;">
+              <button class="excel-btn-sm" style="border-radius: 4px; padding: 4px 10px; border:1px solid #ddd; background:#fff; cursor:pointer; font-size:11px;" onclick="clearExcelFilter('${columnId}')">ยกเลิกฟิลเตอร์</button>
+              <button class="excel-btn-sm confirm" style="background: #15803d; border-color: #15803d; color: white; border-radius: 4px; padding: 4px 12px; cursor:pointer; font-size:11px; font-weight:bold;" onclick="confirmExcelFilter()">ตกลง</button>
+            </div>
           </div>
         </div>
-      </div>
-    </th>
-  `;
-}
+      </th>
+    `;
+  }
 
-  // 9. แสดงผล UI โครงสร้างหน้าหลัก
   let html = `
     <div class="hub-header">
       <h2>Customer Insight Hub</h2>
@@ -906,7 +859,7 @@ function renderInsightHub(filteredData, rawData) {
               ${makeExcelHeaderTh('lastChannel', 'LastChannel (Main)', 'th-action')}
               ${makeExcelHeaderTh('lastAdmin', 'Last Admin', 'th-action')}
               
-              ${state.availableYears.map(y => makeExcelHeaderTh('tier' + y, `Tier ${y}`, 'th-tiers')).join('')}
+              ${state.availableYears.map(y => makeExcelHeaderTh('tier' + y, `ยอดซื้อปี ${y}`, 'th-tiers')).join('')}
             </tr>
           </thead>
           <tbody>
@@ -936,7 +889,7 @@ function renderInsightHub(filteredData, rawData) {
                 <td>${c.lastChannel}</td>
                 <td>${c.lastAdmin}</td>
                 
-                ${state.availableYears.map(y => `<td style="text-align: center;">${c['tier' + y]}</td>`).join('')}
+                ${state.availableYears.map(y => '<td style="text-align: right; font-weight: 500;">' + c['tier' + y] + '</td>').join('')}
               </tr>
             `).join('')}
           </tbody>
@@ -965,19 +918,15 @@ function renderInsightHub(filteredData, rawData) {
   container.innerHTML = html;
 }
 
-// 10. ฟังก์ชันจัดการพฤติกรรมระบบ Excel Filtering เชื่อมต่อเข้ากับ Window
 window.toggleExcelDropdown = function(colId) {
-  // สลับการเปิดปิดหน้าต่างดรอปดาวน์ โดยไม่รีรันตารางหลัก ป้องกันอาการหนัตารางสั่นเด้ง
   if (window.insightHubState.activeDropdown === colId) {
     window.insightHubState.activeDropdown = null;
   } else {
     window.insightHubState.activeDropdown = colId;
   }
-  // ดึงเฉพาะแถว Th หัวตารางมารีเฟรชสถานะเปิด/ปิด เพื่อล็อกพิกัด Scroll ไว้ที่เดิม
   if (window.applyFilters) window.applyFilters();
 };
 
-// แก้บัคข้อ 1 & 2: เมื่อพิมพ์เสิร์ช จะเปลี่ยนเฉพาะลิสต์กล่องเช็คบ็อกซ์ภายใน โดยไม่ยุ่งกับตารางด้านหลัง โฟกัสไม่หลุดแน่นอน
 window.handleDropdownSearch = function(colId, value) {
   window.insightHubState.excelSearchTerms[colId] = value;
   
@@ -1026,7 +975,6 @@ window.handleDropdownCheck = function(colId, value, isChecked) {
   }
 };
 
-// แก้บัคข้อ 3: ฟังก์ชันคลิกปุ่ม "เลือกทั้งหมด" 
 window.excelSelectAllRows = function(colId) {
   const uniqueValues = Array.from(new Set(window.insightHubState.allCustomers.map(c => {
     if (colId === 'firstPurchaseDate') return c.firstPurchaseStr;
@@ -1044,14 +992,12 @@ window.excelSelectAllRows = function(colId) {
   window.handleDropdownSearch(colId, filterSearchText);
 };
 
-// แก้บัคข้อ 3: ฟังก์ชันคลิกปุ่ม "ล้าง"
 window.excelClearAllRows = function(colId) {
   window.insightHubState.excelFilters[colId] = [];
   const filterSearchText = (window.insightHubState.excelSearchTerms[colId] || "");
   window.handleDropdownSearch(colId, filterSearchText);
 };
 
-// ปุ่มยกเลิกฟิลเตอร์ -> รีเซ็ตกลับไปเป็นเลือกทั้งหมดของคอลัมน์นั้นและอัปเดตตารางหลัก
 window.clearExcelFilter = function(colId) {
   delete window.insightHubState.excelFilters[colId];
   delete window.insightHubState.excelSearchTerms[colId];
@@ -1060,7 +1006,6 @@ window.clearExcelFilter = function(colId) {
   if (window.applyFilters) window.applyFilters();
 };
 
-// ปุ่มตกลง -> ทำการคำนวณและปรับเปลี่ยนผลลัพธ์บนตารางหลักตามชอยส์ที่เลือกทันที (แก้บัคข้อ 2)
 window.confirmExcelFilter = function() {
   window.insightHubState.activeDropdown = null;
   window.insightHubState.currentPage = 1;
@@ -1330,6 +1275,22 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
             <span style="color: #64748b; font-size: 13px;"><i class="fas fa-sign-out-alt" style="margin-right: 8px; width: 15px;"></i> Last Channel</span>
             <span style="font-size: 13px; font-weight: 600; color: #334155;">${c.lastChannel || '-'}</span>
           </div>
+
+          <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #e2e8f0;">
+            <span style="font-size: 12px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">ยอดซื้อสะสมรายปี (2021 - 2026)</span>
+          </div>
+          ${[2021, 2022, 2023, 2024, 2025, 2026].map(year => {
+            const amount = c.annualSpending[year] || 0;
+            return `
+              <div class="profile-detail-row" style="padding: 6px 0;">
+                <span style="color: #64748b; font-size: 13px;"><i class="fas fa-coins" style="margin-right: 8px; width: 15px; color: #f59e0b;"></i> ยอดซื้อปี ${year}</span>
+                <span style="font-size: 13px; font-weight: bold; color: ${amount > 0 ? '#1e293b' : '#94a3b8'};">
+                  ${amount > 0 ? '฿' + amount.toLocaleString() : '-'}
+                </span>
+              </div>
+            `;
+          }).join('')}
+
         </div>
       </div>
     </div>
