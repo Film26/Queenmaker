@@ -1342,3 +1342,5 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
   `;
   container.innerHTML = html;
 }
+
+}
