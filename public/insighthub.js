@@ -142,6 +142,34 @@ function getMainChannel(rawChannel) {
   return mainChannelMap[key] !== undefined ? mainChannelMap[key] : raw;
 }
 
+// Mapping ช่องทางดิบ -> SubChannel_STD (คงรหัสย่อยของ Facebook/Instagram ไว้ เช่น FBH, IG-FBW แต่ช่องทางอื่น
+// ที่ไม่มีรายละเอียดย่อยจะรวมเป็นชื่อหลักเหมือน MainChannel_STD) ใช้กับคอลัมน์ LastChannel ตามที่ลูกค้ายืนยัน
+const subChannelMap = {
+  'FBH': 'FBH', 'FBP': 'FBP', 'FBSS': 'FBSS', 'FBD': 'FBD',
+  'FBM': 'FBM', 'FBW': 'FBW', 'FBK': 'FBK', 'FBG': 'FBG',
+  'FBC': 'FBC', 'FBP-W': 'FBP-W', 'FB': 'FBH',
+  'IG-FBW': 'IG-FBW', 'IG-FBSS': 'IG-FBSS', 'IG-FBH': 'IG-FBH',
+  'FBH-IG': 'FBH-IG', 'IG': 'IG',
+  'LINE': 'Line', 'L1': 'Line', 'L2': 'Line', 'L3': 'Line',
+  'LAZADA': 'Lazada',
+  'SHOPEE': 'Shopee',
+  'TIKTOK': 'Tiktok',
+  'WEB': 'Website', 'WWW': 'Website', 'WEBSITE': 'Website',
+  'โทรศัพท์': 'Call', 'CALL': 'Call', 'PHONE': 'Call',
+  'EMAIL': 'Email',
+  'CRM': 'CRM',
+  'PC': 'PC',
+  'OTHER': 'Other',
+  'TELESALE': 'Telesale', 'TELESALES': 'Telesale'
+};
+
+function getSubChannel(rawChannel) {
+  const raw = (rawChannel || '').toString().trim();
+  if (!raw) return "-";
+  const key = raw.toUpperCase();
+  return subChannelMap[key] !== undefined ? subChannelMap[key] : raw;
+}
+
 function renderInsightHub(filteredData, rawData) {
   const container = document.getElementById('view-insighthub');
   
@@ -650,7 +678,7 @@ function renderInsightHub(filteredData, rawData) {
     let lastChannel = "-";
     for (let i = allOrdersSorted.length - 1; i >= 0; i--) {
       const ch = window.getRowValue(allOrdersSorted[i].row, ['ช่องทาง', 'Channel']);
-      if (ch) { lastChannel = getMainChannel(ch); break; }
+      if (ch) { lastChannel = getSubChannel(ch); break; }
     }
     
     let lastAdmin = "-";
