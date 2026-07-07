@@ -102,7 +102,8 @@ function normalizePhone(raw) {
     const num = Number(p);
     if (!isNaN(num)) p = num.toFixed(0);
   }
-  p = p.replace(/\D/g, '');
+  // เก็บเลข 0-9 และตัวมาสก์ x/X ไว้ (เบอร์ที่ถูกปิดบังบางส่วน เช่น 081-xxx-1234) ตัดเฉพาะขีด/วงเล็บ/เว้นวรรค/+
+  p = p.replace(/[^0-9xX]/g, '').toLowerCase();
   if (!p) return '';
   if (p.startsWith('66') && p.length >= 11) {
     p = '0' + p.slice(2);
@@ -111,6 +112,34 @@ function normalizePhone(raw) {
     p = '0' + p;
   }
   return p;
+}
+
+// Mapping ช่องทางดิบ -> MainChannel_STD ตามตาราง mapping เดิมที่ลูกค้าใช้ใน Google Sheets
+// (RawKey -> SubChannel_STD -> MainChannel_STD) ใช้กับคอลัมน์ FirstChannel/LastChannel ที่ระบุ "(Main)"
+const mainChannelMap = {
+  'FBH': 'Facebook', 'FBP': 'Facebook', 'FBSS': 'Facebook', 'FBD': 'Facebook',
+  'FBM': 'Facebook', 'FBW': 'Facebook', 'FBK': 'Facebook', 'FBG': 'Facebook',
+  'FBC': 'Facebook', 'FBP-W': 'Facebook', 'FB': 'Facebook',
+  'IG-FBW': 'Instagram', 'IG-FBSS': 'Instagram', 'IG-FBH': 'Instagram',
+  'FBH-IG': 'Instagram', 'IG': 'Instagram',
+  'LINE': 'Line', 'L1': 'Line', 'L2': 'Line', 'L3': 'Line',
+  'LAZADA': 'Lazada',
+  'SHOPEE': 'Shopee',
+  'TIKTOK': 'Tiktok',
+  'WEB': 'Website', 'WWW': 'Website', 'WEBSITE': 'Website',
+  'โทรศัพท์': 'Call', 'CALL': 'Call', 'PHONE': 'Call',
+  'EMAIL': 'Email',
+  'CRM': 'CRM',
+  'PC': 'PC',
+  'OTHER': 'Other',
+  'TELESALE': 'Telesale', 'TELESALES': 'Telesale'
+};
+
+function getMainChannel(rawChannel) {
+  const raw = (rawChannel || '').toString().trim();
+  if (!raw) return "-";
+  const key = raw.toUpperCase();
+  return mainChannelMap[key] !== undefined ? mainChannelMap[key] : raw;
 }
 
 function renderInsightHub(filteredData, rawData) {
@@ -615,13 +644,13 @@ function renderInsightHub(filteredData, rawData) {
     }).filter(item => item.dateObj !== null).sort((a, b) => a.dateObj - b.dateObj);
 
     const firstChannel = allOrdersSorted.length > 0
-      ? (window.getRowValue(allOrdersSorted[0].row, ['ช่องทาง', 'Channel']) || "-")
+      ? getMainChannel(window.getRowValue(allOrdersSorted[0].row, ['ช่องทาง', 'Channel']))
       : "-";
 
     let lastChannel = "-";
     for (let i = allOrdersSorted.length - 1; i >= 0; i--) {
       const ch = window.getRowValue(allOrdersSorted[i].row, ['ช่องทาง', 'Channel']);
-      if (ch) { lastChannel = ch; break; }
+      if (ch) { lastChannel = getMainChannel(ch); break; }
     }
     
     let lastAdmin = "-";
