@@ -114,62 +114,69 @@ function normalizePhone(raw) {
   return p;
 }
 
-// Mapping ช่องทางดิบ -> MainChannel_STD ตามตาราง mapping เดิมที่ลูกค้าใช้ใน Google Sheets
-// (RawKey -> SubChannel_STD -> MainChannel_STD) ใช้กับคอลัมน์ FirstChannel/LastChannel ที่ระบุ "(Main)"
-const mainChannelMap = {
-  'FBH': 'Facebook', 'FBP': 'Facebook', 'FBSS': 'Facebook', 'FBD': 'Facebook',
-  'FBM': 'Facebook', 'FBW': 'Facebook', 'FBK': 'Facebook', 'FBG': 'Facebook',
-  'FBC': 'Facebook', 'FBP-W': 'Facebook', 'FB': 'Facebook',
-  'IG-FBW': 'Instagram', 'IG-FBSS': 'Instagram', 'IG-FBH': 'Instagram',
-  'FBH-IG': 'Instagram', 'IG': 'Instagram',
-  'LINE': 'Line', 'L1': 'Line', 'L2': 'Line', 'L3': 'Line',
-  'LAZADA': 'Lazada',
-  'SHOPEE': 'Shopee',
-  'TIKTOK': 'Tiktok',
-  'WEB': 'Website', 'WWW': 'Website', 'WEBSITE': 'Website',
-  'โทรศัพท์': 'Call', 'CALL': 'Call', 'PHONE': 'Call',
-  'EMAIL': 'Email',
-  'CRM': 'CRM',
-  'PC': 'PC',
-  'OTHER': 'Other',
-  'TELESALE': 'Telesale', 'TELESALES': 'Telesale'
+// Mapping ช่องทางดิบ (RawKey) -> { sub: SubChannel_STD, main: MainChannel_STD }
+// source of truth เดียว ใช้ทั้ง FirstChannel (Main) และ LastChannel (Main)
+const CHANNEL_MAP = {
+  'FBH':       { sub: 'FBH',      main: 'Facebook' },
+  'FBP':       { sub: 'FBP',      main: 'Facebook' },
+  'FBSS':      { sub: 'FBSS',     main: 'Facebook' },
+  'FBD':       { sub: 'FBD',      main: 'Facebook' },
+  'FBM':       { sub: 'FBM',      main: 'Facebook' },
+  'FBW':       { sub: 'FBW',      main: 'Facebook' },
+  'FBK':       { sub: 'FBK',      main: 'Facebook' },
+  'FBG':       { sub: 'FBG',      main: 'Facebook' },
+  'FBC':       { sub: 'FBC',      main: 'Facebook' },
+  'FBP-W':     { sub: 'FBP-W',    main: 'Facebook' },
+  'FB':        { sub: 'FBH',      main: 'Facebook' },
+  'IG':        { sub: 'IG',       main: 'Instagram' },
+  'IG-FBW':    { sub: 'IG-FBW',   main: 'Instagram' },
+  'IG-FBSS':   { sub: 'IG-FBSS',  main: 'Instagram' },
+  'IG-FBH':    { sub: 'IG-FBH',   main: 'Instagram' },
+  'FBH-IG':    { sub: 'FBH-IG',   main: 'Instagram' },
+  'LINE':      { sub: 'Line',     main: 'Line' },
+  'L1':        { sub: 'Line',     main: 'Line' },
+  'L2':        { sub: 'Line',     main: 'Line' },
+  'L3':        { sub: 'Line',     main: 'Line' },
+  'LAZADA':    { sub: 'Lazada',   main: 'Lazada' },
+  'SHOPEE':    { sub: 'Shopee',   main: 'Shopee' },
+  'TIKTOK':    { sub: 'Tiktok',   main: 'Tiktok' },
+  'WEB':       { sub: 'Website',  main: 'Website' },
+  'WWW':       { sub: 'Website',  main: 'Website' },
+  'WEBSITE':   { sub: 'Website',  main: 'Website' },
+  'โทรศัพท์':   { sub: 'Call',     main: 'Call' },
+  'CALL':      { sub: 'Call',     main: 'Call' },
+  'PHONE':     { sub: 'Call',     main: 'Call' },
+  'EMAIL':     { sub: 'Email',    main: 'Email' },
+  'CRM':       { sub: 'CRM',      main: 'CRM' },
+  'PC':        { sub: 'PC',       main: 'PC' },
+  'OTHER':     { sub: 'Other',    main: 'Other' },
+  'TELESALE':  { sub: 'Telesale', main: 'Telesale' },
+  'TELESALES': { sub: 'Telesale', main: 'Telesale' }
 };
 
-function getMainChannel(rawChannel) {
-  const raw = (rawChannel || '').toString().trim();
-  if (!raw) return "-";
-  const key = raw.toUpperCase();
-  // ยึดตามตาราง mapping ที่ยืนยันแล้วเท่านั้น ค่าดิบที่ไม่อยู่ในลิสต์ (เช่น "Line_oa") จะไม่หลุดออกมาตรงๆ แต่ถือเป็น "Other"
-  return mainChannelMap[key] !== undefined ? mainChannelMap[key] : "Other";
+// rawChannel: string|null/undefined -> { subChannel, mainChannel }
+// case-insensitive (trim + toUpperCase; ไม่กระทบคีย์ไทยอย่าง "โทรศัพท์" เพราะ toUpperCase ไม่เปลี่ยนอักษรไทย)
+// ค่าว่าง -> คืนค่าว่างทั้งคู่, ค่าที่ไม่รู้จัก -> "Other" ทั้งคู่ (ไม่ปล่อยค่าดิบหลุดออกมา)
+function standardizeChannel(rawChannel) {
+  if (rawChannel === null || rawChannel === undefined) return { subChannel: '', mainChannel: '' };
+  const raw = rawChannel.toString().trim();
+  if (!raw) return { subChannel: '', mainChannel: '' };
+
+  const entry = CHANNEL_MAP[raw.toUpperCase()];
+  if (entry) return { subChannel: entry.sub, mainChannel: entry.main };
+
+  console.warn('[standardizeChannel] Unknown channel key, defaulting to "Other":', raw);
+  return { subChannel: 'Other', mainChannel: 'Other' };
 }
 
-// Mapping ช่องทางดิบ -> SubChannel_STD (คงรหัสย่อยของ Facebook/Instagram ไว้ เช่น FBH, IG-FBW แต่ช่องทางอื่น
-// ที่ไม่มีรายละเอียดย่อยจะรวมเป็นชื่อหลักเหมือน MainChannel_STD) ใช้กับคอลัมน์ LastChannel ตามที่ลูกค้ายืนยัน
-const subChannelMap = {
-  'FBH': 'FBH', 'FBP': 'FBP', 'FBSS': 'FBSS', 'FBD': 'FBD',
-  'FBM': 'FBM', 'FBW': 'FBW', 'FBK': 'FBK', 'FBG': 'FBG',
-  'FBC': 'FBC', 'FBP-W': 'FBP-W', 'FB': 'FBH',
-  'IG-FBW': 'IG-FBW', 'IG-FBSS': 'IG-FBSS', 'IG-FBH': 'IG-FBH',
-  'FBH-IG': 'FBH-IG', 'IG': 'IG',
-  'LINE': 'Line', 'L1': 'L1', 'L2': 'L2', 'L3': 'L3',
-  'LAZADA': 'Lazada',
-  'SHOPEE': 'Shopee',
-  'TIKTOK': 'Tiktok',
-  'WEB': 'Website', 'WWW': 'Website', 'WEBSITE': 'Website',
-  'โทรศัพท์': 'Call', 'CALL': 'Call', 'PHONE': 'Call',
-  'EMAIL': 'Email',
-  'CRM': 'CRM',
-  'PC': 'PC',
-  'OTHER': 'Other',
-  'TELESALE': 'Telesale', 'TELESALES': 'Telesale'
-};
+function getMainChannel(rawChannel) {
+  const mainChannel = standardizeChannel(rawChannel).mainChannel;
+  return mainChannel || "-";
+}
 
 function getSubChannel(rawChannel) {
-  const raw = (rawChannel || '').toString().trim();
-  if (!raw) return "-";
-  const key = raw.toUpperCase();
-  // ยึดตามตาราง mapping ที่ยืนยันแล้วเท่านั้น ค่าดิบที่ไม่อยู่ในลิสต์ (เช่น "Line_oa") จะไม่หลุดออกมาตรงๆ แต่ถือเป็น "Other"
-  return subChannelMap[key] !== undefined ? subChannelMap[key] : "Other";
+  const subChannel = standardizeChannel(rawChannel).subChannel;
+  return subChannel || "-";
 }
 
 function renderInsightHub(filteredData, rawData) {
