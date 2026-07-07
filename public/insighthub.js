@@ -92,6 +92,27 @@ function formatDateDisplay(dObj) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
+// Cleansing: ใช้เบอร์โทรศัพท์เป็นคีย์หลักของลูกค้า ต้อง normalize ก่อนเทียบ/รวมข้อมูล
+// เพื่อไม่ให้เบอร์เดียวกันที่รูปแบบต่างกัน (ขีด, เว้นวรรค, +66, เลข 0 นำหน้าหาย) ถูกนับเป็นคนละคน
+function normalizePhone(raw) {
+  if (raw === null || raw === undefined) return '';
+  let p = raw.toString().trim();
+  if (!p) return '';
+  if (/e\+?\d+$/i.test(p)) {
+    const num = Number(p);
+    if (!isNaN(num)) p = num.toFixed(0);
+  }
+  p = p.replace(/\D/g, '');
+  if (!p) return '';
+  if (p.startsWith('66') && p.length >= 11) {
+    p = '0' + p.slice(2);
+  }
+  if (p.length === 9 && !p.startsWith('0')) {
+    p = '0' + p;
+  }
+  return p;
+}
+
 function renderInsightHub(filteredData, rawData) {
   const container = document.getElementById('view-insighthub');
   
@@ -459,9 +480,9 @@ function renderInsightHub(filteredData, rawData) {
   window.insightHubState.availableYears = availableYears;
 
   const customerHistoryMap = {};
-  
+
   rawSaleOrders.forEach(row => {
-    const phone = window.getRowValue(row, ['Phone']).toString().trim();
+    const phone = normalizePhone(window.getRowValue(row, ['Phone']));
     if (!phone) return;
     if (!customerHistoryMap[phone]) {
       customerHistoryMap[phone] = [];
@@ -469,9 +490,21 @@ function renderInsightHub(filteredData, rawData) {
     customerHistoryMap[phone].push(row);
   });
 
+  // ประวัติออเดอร์ "ทุกประเภท" (ไม่กรองเฉพาะ SALE) ต่อเบอร์โทร ใช้คำนวณ FirstChannel/LastChannel
+  // ให้ตรงกับสูตรเดิมใน Google Sheets ที่ค้นหาจากชีต 'All Order_Inputs' ทั้งหมด
+  const allOrdersHistoryMap = {};
+  rawData.forEach(row => {
+    const phone = normalizePhone(window.getRowValue(row, ['Phone']));
+    if (!phone) return;
+    if (!allOrdersHistoryMap[phone]) {
+      allOrdersHistoryMap[phone] = [];
+    }
+    allOrdersHistoryMap[phone].push(row);
+  });
+
   const filteredCustomerPhones = new Set();
   rawData.forEach(row => {
-    const phone = window.getRowValue(row, ['Phone']).toString().trim();
+    const phone = normalizePhone(window.getRowValue(row, ['Phone']));
     if (phone) filteredCustomerPhones.add(phone);
   });
 
@@ -574,8 +607,22 @@ function renderInsightHub(filteredData, rawData) {
     else if (segment1 === "NEW" && segment2 === "NEW") actionStrategy = "💖 Welcome: ติดตามผล/สอนวิธีใช้";
     else if ((segment1 === "RISK" || segment1 === "CHURN") && segment2 === "CHURN") actionStrategy = "😴 Dead Churn: ส่งโปรแรงดึงกลับ";
 
-    const firstChannel = window.getRowValue(firstOrder.row, ['ช่องทาง', 'Channel']) || "-";
-    const lastChannel = window.getRowValue(lastOrder.row, ['ช่องทาง', 'Channel']) || "-";
+    // FirstChannel = XLOOKUP(key, E, O, "", 0, 1) -> ช่องทางของออเดอร์แรกสุด (ทุกประเภท) ตามลำดับเวลา
+    // LastChannel (Main) = FILTER(...O<>"")-> INDEX(f, ROWS(f)) -> ช่องทางล่าสุดที่ "ไม่ว่าง" (ทุกประเภท)
+    const allOrdersSorted = (allOrdersHistoryMap[phone] || []).map(row => {
+      const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+      return { row, dateObj: parseToDateObj(dateStr) };
+    }).filter(item => item.dateObj !== null).sort((a, b) => a.dateObj - b.dateObj);
+
+    const firstChannel = allOrdersSorted.length > 0
+      ? (window.getRowValue(allOrdersSorted[0].row, ['ช่องทาง', 'Channel']) || "-")
+      : "-";
+
+    let lastChannel = "-";
+    for (let i = allOrdersSorted.length - 1; i >= 0; i--) {
+      const ch = window.getRowValue(allOrdersSorted[i].row, ['ช่องทาง', 'Channel']);
+      if (ch) { lastChannel = ch; break; }
+    }
     
     let lastAdmin = "-";
     if (window.getNormalizedAdmin) {
