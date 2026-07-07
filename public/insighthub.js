@@ -151,7 +151,7 @@ const subChannelMap = {
   'FBC': 'FBC', 'FBP-W': 'FBP-W', 'FB': 'FBH',
   'IG-FBW': 'IG-FBW', 'IG-FBSS': 'IG-FBSS', 'IG-FBH': 'IG-FBH',
   'FBH-IG': 'FBH-IG', 'IG': 'IG',
-  'LINE': 'Line', 'L1': 'Line', 'L2': 'Line', 'L3': 'Line',
+  'LINE': 'Line', 'L1': 'L1', 'L2': 'L2', 'L3': 'L3',
   'LAZADA': 'Lazada',
   'SHOPEE': 'Shopee',
   'TIKTOK': 'Tiktok',
