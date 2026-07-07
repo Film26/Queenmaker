@@ -139,7 +139,8 @@ function getMainChannel(rawChannel) {
   const raw = (rawChannel || '').toString().trim();
   if (!raw) return "-";
   const key = raw.toUpperCase();
-  return mainChannelMap[key] !== undefined ? mainChannelMap[key] : raw;
+  // ยึดตามตาราง mapping ที่ยืนยันแล้วเท่านั้น ค่าดิบที่ไม่อยู่ในลิสต์ (เช่น "Line_oa") จะไม่หลุดออกมาตรงๆ แต่ถือเป็น "Other"
+  return mainChannelMap[key] !== undefined ? mainChannelMap[key] : "Other";
 }
 
 // Mapping ช่องทางดิบ -> SubChannel_STD (คงรหัสย่อยของ Facebook/Instagram ไว้ เช่น FBH, IG-FBW แต่ช่องทางอื่น
@@ -167,7 +168,8 @@ function getSubChannel(rawChannel) {
   const raw = (rawChannel || '').toString().trim();
   if (!raw) return "-";
   const key = raw.toUpperCase();
-  return subChannelMap[key] !== undefined ? subChannelMap[key] : raw;
+  // ยึดตามตาราง mapping ที่ยืนยันแล้วเท่านั้น ค่าดิบที่ไม่อยู่ในลิสต์ (เช่น "Line_oa") จะไม่หลุดออกมาตรงๆ แต่ถือเป็น "Other"
+  return subChannelMap[key] !== undefined ? subChannelMap[key] : "Other";
 }
 
 function renderInsightHub(filteredData, rawData) {
