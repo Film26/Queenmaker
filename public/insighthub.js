@@ -1,8 +1,4 @@
 // public/insighthub.js
-// ปรับให้รองรับรูปแบบไฟล์ RAW 2021 (OrderDate, Remark, CustomerName, Address, Phone,
-// Product Set, Net Sales, Promotion, Birth month, Sex)
-// จุดที่เปลี่ยนหลักๆ ถูกคอมเมนต์กำกับด้วย [RAW2021]
-
 if (!window.insightHubState) {
   window.insightHubState = {
     currentPage: 1,
@@ -813,8 +809,16 @@ function renderInsightHub(filteredData, rawData) {
       }
     });
 
+    // [RAW2021] เบอร์สำหรับ "แสดงผล" ในคอลัมน์ CustomerKey (Phone)
+    // - ไฟล์เดิม: custKey คือเบอร์อยู่แล้ว -> โชว์เหมือนเดิมเป๊ะ
+    // - RAW 2021: custKey เป็นรหัสลูกค้า (ใช้จับกลุ่มเบื้องหลัง) แต่หน้าจอโชว์เบอร์มาสก์ตามไฟล์ เช่น xxxxxxx429
+    const rawPhoneVal = (window.getRowValue(lastOrder.row, ['Phone', 'เบอร์โทร', 'เบอร์โทรศัพท์']) || '').toString().trim();
+    const normPhone = normalizePhone(rawPhoneVal);
+    const displayPhone = (custKey === normPhone) ? custKey : (normPhone || rawPhoneVal || custKey);
+
     const customerObj = {
       phone: custKey, // [RAW2021] property ชื่อเดิม ค่าคือคีย์จาก getCustomerKey (ไฟล์เดิม = เบอร์โทรเหมือนเดิม)
+      displayPhone,
       name: window.getRowValue(lastOrder.row, ['CustomerName', 'ชื่อผู้ส่ง', 'Customer ID', 'รหัสลูกค้า']) || custKey,
       firstPurchaseDate,
       lastPurchaseDate,
@@ -882,7 +886,7 @@ function renderInsightHub(filteredData, rawData) {
   const getPctStr = (count) => totalCount > 0 ? ((count / totalCount) * 100).toFixed(0) + '%' : '0%';
 
   let displayedCustomers = customers.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(state.searchTerm.toLowerCase()) || c.phone.includes(state.searchTerm);
+    const matchesSearch = c.name.toLowerCase().includes(state.searchTerm.toLowerCase()) || c.phone.includes(state.searchTerm) || (c.displayPhone || '').includes(state.searchTerm);
     if (!matchesSearch) return false;
 
     for (const colId in state.excelFilters) {
@@ -1052,7 +1056,7 @@ function renderInsightHub(filteredData, rawData) {
         <table class="customer-table">
           <thead>
             <tr>
-              ${makeExcelHeaderTh('phone', 'CustomerKey (Phone)')}
+              ${makeExcelHeaderTh('displayPhone', 'CustomerKey (Phone)')}
               ${makeExcelHeaderTh('name', 'CustomerName (Latest)')}
               ${makeExcelHeaderTh('firstPurchaseDate', 'FirstPurchaseDate')}
               ${makeExcelHeaderTh('lastPurchaseDate', 'LastPurchaseDate')}
@@ -1065,8 +1069,8 @@ function renderInsightHub(filteredData, rawData) {
               
               ${makeExcelHeaderTh('ltvTier', 'Life time value', 'th-insight')}
               ${makeExcelHeaderTh('loyaltyTier', 'Loyalty Index', 'th-insight')}
-              ${makeExcelHeaderTh('entryProduct', 'Entry Product (สินค้าแรกเริ่ม)', 'th-insight')}
-              ${makeExcelHeaderTh('currentFavorite', 'Current Favorite (สินค้าโปรดล่าสุด)', 'th-insight')}
+              ${makeExcelHeaderTh('entryProduct', 'Entry Product (สินค้าเปิดใจ)', 'th-insight')}
+              ${makeExcelHeaderTh('currentFavorite', 'Current Favorite (สินค้าตัวโปรด)', 'th-insight')}
               
               ${makeExcelHeaderTh('adminPriority', 'Admin Priority', 'th-action')}
               ${makeExcelHeaderTh('segment1', 'Segment 1 : Standard Period', 'th-action')}
@@ -1082,7 +1086,7 @@ function renderInsightHub(filteredData, rawData) {
           <tbody>
             ${pageEntries.map(c => `
               <tr>
-                <td style="font-weight: 600; cursor: pointer; color: #d95f1d; text-decoration: underline;" onclick="openCustomerProfile('${c.phone}')">${c.phone}</td>
+                <td style="font-weight: 600; cursor: pointer; color: #d95f1d; text-decoration: underline;" onclick="openCustomerProfile('${c.phone}')">${c.displayPhone}</td>
                 <td style="font-weight: 600; cursor: pointer; color: #d95f1d; text-decoration: underline;" onclick="openCustomerProfile('${c.phone}')">${c.name}</td>
                 <td>${c.firstPurchaseStr}</td>
                 <td>${c.lastPurchaseStr}</td>
@@ -1324,7 +1328,8 @@ window.searchProfileKey = function() {
     c.phone === inputVal || 
     c.name.toLowerCase() === inputVal.toLowerCase() ||
     c.phone.includes(inputVal) ||
-    c.name.toLowerCase().includes(inputVal.toLowerCase())
+    c.name.toLowerCase().includes(inputVal.toLowerCase()) ||
+    (c.displayPhone || '').includes(inputVal)
   );
   if (match) {
     window.insightHubState.selectedCustomerPhone = match.phone;
