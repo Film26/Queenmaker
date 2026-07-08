@@ -1227,6 +1227,32 @@ function renderInsightHub(filteredData, rawData) {
   container.innerHTML = html;
 }
 
+// [Export] โหลดไลบรารี SheetJS (xlsx) แบบ dynamic เฉพาะตอนกดปุ่ม Export (ไม่ต้องแก้ dashboard.html)
+function loadXLSXLibrary(onReady) {
+  if (typeof XLSX !== 'undefined') { onReady(); return; }
+  if (window.__xlsxLoading) {
+    window.__xlsxLoadCallbacks = window.__xlsxLoadCallbacks || [];
+    window.__xlsxLoadCallbacks.push(onReady);
+    return;
+  }
+  window.__xlsxLoading = true;
+  window.__xlsxLoadCallbacks = [onReady];
+  const script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+  script.onload = function() {
+    window.__xlsxLoading = false;
+    const callbacks = window.__xlsxLoadCallbacks || [];
+    window.__xlsxLoadCallbacks = [];
+    callbacks.forEach(cb => cb());
+  };
+  script.onerror = function() {
+    window.__xlsxLoading = false;
+    window.__xlsxLoadCallbacks = [];
+    alert('ไม่สามารถโหลดไลบรารี Export Excel ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
+  };
+  document.head.appendChild(script);
+}
+
 // [Export] ส่งออกลูกค้าที่ผ่านการค้นหา/กรองแล้ว (ไม่รวมผลของการแบ่งหน้า) เป็นไฟล์ Excel (.xlsx)
 window.exportInsightHubExcel = function() {
   const exportState = window.__hubExportState;
@@ -1234,11 +1260,10 @@ window.exportInsightHubExcel = function() {
     alert('ไม่มีข้อมูลสำหรับ Export');
     return;
   }
-  if (typeof XLSX === 'undefined') {
-    alert('ไม่สามารถโหลดไลบรารี Export Excel ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
-    return;
-  }
+  loadXLSXLibrary(() => runInsightHubExcelExport(exportState));
+};
 
+function runInsightHubExcelExport(exportState) {
   const years = exportState.availableYears || [];
   const rows = exportState.customers.map(c => {
     const row = {
@@ -1279,7 +1304,7 @@ window.exportInsightHubExcel = function() {
   const fileName = `CustomerInsightHub_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.xlsx`;
 
   XLSX.writeFile(workbook, fileName);
-};
+}
 
 window.toggleExcelDropdown = function(colId) {
   if (window.insightHubState.activeDropdown === colId) {
