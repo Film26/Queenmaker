@@ -2,7 +2,7 @@
 if (!window.insightHubState) {
   window.insightHubState = {
     currentPage: 1,
-    rowsPerPage: 50,
+    rowsPerPage: 10,
     searchTerm: "",
     sortColumn: "totalRevenue",
     sortAsc: false,
