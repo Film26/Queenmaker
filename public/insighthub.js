@@ -275,6 +275,34 @@ function getSubChannel(rawChannel) {
   return subChannel || "-";
 }
 
+// [PERF] แปลงค่าในออบเจ็กต์ลูกค้าเป็นสตริงที่ใช้แสดง/กรอง (รวมไว้ที่เดียว เดิมโค้ดชุดนี้ถูกก๊อปซ้ำ 4 ที่)
+function getCustomerFilterValue(c, colId) {
+  if (colId === 'firstPurchaseDate') return c.firstPurchaseStr;
+  if (colId === 'lastPurchaseDate') return c.lastPurchaseStr;
+  if (colId === 'nextPurchaseDateObj') return c.nextPurchaseStr;
+  if (colId === 'totalOrders') return c.totalOrdersStr;
+  if (colId === 'totalRevenue') return c.totalRevenueStr;
+  if (colId === 'aov') return c.aovStr;
+  if (colId === 'daysSinceLast') return c.daysSinceLastStr;
+  return String(c[colId] || "").trim();
+}
+
+// [PERF] แคชรายการค่า unique ต่อคอลัมน์ (ตัวเลือกใน dropdown filter)
+// เดิมถูกคำนวณใหม่จากลูกค้าทั้งหมด (~21k ราย) ทุกคอลัมน์ทุกครั้งที่ render -> คำนวณครั้งเดียวต่อชุดข้อมูล
+function getHubUniqueValues(colId) {
+  const uniq = window.__hubCache && window.__hubCache.uniq;
+  if (uniq && uniq[colId]) return uniq[colId];
+  const vals = Array.from(new Set(
+    (window.insightHubState.allCustomers || []).map(c => getCustomerFilterValue(c, colId))
+  )).sort();
+  if (uniq) uniq[colId] = vals;
+  return vals;
+}
+
+// [PERF] จำกัดจำนวนตัวเลือกที่ render ใน dropdown ต่อครั้ง (บางคอลัมน์มี unique เป็นหมื่นค่า
+// การยัดเป็น <li> ทั้งหมดทำให้ DOM บวมและหน่วง) พิมพ์ค้นหาเพื่อกรองตัวเลือกได้ตามปกติ
+const HUB_OPTION_RENDER_LIMIT = 500;
+
 function renderInsightHub(filteredData, rawData) {
   const container = document.getElementById('view-insighthub');
   
@@ -623,9 +651,32 @@ function renderInsightHub(filteredData, rawData) {
   }
 
   const state = window.insightHubState;
-  // [RAW2021] กันพังกรณี window.isSaleOrder ไม่ถูกโหลด/ไม่รองรับรูปแบบไฟล์นี้ -> ถือว่าทุกแถวเป็น SALE
+
+  // [PERF] แคชผลการยุบข้อมูล: raw ~56k แถว -> ลูกค้า ~21k ราย เป็นงานหนักที่สุดของหน้านี้
+  // เดิมถูกคำนวณใหม่ทุก interaction (เปิด dropdown, sort, เปลี่ยนหน้า ล้วนเรียก render ใหม่) ทำให้หน่วง
+  // -> คำนวณครั้งเดียวต่อชุดข้อมูล ส่วน sort/filter/แบ่งหน้าใช้ผลจากแคช (ข้อมูลใหม่/import ใหม่จะคำนวณใหม่เอง)
+  if (!window.__hubCache) window.__hubCache = { rawRef: null, rawLen: -1, customers: null, years: null, uniq: {} };
+  const hubCache = window.__hubCache;
+
+  let customers, availableYears;
+  if (hubCache.rawRef === rawData && hubCache.rawLen === rawData.length && hubCache.customers) {
+    customers = hubCache.customers;
+    availableYears = hubCache.years;
+    window.insightHubState.availableYears = availableYears;
+  } else {
+
+  // [RAW2021] กันพังกรณี window.isSaleOrder ไม่ถูกโหลด -> ถือว่าทุกแถวเป็น SALE
   const isSaleRow = (row) => (typeof window.isSaleOrder === 'function' ? window.isSaleOrder(row) : true);
-  const rawSaleOrders = rawData.filter(row => isSaleRow(row));
+
+  // [RAW2021] ตรวจรูปแบบไฟล์: RAW 2021 เป็น export รายการขายล้วน (มีคอลัมน์ Net Sales
+  // แต่ไม่มีคอลัมน์ประเภทเอกสาร/สถานะ) ถ้าปล่อยผ่าน isSaleOrder ของรูปแบบเดิม
+  // มันอาจกรองแถวทิ้งเพราะหาคอลัมน์ที่ใช้ตรวจไม่เจอ ทำให้ยอดขาย/จำนวนออเดอร์ "มาไม่ครบ"
+  // -> ไฟล์รูปแบบนี้ให้นับทุกแถวเป็นรายการขาย ส่วนไฟล์รูปแบบเดิมยังผ่าน isSaleOrder ตามปกติทุกอย่าง
+  const sampleRows = rawData.slice(0, 50);
+  const hasNetSalesCol = sampleRows.some(r => (window.getRowValue(r, ['Net Sales']) || '').toString().trim() !== '');
+  const hasDocTypeCol = sampleRows.some(r => (window.getRowValue(r, ['ประเภทเอกสาร', 'ประเภท', 'สถานะ', 'DocType', 'Document Type', 'Status', 'Type']) || '').toString().trim() !== '');
+  const isRaw2021Format = hasNetSalesCol && !hasDocTypeCol;
+  const rawSaleOrders = isRaw2021Format ? rawData.slice() : rawData.filter(row => isSaleRow(row));
   
   let maxTime = 0;
   const availableYearsSet = new Set();
@@ -640,7 +691,7 @@ function renderInsightHub(filteredData, rawData) {
   });
   
   const today = maxTime > 0 ? new Date(maxTime) : new Date();
-  const availableYears = Array.from(availableYearsSet).sort((a, b) => a - b);
+  availableYears = Array.from(availableYearsSet).sort((a, b) => a - b);
   window.insightHubState.availableYears = availableYears;
 
   const customerHistoryMap = {};
@@ -677,7 +728,7 @@ function renderInsightHub(filteredData, rawData) {
     return;
   }
 
-  const customers = Array.from(filteredCustomerKeys).map(custKey => {
+  customers = Array.from(filteredCustomerKeys).map(custKey => {
     const historyRows = customerHistoryMap[custKey] || [];
     const sortedHistory = historyRows.map(row => {
       const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
@@ -858,6 +909,20 @@ function renderInsightHub(filteredData, rawData) {
     return customerObj;
   }).filter(c => c !== null);
 
+  // [PERF] เก็บผลลงแคช + log ตัวเลขไว้ตรวจสอบ (เปิด Console ดูได้ว่าแถว/ยอดหายที่ขั้นไหน)
+  hubCache.rawRef = rawData;
+  hubCache.rawLen = rawData.length;
+  hubCache.customers = customers;
+  hubCache.years = availableYears;
+  hubCache.uniq = {};
+  console.info('[InsightHub] rows:', rawData.length,
+    '| sale rows:', rawSaleOrders.length,
+    '| isRaw2021Format:', isRaw2021Format,
+    '| customers:', customers.length,
+    '| total revenue:', customers.reduce((s, c) => s + c.totalRevenue, 0).toLocaleString());
+
+  } // end: cache miss (คำนวณใหม่)
+
   window.insightHubState.allCustomers = customers;
 
   if (state.selectedCustomerPhone) {
@@ -885,24 +950,24 @@ function renderInsightHub(filteredData, rawData) {
 
   const getPctStr = (count) => totalCount > 0 ? ((count / totalCount) * 100).toFixed(0) + '%' : '0%';
 
+  // [PERF] เตรียมชุดกรองล่วงหน้า: เดิมเช็คด้วย Array.includes ต่อลูกค้าต่อคอลัมน์
+  // (ลูกค้า ~21k ราย x ตัวเลือกในคอลัมน์สูงสุด ~21k ค่า = O(n^2) คือต้นเหตุอาการค้าง)
+  // -> แปลงเป็น Set (เช็ค O(1)) และข้ามคอลัมน์ที่เลือกครบทุกค่า (ถือว่าไม่ได้กรอง)
+  // หมายเหตุ: คอลัมน์ที่ "ล้าง" จนว่าง (length 0) ต้องข้ามเหมือนเดิมตามพฤติกรรมโค้ดเดิม
+  const activeFilterSets = {};
+  for (const colId in state.excelFilters) {
+    const allowedValues = state.excelFilters[colId];
+    if (!allowedValues || allowedValues.length === 0) continue;
+    if (allowedValues.length >= getHubUniqueValues(colId).length) continue;
+    activeFilterSets[colId] = new Set(allowedValues);
+  }
+
   let displayedCustomers = customers.filter(c => {
     const matchesSearch = c.name.toLowerCase().includes(state.searchTerm.toLowerCase()) || c.phone.includes(state.searchTerm) || (c.displayPhone || '').includes(state.searchTerm);
     if (!matchesSearch) return false;
 
-    for (const colId in state.excelFilters) {
-      const allowedValues = state.excelFilters[colId];
-      if (allowedValues && allowedValues.length > 0) {
-        let itemValue = String(c[colId] || "").trim();
-        if (colId === 'firstPurchaseDate') itemValue = c.firstPurchaseStr;
-        if (colId === 'lastPurchaseDate') itemValue = c.lastPurchaseStr;
-        if (colId === 'nextPurchaseDateObj') itemValue = c.nextPurchaseStr;
-        if (colId === 'totalOrders') itemValue = c.totalOrdersStr;
-        if (colId === 'totalRevenue') itemValue = c.totalRevenueStr;
-        if (colId === 'aov') itemValue = c.aovStr;
-        if (colId === 'daysSinceLast') itemValue = c.daysSinceLastStr;
-
-        if (!allowedValues.includes(itemValue)) return false;
-      }
+    for (const colId in activeFilterSets) {
+      if (!activeFilterSets[colId].has(getCustomerFilterValue(c, colId))) return false;
     }
     return true;
   });
@@ -931,16 +996,8 @@ function renderInsightHub(filteredData, rawData) {
   const pageEntries = displayedCustomers.slice(startIndex, endIndex);
 
   function makeExcelHeaderTh(columnId, displayTitle, extraClass = "") {
-    const uniqueValues = Array.from(new Set(window.insightHubState.allCustomers.map(c => {
-      if (columnId === 'firstPurchaseDate') return c.firstPurchaseStr;
-      if (columnId === 'lastPurchaseDate') return c.lastPurchaseStr;
-      if (columnId === 'nextPurchaseDateObj') return c.nextPurchaseStr;
-      if (columnId === 'totalOrders') return c.totalOrdersStr;
-      if (columnId === 'totalRevenue') return c.totalRevenueStr;
-      if (columnId === 'aov') return c.aovStr;
-      if (columnId === 'daysSinceLast') return c.daysSinceLastStr;
-      return String(c[columnId] || "").trim();
-    }))).sort();
+    // [PERF] ใช้ค่าจากแคชแทนการ map ลูกค้าทั้งหมดใหม่ทุกคอลัมน์ทุกครั้งที่ render
+    const uniqueValues = getHubUniqueValues(columnId);
 
     if (!window.insightHubState.excelFilters[columnId]) {
       window.insightHubState.excelFilters[columnId] = [...uniqueValues];
@@ -949,7 +1006,10 @@ function renderInsightHub(filteredData, rawData) {
     const currentSelected = window.insightHubState.excelFilters[columnId];
     const isOpen = window.insightHubState.activeDropdown === columnId;
     const filterSearchText = (window.insightHubState.excelSearchTerms[columnId] || "").toLowerCase();
-    const visibleOptions = uniqueValues.filter(v => v.toLowerCase().includes(filterSearchText));
+    // [PERF] คำนวณ/สร้าง <li> เฉพาะ dropdown ที่เปิดอยู่ (เดิมสร้างของทุกคอลัมน์แม้ซ่อนอยู่
+    // บางคอลัมน์มีตัวเลือกเป็นหมื่น -> DOM บวมหลักแสน node ต่อ render) และจำกัดที่ HUB_OPTION_RENDER_LIMIT
+    const visibleOptions = isOpen ? uniqueValues.filter(v => v.toLowerCase().includes(filterSearchText)) : [];
+    const renderedOptions = visibleOptions.slice(0, HUB_OPTION_RENDER_LIMIT);
     const hasActiveFilter = currentSelected.length < uniqueValues.length;
 
     return `
@@ -971,7 +1031,7 @@ function renderInsightHub(filteredData, rawData) {
               <input type="text" class="excel-search-input" placeholder="🔍 พิมพ์คำค้นหาตัวเลือก..." value="${window.insightHubState.excelSearchTerms[columnId] || ''}" oninput="handleDropdownSearch('${columnId}', this.value)" style="width:100%; padding:6px; font-size:11px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box;">
             </div>
             <ul class="excel-options-list" id="list-${columnId}" style="max-height: 160px; overflow-y: auto; list-style: none; padding: 0; margin: 0; text-align: left;">
-              ${visibleOptions.map(opt => {
+              ${renderedOptions.map(opt => {
                 const isChecked = currentSelected.includes(opt);
                 return `
                   <li style="padding: 4px 0; display: flex; align-items: center; gap: 6px; font-size:11px;">
@@ -980,7 +1040,8 @@ function renderInsightHub(filteredData, rawData) {
                   </li>
                 `;
               }).join('')}
-              ${visibleOptions.length === 0 ? '<li style="color:#999; text-align:center; padding: 10px 0;">ไม่พบผลลัพธ์</li>' : ''}
+              ${isOpen && visibleOptions.length > HUB_OPTION_RENDER_LIMIT ? `<li style="color:#999; padding: 6px 0; font-style: italic;">แสดง ${HUB_OPTION_RENDER_LIMIT.toLocaleString()} จาก ${visibleOptions.length.toLocaleString()} รายการ — พิมพ์ค้นหาเพื่อกรองตัวเลือก</li>` : ''}
+              ${isOpen && visibleOptions.length === 0 ? '<li style="color:#999; text-align:center; padding: 10px 0;">ไม่พบผลลัพธ์</li>' : ''}
             </ul>
             <div class="excel-dropdown-actions" style="margin-top: 10px; border-top: 1px solid #eee; padding-top: 8px; display: flex; justify-content: space-between;">
               <button class="excel-btn-sm" style="border-radius: 4px; padding: 4px 10px; border:1px solid #ddd; background:#fff; cursor:pointer; font-size:11px;" onclick="clearExcelFilter('${columnId}')">ยกเลิกฟิลเตอร์</button>
@@ -1154,29 +1215,22 @@ window.handleDropdownSearch = function(colId, value) {
   const listContainer = document.getElementById(`list-${colId}`);
   if (!listContainer) return;
 
-  const uniqueValues = Array.from(new Set(window.insightHubState.allCustomers.map(c => {
-    if (colId === 'firstPurchaseDate') return c.firstPurchaseStr;
-    if (colId === 'lastPurchaseDate') return c.lastPurchaseStr;
-    if (colId === 'nextPurchaseDateObj') return c.nextPurchaseStr;
-    if (colId === 'totalOrders') return c.totalOrdersStr;
-    if (colId === 'totalRevenue') return c.totalRevenueStr;
-    if (colId === 'aov') return c.aovStr;
-    if (colId === 'daysSinceLast') return c.daysSinceLastStr;
-    return String(c[colId] || "").trim();
-  }))).sort();
+  // [PERF] ใช้ค่าจากแคช + จำกัดจำนวนที่ render
+  const uniqueValues = getHubUniqueValues(colId);
 
-  const currentSelected = window.insightHubState.excelFilters[colId] || [];
+  const currentSelectedSet = new Set(window.insightHubState.excelFilters[colId] || []);
   const filteredOpts = uniqueValues.filter(v => v.toLowerCase().includes(value.toLowerCase()));
+  const renderedOpts = filteredOpts.slice(0, HUB_OPTION_RENDER_LIMIT);
   
-  listContainer.innerHTML = filteredOpts.map(opt => {
-    const isChecked = currentSelected.includes(opt);
+  listContainer.innerHTML = renderedOpts.map(opt => {
+    const isChecked = currentSelectedSet.has(opt);
     return `
       <li style="padding: 4px 0; display: flex; align-items: center; gap: 6px; font-size:11px;">
         <input type="checkbox" id="chk-${colId}-${opt.replace(/[^a-zA-Z0-9]/g, '_')}" ${isChecked ? 'checked' : ''} onchange="handleDropdownCheck('${colId}', '${opt.replace(/'/g, "\\'")}', this.checked)">
         <label style="cursor:pointer; flex-grow:1; font-weight: normal; margin:0;" for="chk-${colId}-${opt.replace(/[^a-zA-Z0-9]/g, '_')}">${opt || '(ว่าง)'}</label>
       </li>
     `;
-  }).join('');
+  }).join('') + (filteredOpts.length > HUB_OPTION_RENDER_LIMIT ? `<li style="color:#999; padding: 6px 0; font-style: italic;">แสดง ${HUB_OPTION_RENDER_LIMIT.toLocaleString()} จาก ${filteredOpts.length.toLocaleString()} รายการ — พิมพ์ค้นหาเพื่อกรองตัวเลือก</li>` : '');
   
   if (filteredOpts.length === 0) {
     listContainer.innerHTML = '<li style="color:#999; text-align:center; padding: 10px 0;">ไม่พบผลลัพธ์</li>';
@@ -1197,18 +1251,8 @@ window.handleDropdownCheck = function(colId, value, isChecked) {
 };
 
 window.excelSelectAllRows = function(colId) {
-  const uniqueValues = Array.from(new Set(window.insightHubState.allCustomers.map(c => {
-    if (colId === 'firstPurchaseDate') return c.firstPurchaseStr;
-    if (colId === 'lastPurchaseDate') return c.lastPurchaseStr;
-    if (colId === 'nextPurchaseDateObj') return c.nextPurchaseStr;
-    if (colId === 'totalOrders') return c.totalOrdersStr;
-    if (colId === 'totalRevenue') return c.totalRevenueStr;
-    if (colId === 'aov') return c.aovStr;
-    if (colId === 'daysSinceLast') return c.daysSinceLastStr;
-    return String(c[colId] || "").trim();
-  })));
-  
-  window.insightHubState.excelFilters[colId] = [...uniqueValues];
+  // [PERF] ใช้ค่าจากแคช
+  window.insightHubState.excelFilters[colId] = [...getHubUniqueValues(colId)];
   const filterSearchText = (window.insightHubState.excelSearchTerms[colId] || "");
   window.handleDropdownSearch(colId, filterSearchText);
 };
