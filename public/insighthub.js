@@ -6,9 +6,9 @@ if (!window.insightHubState) {
     searchTerm: "",
     sortColumn: "totalRevenue",
     sortAsc: false,
-    excelFilters: {}, 
-    excelSearchTerms: {}, 
-    activeDropdown: null, 
+    excelFilters: {},
+    excelSearchTerms: {},
+    activeDropdown: null,
     selectedCustomerPhone: null,
     allCustomers: []
   };
