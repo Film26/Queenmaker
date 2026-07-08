@@ -1,8 +1,12 @@
 // public/insighthub.js
+// ปรับให้รองรับรูปแบบไฟล์ RAW 2021 (OrderDate, Remark, CustomerName, Address, Phone,
+// Product Set, Net Sales, Promotion, Birth month, Sex)
+// จุดที่เปลี่ยนหลักๆ ถูกคอมเมนต์กำกับด้วย [RAW2021]
+
 if (!window.insightHubState) {
   window.insightHubState = {
     currentPage: 1,
-    rowsPerPage: 50,
+    rowsPerPage: 10,
     searchTerm: "",
     sortColumn: "totalRevenue",
     sortAsc: false,
@@ -1280,7 +1284,7 @@ window.confirmExcelFilter = function() {
 window.resetHubFilters = function() {
   window.insightHubState = {
     currentPage: 1,
-    rowsPerPage: 50,
+    rowsPerPage: 10,
     searchTerm: "",
     sortColumn: "totalRevenue",
     sortAsc: false,
