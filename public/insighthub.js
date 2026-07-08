@@ -653,6 +653,34 @@ function renderInsightHub(filteredData, rawData) {
       .profile-detail-card h3 { font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 15px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; }
       .profile-detail-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f8fafc; }
       .profile-detail-row:last-child { border-bottom: none; }
+
+      .yearly-tier-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-top: 12px;
+      }
+      @media (max-width: 600px) {
+        .yearly-tier-grid { grid-template-columns: repeat(2, 1fr); }
+      }
+      .yearly-tier-cell {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 12px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .yearly-tier-year { font-size: 11px; font-weight: 600; color: #64748b; }
+      .yearly-tier-amount { font-size: 15px; font-weight: 700; }
+
+      .yr-tier-junior { background: #f5f5f5; color: #666666; }
+      .yr-tier-silver { background: #e5e7eb; color: #374151; }
+      .yr-tier-gold { background: #fef3c7; color: #b45309; }
+      .yr-tier-platinum { background: #ede9fe; color: #6d28d9; }
+      .yr-tier-diamond { background: #e0f2fe; color: #0369a1; }
     `;
     document.head.appendChild(style);
 
@@ -1445,6 +1473,23 @@ function getSegClass(seg) {
   return "";
 }
 
+// Customer Tier ต่อปี: อิงยอดซื้อสะสมของปีนั้นๆ (annualSpending[year])
+function getYearlyTier(amount) {
+  if (amount >= 45000) return "Diamond";
+  if (amount >= 35000) return "Platinum";
+  if (amount >= 25000) return "Gold";
+  if (amount >= 5900) return "Silver";
+  return "Junior";
+}
+
+function getYearlyTierClass(tier) {
+  if (tier === "Diamond") return "yr-tier-diamond";
+  if (tier === "Platinum") return "yr-tier-platinum";
+  if (tier === "Gold") return "yr-tier-gold";
+  if (tier === "Silver") return "yr-tier-silver";
+  return "yr-tier-junior";
+}
+
 function getSortIcon(colName) {
   const state = window.insightHubState;
   if (state.sortColumn !== colName) return '<i class="fas fa-sort sorting-icon"></i>';
@@ -1651,17 +1696,19 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
           <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #e2e8f0;">
             <span style="font-size: 12px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">ยอดซื้อสะสมรายปี (2021 - 2026)</span>
           </div>
-          ${[2021, 2022, 2023, 2024, 2025, 2026].map(year => {
-            const amount = c.annualSpending[year] || 0;
-            return `
-              <div class="profile-detail-row" style="padding: 6px 0;">
-                <span style="color: #64748b; font-size: 13px;"><i class="fas fa-coins" style="margin-right: 8px; width: 15px; color: #f59e0b;"></i> ยอดซื้อปี ${year}</span>
-                <span style="font-size: 13px; font-weight: bold; color: ${amount > 0 ? '#1e293b' : '#94a3b8'};">
-                  ${amount > 0 ? '฿' + amount.toLocaleString() : '-'}
-                </span>
-              </div>
-            `;
-          }).join('')}
+          <div class="yearly-tier-grid">
+            ${[2021, 2022, 2023, 2024, 2025, 2026].map(year => {
+              const amount = c.annualSpending[year] || 0;
+              const tier = getYearlyTier(amount);
+              return `
+                <div class="yearly-tier-cell">
+                  <div class="yearly-tier-year"><i class="fas fa-coins" style="margin-right: 6px; color: #f59e0b;"></i>ยอดซื้อปี ${year}</div>
+                  <div class="yearly-tier-amount" style="color: ${amount > 0 ? '#1e293b' : '#94a3b8'};">${amount > 0 ? '฿' + amount.toLocaleString() : '-'}</div>
+                  <span class="badge-span ${getYearlyTierClass(tier)}">${tier}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
 
         </div>
       </div>
