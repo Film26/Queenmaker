@@ -1,4 +1,7 @@
 // public/insighthub.js
+// ปรับให้รองรับรูปแบบไฟล์ RAW 2021 (OrderDate, Remark, CustomerName, Address, Phone,
+// Product Set, Net Sales, Promotion, Birth month, Sex)
+// จุดที่เปลี่ยนหลักๆ ถูกคอมเมนต์กำกับด้วย [RAW2021]
 
 if (!window.insightHubState) {
   window.insightHubState = {
@@ -81,6 +84,12 @@ function parseToDateObj(dateStr) {
       return new Date(parsed.y, parsed.m - 1, parsed.d);
     }
   }
+  // [RAW2021] fallback: รูปแบบวันที่ใน RAW 2021 เป็น d/m/yyyy เช่น 30/1/2021
+  const m = dateStr.toString().trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) {
+    const d = parseInt(m[1], 10), mo = parseInt(m[2], 10), y = parseInt(m[3], 10);
+    if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12) return new Date(y, mo - 1, d);
+  }
   return null;
 }
 
@@ -114,6 +123,19 @@ function normalizePhone(raw) {
   return p;
 }
 
+// [RAW2021] คีย์ลูกค้า (auto-detect ตามรูปแบบไฟล์ ไม่กระทบพฤติกรรมเดิม):
+// - ไฟล์รูปแบบเดิมที่มีเบอร์เต็ม -> ใช้เบอร์แบบ normalize เป็นคีย์ "เหมือนเดิมทุกอย่าง"
+// - ไฟล์แบบ RAW 2021 ที่เบอร์ถูกมาสก์ (xxxxxxx746 มี unique แค่ ~1,050 แต่ลูกค้าจริง ~21,325 ราย)
+//   -> สลับไปใช้รหัสใน CustomerName (เช่น EW66746) แทน ไม่งั้นลูกค้าเลขท้ายซ้ำจะถูกรวมเป็นคนเดียว
+function getCustomerKey(row) {
+  const phone = normalizePhone(window.getRowValue(row, ['Phone', 'เบอร์โทร', 'เบอร์โทรศัพท์']));
+  const isMasked = phone.indexOf('x') !== -1;
+  if (phone && !isMasked) return phone; // พฤติกรรมเดิม
+  const code = (window.getRowValue(row, ['CustomerName', 'รหัสลูกค้า', 'Customer ID']) || '').toString().trim();
+  if (code) return code.toUpperCase(); // เฉพาะกรณีเบอร์มาสก์/ไม่มีเบอร์
+  return phone;
+}
+
 // Mapping ช่องทางดิบ (RawKey) -> { sub: SubChannel_STD, main: MainChannel_STD }
 // source of truth เดียว ใช้ทั้ง FirstChannel (Main) และ LastChannel (Main)
 const CHANNEL_MAP = {
@@ -129,6 +151,14 @@ const CHANNEL_MAP = {
   'FBP-W':     { sub: 'FBP-W',    main: 'Facebook' },
   'FB':        { sub: 'FBH',      main: 'Facebook' },
   'FACEBOOK':  { sub: 'FBH',      main: 'Facebook' },
+  // [RAW2021] sub-channel ที่พบจริงใน Remark ของ RAW 2021
+  'FBA':       { sub: 'FBA',      main: 'Facebook' },
+  'FBS':       { sub: 'FBS',      main: 'Facebook' },
+  'FBB':       { sub: 'FBB',      main: 'Facebook' },
+  'FBN':       { sub: 'FBN',      main: 'Facebook' },
+  'FBO':       { sub: 'FBO',      main: 'Facebook' },
+  'FBF':       { sub: 'FBF',      main: 'Facebook' },
+  'PBP':       { sub: 'FBP',      main: 'Facebook' },
   'IG':        { sub: 'IG',       main: 'Instagram' },
   'IG-FBW':    { sub: 'IG-FBW',   main: 'Instagram' },
   'IG-FBSS':   { sub: 'IG-FBSS',  main: 'Instagram' },
@@ -157,19 +187,86 @@ const CHANNEL_MAP = {
   'TELESALES': { sub: 'Telesale', main: 'Telesale' }
 };
 
+// [RAW2021] แปลง token ช่องทางดิบ -> entry ใน CHANNEL_MAP (คืน null ถ้าไม่รู้จัก)
+// รองรับความเพี้ยนที่พบจริงในข้อมูล: zero-width space, จุด/เครื่องหมายปน (FB., L;INE),
+// มีคำต่อท้าย (FB P, LINE H, FBบอกลา), พิมพ์ผิด (LIINE, LINME, LIN, INE)
+function resolveChannel(rawChannel) {
+  if (rawChannel === null || rawChannel === undefined) return null;
+  let t = rawChannel.toString()
+    .replace(/[\u200b\u200c\u200d\ufeff]/g, '')
+    .replace(/[^0-9A-Za-z\u0e00-\u0e7f\- ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+  if (!t) return null;
+
+  if (CHANNEL_MAP[t]) return CHANNEL_MAP[t];
+
+  const first = t.split(' ')[0];
+  if (CHANNEL_MAP[first]) return CHANNEL_MAP[first];
+
+  const compact = t.replace(/\s+/g, '');
+  if (CHANNEL_MAP[compact]) return CHANNEL_MAP[compact];
+
+  if (/^LI{1,2}N+M?E*$/.test(compact) || compact === 'LIN' || compact === 'INE' || compact.indexOf('LINE') === 0) {
+    return CHANNEL_MAP['LINE'];
+  }
+  if (compact.indexOf('IG') === 0) return CHANNEL_MAP['IG'];
+  if (compact.indexOf('FBP') === 0) return CHANNEL_MAP['FBP'];
+  if (compact.indexOf('FB') === 0) {
+    const sub = compact.length > 2 && compact.length <= 6 && /^FB[A-Z\-]+$/.test(compact) ? compact : 'FBH';
+    return { sub: sub, main: 'Facebook' };
+  }
+  if (compact.indexOf('WEB') === 0 || compact === 'WWW') return CHANNEL_MAP['WEB'];
+  if (compact.indexOf('EMAIL') === 0 || compact.indexOf('MAIL') === 0) return CHANNEL_MAP['EMAIL'];
+  if (compact.indexOf('TELESALE') === 0) return CHANNEL_MAP['TELESALE'];
+  if (compact.indexOf('LAZADA') === 0) return CHANNEL_MAP['LAZADA'];
+  if (compact.indexOf('SHOPEE') === 0) return CHANNEL_MAP['SHOPEE'];
+  if (compact.indexOf('TIKTOK') === 0) return CHANNEL_MAP['TIKTOK'];
+  return null;
+}
+
 // rawChannel: string|null/undefined -> { subChannel, mainChannel }
-// case-insensitive (trim + toUpperCase; ไม่กระทบคีย์ไทยอย่าง "โทรศัพท์" เพราะ toUpperCase ไม่เปลี่ยนอักษรไทย)
 // ค่าว่าง -> คืนค่าว่างทั้งคู่, ค่าที่ไม่รู้จัก -> "Other" ทั้งคู่ (ไม่ปล่อยค่าดิบหลุดออกมา)
 function standardizeChannel(rawChannel) {
   if (rawChannel === null || rawChannel === undefined) return { subChannel: '', mainChannel: '' };
   const raw = rawChannel.toString().trim();
   if (!raw) return { subChannel: '', mainChannel: '' };
 
-  const entry = CHANNEL_MAP[raw.toUpperCase()];
+  const entry = resolveChannel(raw);
   if (entry) return { subChannel: entry.sub, mainChannel: entry.main };
 
   console.warn('[standardizeChannel] Unknown channel key, defaulting to "Other":', raw);
   return { subChannel: 'Other', mainChannel: 'Other' };
+}
+
+// [RAW2021] RAW 2021 ไม่มีคอลัมน์ช่องทางแยก แต่ฝังอยู่ใน Remark รูปแบบเช่น
+//   "เลข Tracking : 121563623182\nFB : Gojy Jinutta"      -> FB
+//   "...\nFBH,แอน"                                        -> FBH (คั่นด้วย comma ตามด้วยชื่อแอดมิน)
+//   "...\nEMAIL" หรือ "...\nTelesale"                      -> token เดี่ยวๆ ทั้งบรรทัด
+// วิธีอ่าน: ไล่ทีละบรรทัด ข้ามบรรทัด Tracking แล้วเอาข้อความก่อน : หรือ , (หรือทั้งบรรทัดถ้าสั้น)
+// ไปเช็คกับ CHANNEL_MAP -- รับเฉพาะบรรทัดที่ resolve เป็นช่องทางที่รู้จักจริงๆ กันข้อความอิสระปนเข้ามา
+function extractChannelFromRemark(remark) {
+  if (!remark) return '';
+  const lines = remark.toString().split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(/[\u200b\u200c\u200d\ufeff]/g, '').trim();
+    if (!line) continue;
+    if (/tracking/i.test(line) || line.indexOf('เลข') === 0) continue;
+    const sep = line.search(/[:：,]/);
+    const candidate = (sep >= 0 ? line.slice(0, sep) : line).trim();
+    if (!candidate || candidate.length > 25) continue;
+    if (resolveChannel(candidate)) return candidate;
+  }
+  return '';
+}
+
+// [RAW2021] จุดอ่านช่องทางจุดเดียว: ใช้คอลัมน์ ช่องทาง/Channel ก่อนถ้ามี (ไฟล์รูปแบบเดิม)
+// ถ้าไม่มีค่อย fallback ไปแกะจาก Remark (รูปแบบ RAW 2021)
+function getChannelRaw(row) {
+  const direct = window.getRowValue(row, ['ช่องทาง', 'Channel']);
+  if (direct && direct.toString().trim()) return direct.toString().trim();
+  return extractChannelFromRemark(window.getRowValue(row, ['Remark', 'หมายเหตุ']));
 }
 
 function getMainChannel(rawChannel) {
@@ -530,7 +627,9 @@ function renderInsightHub(filteredData, rawData) {
   }
 
   const state = window.insightHubState;
-  const rawSaleOrders = rawData.filter(row => window.isSaleOrder(row));
+  // [RAW2021] กันพังกรณี window.isSaleOrder ไม่ถูกโหลด/ไม่รองรับรูปแบบไฟล์นี้ -> ถือว่าทุกแถวเป็น SALE
+  const isSaleRow = (row) => (typeof window.isSaleOrder === 'function' ? window.isSaleOrder(row) : true);
+  const rawSaleOrders = rawData.filter(row => isSaleRow(row));
   
   let maxTime = 0;
   const availableYearsSet = new Set();
@@ -551,39 +650,39 @@ function renderInsightHub(filteredData, rawData) {
   const customerHistoryMap = {};
 
   rawSaleOrders.forEach(row => {
-    const phone = normalizePhone(window.getRowValue(row, ['Phone']));
-    if (!phone) return;
-    if (!customerHistoryMap[phone]) {
-      customerHistoryMap[phone] = [];
+    const key = getCustomerKey(row); // [RAW2021] เดิมใช้ normalizePhone
+    if (!key) return;
+    if (!customerHistoryMap[key]) {
+      customerHistoryMap[key] = [];
     }
-    customerHistoryMap[phone].push(row);
+    customerHistoryMap[key].push(row);
   });
 
-  // ประวัติออเดอร์ "ทุกประเภท" (ไม่กรองเฉพาะ SALE) ต่อเบอร์โทร ใช้คำนวณ FirstChannel/LastChannel
+  // ประวัติออเดอร์ "ทุกประเภท" (ไม่กรองเฉพาะ SALE) ต่อลูกค้า ใช้คำนวณ FirstChannel/LastChannel
   // ให้ตรงกับสูตรเดิมใน Google Sheets ที่ค้นหาจากชีต 'All Order_Inputs' ทั้งหมด
   const allOrdersHistoryMap = {};
   rawData.forEach(row => {
-    const phone = normalizePhone(window.getRowValue(row, ['Phone']));
-    if (!phone) return;
-    if (!allOrdersHistoryMap[phone]) {
-      allOrdersHistoryMap[phone] = [];
+    const key = getCustomerKey(row); // [RAW2021]
+    if (!key) return;
+    if (!allOrdersHistoryMap[key]) {
+      allOrdersHistoryMap[key] = [];
     }
-    allOrdersHistoryMap[phone].push(row);
+    allOrdersHistoryMap[key].push(row);
   });
 
-  const filteredCustomerPhones = new Set();
+  const filteredCustomerKeys = new Set();
   rawData.forEach(row => {
-    const phone = normalizePhone(window.getRowValue(row, ['Phone']));
-    if (phone) filteredCustomerPhones.add(phone);
+    const key = getCustomerKey(row); // [RAW2021]
+    if (key) filteredCustomerKeys.add(key);
   });
 
-  if (filteredCustomerPhones.size === 0) {
+  if (filteredCustomerKeys.size === 0) {
     container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">No customers found matching the filters.</div>';
     return;
   }
 
-  const customers = Array.from(filteredCustomerPhones).map(phone => {
-    const historyRows = customerHistoryMap[phone] || [];
+  const customers = Array.from(filteredCustomerKeys).map(custKey => {
+    const historyRows = customerHistoryMap[custKey] || [];
     const sortedHistory = historyRows.map(row => {
       const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
       return { row: row, dateObj: parseToDateObj(dateStr) };
@@ -676,20 +775,21 @@ function renderInsightHub(filteredData, rawData) {
     else if (segment1 === "NEW" && segment2 === "NEW") actionStrategy = "💖 Welcome: ติดตามผล/สอนวิธีใช้";
     else if ((segment1 === "RISK" || segment1 === "CHURN") && segment2 === "CHURN") actionStrategy = "😴 Dead Churn: ส่งโปรแรงดึงกลับ";
 
-    // FirstChannel = XLOOKUP(key, E, O, "", 0, 1) -> ช่องทางของออเดอร์แรกสุด (ทุกประเภท) ตามลำดับเวลา
-    // LastChannel (Main) = FILTER(...O<>"")-> INDEX(f, ROWS(f)) -> ช่องทางล่าสุดที่ "ไม่ว่าง" (ทุกประเภท)
-    const allOrdersSorted = (allOrdersHistoryMap[phone] || []).map(row => {
+    // FirstChannel = ช่องทางของออเดอร์แรกสุด (ทุกประเภท) ตามลำดับเวลา
+    // LastChannel = ช่องทางล่าสุดที่ "ไม่ว่าง" (ทุกประเภท)
+    // [RAW2021] เปลี่ยนจากอ่านคอลัมน์ ช่องทาง/Channel ตรงๆ เป็น getChannelRaw() ที่ fallback ไปแกะจาก Remark
+    const allOrdersSorted = (allOrdersHistoryMap[custKey] || []).map(row => {
       const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
       return { row, dateObj: parseToDateObj(dateStr) };
     }).filter(item => item.dateObj !== null).sort((a, b) => a.dateObj - b.dateObj);
 
     const firstChannel = allOrdersSorted.length > 0
-      ? getMainChannel(window.getRowValue(allOrdersSorted[0].row, ['ช่องทาง', 'Channel']))
+      ? getMainChannel(getChannelRaw(allOrdersSorted[0].row))
       : "-";
 
     let lastChannel = "-";
     for (let i = allOrdersSorted.length - 1; i >= 0; i--) {
-      const ch = window.getRowValue(allOrdersSorted[i].row, ['ช่องทาง', 'Channel']);
+      const ch = getChannelRaw(allOrdersSorted[i].row);
       if (ch) { lastChannel = getSubChannel(ch); break; }
     }
     
@@ -701,20 +801,21 @@ function renderInsightHub(filteredData, rawData) {
     }
 
     // คำนวณยอดเงินสะสมจริงแยกรายปี
+    // [RAW2021] เพิ่ม 'Net Sales' ในลิสต์คอลัมน์ยอดขาย (เดิมมีแค่ ยอดขาย/ยอดโอน ทำให้ RAW 2021 ได้ 0 หมด)
     const annualSpending = {};
     availableYears.forEach(y => annualSpending[y] = 0);
     sortedHistory.forEach(o => {
       const year = o.dateObj.getFullYear();
       if (annualSpending[year] !== undefined) {
-        const revStr = window.getRowValue(o.row, ['ยอดขาย', 'ยอดโอน']) || '0';
+        const revStr = window.getRowValue(o.row, ['ยอดขาย', 'ยอดโอน', 'Net Sales', 'ราคาสินค้ายังไม่รวมภาษี', 'Revenue', 'Amount']) || '0';
         const rev = parseFloat(revStr.replace(/,/g, ''));
         if (!isNaN(rev)) annualSpending[year] += rev;
       }
     });
 
     const customerObj = {
-      phone,
-      name: window.getRowValue(lastOrder.row, ['CustomerName', 'ชื่อผู้ส่ง', 'Customer ID', 'รหัสลูกค้า']) || phone,
+      phone: custKey, // [RAW2021] property ชื่อเดิม ค่าคือคีย์จาก getCustomerKey (ไฟล์เดิม = เบอร์โทรเหมือนเดิม)
+      name: window.getRowValue(lastOrder.row, ['CustomerName', 'ชื่อผู้ส่ง', 'Customer ID', 'รหัสลูกค้า']) || custKey,
       firstPurchaseDate,
       lastPurchaseDate,
       totalOrders,
@@ -744,7 +845,7 @@ function renderInsightHub(filteredData, rawData) {
       daysSinceLastStr: daysSinceLast.toFixed(1)
     };
     
-    // ตั้งค่าแสดงผลบนตารางตารางหน้าหลักเป็น ยอดเงินบาท
+    // ตั้งค่าแสดงผลบนตารางหน้าหลักเป็น ยอดเงินบาท
     availableYears.forEach(y => {
       const amt = annualSpending[y] || 0;
       customerObj['tier' + y] = amt > 0 ? "฿" + amt.toLocaleString(undefined, {maximumFractionDigits:0}) : "-";
