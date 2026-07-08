@@ -1,12 +1,8 @@
 // public/insighthub.js
-// ปรับให้รองรับรูปแบบไฟล์ RAW 2021 (OrderDate, Remark, CustomerName, Address, Phone,
-// Product Set, Net Sales, Promotion, Birth month, Sex)
-// จุดที่เปลี่ยนหลักๆ ถูกคอมเมนต์กำกับด้วย [RAW2021]
-
 if (!window.insightHubState) {
   window.insightHubState = {
     currentPage: 1,
-    rowsPerPage: 10,
+    rowsPerPage: 50,
     searchTerm: "",
     sortColumn: "totalRevenue",
     sortAsc: false,
@@ -328,6 +324,22 @@ function renderInsightHub(filteredData, rawData) {
         font-family: 'Outfit', sans-serif;
       }
       .hub-header h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+      .hub-header-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .hub-export-btn {
+        background: #15803d;
+        color: white;
+        border: none;
+        border-radius: 20px;
+        padding: 8px 18px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: background 0.15s;
+      }
+      .hub-export-btn:hover { background: #106b32; }
       
       .hub-summary-sections {
         display: grid;
@@ -1057,9 +1069,20 @@ function renderInsightHub(filteredData, rawData) {
     `;
   }
 
+  // [Export] เก็บ reference คอลัมน์ + ลูกค้าที่ผ่านการกรอง/ค้นหาแล้ว (ไม่ตัดหน้า) ไว้ให้ปุ่ม Export ใช้
+  window.__hubExportState = {
+    customers: displayedCustomers,
+    availableYears: state.availableYears
+  };
+
   let html = `
     <div class="hub-header">
-      <h2>Customer Insight Hub</h2>
+      <div class="hub-header-row">
+        <h2>Customer Insight Hub</h2>
+        <button class="hub-export-btn" onclick="exportInsightHubExcel()">
+          <i class="fas fa-file-excel"></i> Export Excel
+        </button>
+      </div>
     </div>
 
     <div class="hub-summary-sections">
@@ -1204,6 +1227,60 @@ function renderInsightHub(filteredData, rawData) {
   container.innerHTML = html;
 }
 
+// [Export] ส่งออกลูกค้าที่ผ่านการค้นหา/กรองแล้ว (ไม่รวมผลของการแบ่งหน้า) เป็นไฟล์ Excel (.xlsx)
+window.exportInsightHubExcel = function() {
+  const exportState = window.__hubExportState;
+  if (!exportState || !exportState.customers || exportState.customers.length === 0) {
+    alert('ไม่มีข้อมูลสำหรับ Export');
+    return;
+  }
+  if (typeof XLSX === 'undefined') {
+    alert('ไม่สามารถโหลดไลบรารี Export Excel ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
+    return;
+  }
+
+  const years = exportState.availableYears || [];
+  const rows = exportState.customers.map(c => {
+    const row = {
+      'CustomerKey (Phone)': c.displayPhone,
+      'CustomerName (Latest)': c.name,
+      'FirstPurchaseDate': c.firstPurchaseStr,
+      'LastPurchaseDate': c.lastPurchaseStr,
+      'TotalOrders (SALE only)': c.totalOrders,
+      'TotalRevenue (SALE only)': Math.round(c.totalRevenue),
+      'AOV': Math.round(c.aov),
+      'DaysSinceLast': Number(c.daysSinceLast.toFixed(1)),
+      'Last Product': c.lastProductStr,
+      'Next Purchase Date': c.nextPurchaseStr,
+      'Life time value': c.ltvTier,
+      'Loyalty Index': c.loyaltyTier,
+      'Entry Product (สินค้าเปิดใจ)': c.entryProduct,
+      'Current Favorite (สินค้าตัวโปรด)': c.currentFavorite,
+      'Admin Priority': c.adminPriority,
+      'Segment 1 : Standard Period': c.segment1,
+      'Segment 2 : Dynamic Refill': c.segment2,
+      'Action Strategy Guideline': c.actionStrategy,
+      'FirstChannel (Main)': c.firstChannel,
+      'LastChannel (Main)': c.lastChannel,
+      'Last Admin': c.lastAdmin
+    };
+    years.forEach(y => {
+      row['ยอดซื้อปี ' + y] = Math.round((c.annualSpending && c.annualSpending[y]) || 0);
+    });
+    return row;
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Customer Insight Hub');
+
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const fileName = `CustomerInsightHub_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.xlsx`;
+
+  XLSX.writeFile(workbook, fileName);
+};
+
 window.toggleExcelDropdown = function(colId) {
   if (window.insightHubState.activeDropdown === colId) {
     window.insightHubState.activeDropdown = null;
@@ -1284,7 +1361,7 @@ window.confirmExcelFilter = function() {
 window.resetHubFilters = function() {
   window.insightHubState = {
     currentPage: 1,
-    rowsPerPage: 10,
+    rowsPerPage: 50,
     searchTerm: "",
     sortColumn: "totalRevenue",
     sortAsc: false,
