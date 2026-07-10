@@ -942,41 +942,53 @@
 
       // เติมค่าสถิติดั้งเดิมลงบนหน้าจอ Dashboard
       document.getElementById('val-sales').textContent = formatCurrency(curr.sales);
-      updateChangeUI('change-sales', curr.sales, prevSales);
       document.getElementById('val-total-cust').textContent = totalCust.toLocaleString() + ' คน';
       document.getElementById('val-active-cust').textContent = (activePct * 100).toFixed(1) + '%';
-      updateChangeUI('change-active-cust', activePct, prevActivePct);
       document.getElementById('val-ytd-sales').textContent = formatCurrency(ytdSales);
       document.getElementById('val-ytd-new').textContent = ytdNew.toLocaleString() + ' คน';
       document.getElementById('val-new-cust').textContent = newCount.toLocaleString() + ' คน';
-      updateChangeUI('change-new-cust', newCount, prevNew);
       document.getElementById('val-ret-cust').textContent = retCount.toLocaleString() + ' คน';
-      updateChangeUI('change-ret-cust', retCount, prevRet);
       document.getElementById('val-aov').textContent = formatCurrency(aov);
-      updateChangeUI('change-aov', aov, prevAov);
       document.getElementById('val-sph').textContent = formatCurrency(sph);
-      updateChangeUI('change-sph', sph, prevSph);
       document.getElementById('val-repeat').textContent = repeat.toFixed(2) + ' ครั้ง';
-      updateChangeUI('change-repeat', repeat, prevRepeat);
-      
-      // ==========================================
-      // 💡 โลจิกควบคุมบรรทัดเปรียบเทียบเปอร์เซ็นต์ (KPI Compare Switch)
-      // ==========================================
-      const changeYTDSalesEl = document.getElementById('change-ytd-sales');
-      const changeTotalCustEl = document.getElementById('change-total-cust');
-      const changeYTDNewEl = document.getElementById('change-ytd-new');
 
-      if (filters.KPI === 'On') {
-        changeYTDSalesEl.style.display = 'inline-flex';
-        changeYTDNewEl.style.display = 'inline-flex';
-        updateChangeUI('change-ytd-sales', ytdSales, window.kpiSettingsData.salesYTD);
-        updateChangeUI('change-total-cust', totalCust, window.kpiSettingsData.totalCust);
-        updateChangeUI('change-ytd-new', ytdNew, window.kpiSettingsData.newCustYTD);
-      } else {
-        changeYTDSalesEl.style.display = 'none';
-        changeYTDNewEl.style.display = 'none';
-        updateChangeUI('change-total-cust', totalCust, prev ? totalEverPrev.size : 0);
-      }
+      // ==========================================
+      // 💡 โลจิกควบคุมบรรทัดเปรียบเทียบ % กับเป้าหมายจากหน้า KPI Setting (ปุ่ม KPI Compare)
+      // ON  = โชว์ % เทียบกับเป้าที่กรอกไว้ในหน้า KPI Setting (ต่อเดือน/สะสม YTD ตามรายการ)
+      // OFF = ซ่อนทั้งหมด
+      // ==========================================
+      const monthIdx = parseInt(monthPart, 10) - 1; // 0 = Jan ... 11 = Dec ตรงกับ index ในอาร์เรย์ 12 เดือนของ KPI Setting
+      const kpiData = window.kpiSettingsData || {};
+      const kMonthlySales = kpiData.monthlyOnlineSales || [];
+      const kMonthlyNew = kpiData.monthlyCustomerNew || [];
+      const kMonthlyOld = kpiData.monthlyCustomerOld || [];
+      const kpiSumUpTo = (arr, idx) => arr.slice(0, idx + 1).reduce((s, v) => s + (Number(v) || 0), 0);
+      const kpiAt = (arr, idx) => Number(arr[idx]) || 0;
+
+      // elId, ค่าจริง, เป้าหมายจาก KPI Setting
+      const kpiCompareList = [
+        ['change-ytd-sales', ytdSales, kpiSumUpTo(kMonthlySales, monthIdx)],
+        ['change-total-cust', totalCust, kpiData.totalCust || 0],
+        ['change-ytd-new', ytdNew, kpiSumUpTo(kMonthlyNew, monthIdx)],
+        ['change-aov', aov, kpiData.aov || 0],
+        ['change-sales', curr.sales, kpiAt(kMonthlySales, monthIdx)],
+        ['change-active-cust', activeCustThisMonth, kpiAt(kMonthlyNew, monthIdx) + kpiAt(kMonthlyOld, monthIdx)],
+        ['change-new-cust', newCount, kpiAt(kMonthlyNew, monthIdx)],
+        ['change-ret-cust', retCount, kpiAt(kMonthlyOld, monthIdx)],
+        ['change-sph', sph, kpiData.sph || 0],
+        ['change-repeat', repeat, kpiData.frequency || 0]
+      ];
+
+      kpiCompareList.forEach(([elId, current, target]) => {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        if (filters.KPI === 'On') {
+          el.style.display = 'inline-flex';
+          updateChangeUI(elId, current, target);
+        } else {
+          el.style.display = 'none';
+        }
+      });
 
       // --- ชุดโค้ดการจัดการโครงสร้างและข้อมูลของกราฟทำงานปกติ 100% ---
       const trendMonths = focalMonths.slice(-12);
