@@ -88,7 +88,7 @@
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-crown"></i>TOP SPENDER</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
-        <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-line"></i>KPI SETTING</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" id="side-kpisetting" onclick="event.preventDefault(); switchTab('kpisetting')"><i class="fas fa-chart-line"></i>KPI SETTING</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-cog"></i>SETTINGS</a></li>
       </ul>
     </aside>
@@ -259,7 +259,8 @@
       
         <div id="view-retention" class="view-content" style="display:none; padding: 20px;"></div>
         <div id="view-insighthub" class="view-content" style="display:none; padding: 20px;"></div>
-      
+        <div id="view-kpisetting" class="view-content" style="display:none; padding: 20px;"></div>
+
       </div>
     </main>
   </div>
@@ -403,17 +404,29 @@
       
       document.getElementById('side-crm').classList.remove('active');
       document.getElementById('side-insight').classList.remove('active');
-      
+      const sideKpiSetting = document.getElementById('side-kpisetting');
+      if (sideKpiSetting) sideKpiSetting.classList.remove('active');
+
       if (tabId === 'insighthub') {
         document.getElementById('side-insight').classList.add('active');
         document.getElementById('view-insighthub').style.display = 'block';
-        
+
         const tabsContainer = document.querySelector('.tabs-container');
         if (tabsContainer) tabsContainer.style.display = 'none';
         const filtersBar = document.querySelector('.filters-bar');
         if (filtersBar) filtersBar.style.display = 'none';
-        
+
         if (typeof renderInsightHub === 'function') { renderInsightHub(filteredData, rawData); }
+      } else if (tabId === 'kpisetting') {
+        if (sideKpiSetting) sideKpiSetting.classList.add('active');
+        document.getElementById('view-kpisetting').style.display = 'block';
+
+        const tabsContainer = document.querySelector('.tabs-container');
+        if (tabsContainer) tabsContainer.style.display = 'none';
+        const filtersBar = document.querySelector('.filters-bar');
+        if (filtersBar) filtersBar.style.display = 'none';
+
+        if (typeof renderKpiSetting === 'function') { renderKpiSetting(); }
       } else {
         document.getElementById('side-crm').classList.add('active');
         const tabsContainer = document.querySelector('.tabs-container');
@@ -1051,5 +1064,6 @@
   <script src="executive2.js?v=13"></script>
   <script src="insighthub.js?v=13"></script>
   <script src="retention.js?v=1"></script>
+  <script src="kpisetting.js?v=1"></script>
 </body>
 </html>
