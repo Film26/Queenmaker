@@ -654,27 +654,18 @@ function renderInsightHub(filteredData, rawData) {
       .profile-detail-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f8fafc; }
       .profile-detail-row:last-child { border-bottom: none; }
 
-      .yearly-tier-grid {
+      .yearly-tier-table { margin-top: 8px; }
+      .yearly-tier-row {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        margin-top: 12px;
-      }
-      @media (max-width: 600px) {
-        .yearly-tier-grid { grid-template-columns: repeat(2, 1fr); }
-      }
-      .yearly-tier-cell {
-        background: #f8fafc;
-        border-radius: 12px;
-        padding: 12px;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
+        grid-template-columns: 1fr 1fr auto;
         align-items: center;
-        gap: 6px;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid #f8fafc;
       }
-      .yearly-tier-year { font-size: 11px; font-weight: 600; color: #64748b; }
-      .yearly-tier-amount { font-size: 15px; font-weight: 700; }
+      .yearly-tier-row:last-child { border-bottom: none; }
+      .yearly-tier-year { font-size: 13px; color: #64748b; }
+      .yearly-tier-amount { font-size: 13px; font-weight: 700; text-align: right; }
 
       .yr-tier-junior { background: #f5f5f5; color: #666666; }
       .yr-tier-silver { background: #e5e7eb; color: #374151; }
@@ -1474,11 +1465,17 @@ function getSegClass(seg) {
 }
 
 // Customer Tier ต่อปี: อิงยอดซื้อสะสมของปีนั้นๆ (annualSpending[year])
+// ใช้เกณฑ์จากหน้า KPI Setting ถ้าเคยตั้งค่าไว้ (window.kpiSettingsData.customerTiers) ไม่งั้น fallback ค่า default
 function getYearlyTier(amount) {
-  if (amount >= 45000) return "Diamond";
-  if (amount >= 35000) return "Platinum";
-  if (amount >= 25000) return "Gold";
-  if (amount >= 5900) return "Silver";
+  const t = (window.kpiSettingsData && window.kpiSettingsData.customerTiers) || {};
+  const silver = t.silver || 5900;
+  const gold = t.gold || 25000;
+  const platinum = t.platinum || 35000;
+  const diamond = t.diamond || 45000;
+  if (amount >= diamond) return "Diamond";
+  if (amount >= platinum) return "Platinum";
+  if (amount >= gold) return "Gold";
+  if (amount >= silver) return "Silver";
   return "Junior";
 }
 
@@ -1696,12 +1693,12 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
           <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #e2e8f0;">
             <span style="font-size: 12px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">ยอดซื้อสะสมรายปี (2021 - 2026)</span>
           </div>
-          <div class="yearly-tier-grid">
+          <div class="yearly-tier-table">
             ${[2021, 2022, 2023, 2024, 2025, 2026].map(year => {
               const amount = c.annualSpending[year] || 0;
               const tier = getYearlyTier(amount);
               return `
-                <div class="yearly-tier-cell">
+                <div class="yearly-tier-row">
                   <div class="yearly-tier-year"><i class="fas fa-coins" style="margin-right: 6px; color: #f59e0b;"></i>ยอดซื้อปี ${year}</div>
                   <div class="yearly-tier-amount" style="color: ${amount > 0 ? '#1e293b' : '#94a3b8'};">${amount > 0 ? '฿' + amount.toLocaleString() : '-'}</div>
                   <span class="badge-span ${getYearlyTierClass(tier)}">${tier}</span>
