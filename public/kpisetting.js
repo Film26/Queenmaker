@@ -1,8 +1,4 @@
 // public/kpisetting.js
-// หน้า KPI Setting: ตารางกรอกเป้าหมาย KPI ด้วยมือ ตามฟอร์แมตไฟล์ "KPI setting - KPI.csv"
-// ไม่มีการคำนวณจากข้อมูลขาย เป็นการพิมพ์ตัวเลขเข้าตารางแล้วกดบันทึก (เก็บไว้ใน localStorage ของเบราว์เซอร์)
-// หมายเหตุ: ใช้ prefix class "kpiset-" ทั้งหมด เพราะ dashboard.html มี class .kpi-card/.kpi-header อยู่แล้ว
-// (ใช้กับการ์ด KPI หน้า CRM Overview) ถ้าใช้ชื่อซ้ำจะชนกันและ layout ทั้งสองหน้าพังพร้อมกัน
 
 const KPI_STORAGE_KEY = 'qm_kpi_setting_v1';
 const KPI_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -36,12 +32,6 @@ function kpiDefaultState() {
       sph: null,
       retention: null
     },
-    tiers: {
-      silver: 5900,
-      gold: 25000,
-      platinum: 35000,
-      diamond: 45000
-    },
     savedAt: null
   };
 }
@@ -56,8 +46,7 @@ function kpiLoadState() {
     return Object.assign(def, parsed, {
       customerSetting: Object.assign(def.customerSetting, parsed.customerSetting),
       customerMonthly: Object.assign(def.customerMonthly, parsed.customerMonthly),
-      crm: Object.assign(def.crm, parsed.crm),
-      tiers: Object.assign(def.tiers, parsed.tiers)
+      crm: Object.assign(def.crm, parsed.crm)
     });
   } catch (e) {
     console.error('[KPI Setting] โหลดข้อมูลที่บันทึกไว้ไม่สำเร็จ', e);
@@ -245,28 +234,6 @@ function renderKpiSetting() {
       .kpiset-metric-row .kpiset-input { width: 130px; }
       .kpiset-freq-value { font-size: 15px; font-weight: 700; color: #1e293b; }
 
-      .kpiset-tier-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 10px; }
-      @media (max-width: 900px) { .kpiset-tier-grid { grid-template-columns: repeat(2, 1fr); } }
-      .kpiset-tier-cell {
-        background: #f8fafc;
-        border-radius: 12px;
-        padding: 14px;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 8px;
-      }
-      .kpiset-tier-name { font-size: 13px; font-weight: 700; }
-      .kpiset-tier-range { font-size: 11px; color: #64748b; }
-      .kpiset-tier-cell .kpiset-input { width: 100px; text-align: center; }
-
-      .kpiset-tier-junior { color: #666666; }
-      .kpiset-tier-silver { color: #374151; }
-      .kpiset-tier-gold { color: #b45309; }
-      .kpiset-tier-platinum { color: #6d28d9; }
-      .kpiset-tier-diamond { color: #0369a1; }
-
       .kpiset-saved-note { font-size: 11px; color: #94a3b8; margin-top: -10px; margin-bottom: 20px; }
     `;
     document.head.appendChild(style);
@@ -363,14 +330,6 @@ function kpiRenderAll(container) {
         <input type="text" inputmode="decimal" class="kpiset-input" id="kpi-crm-retention" value="${kpiFormatNum(state.crm.retention)}" placeholder="0">
       </div>
     </div>
-
-    <div class="kpiset-card">
-      <h3>4. Customer Tier</h3>
-      <p class="kpiset-subtitle">ยอดซื้อสะสมในปีนั้นๆ ใช้กำหนดระดับลูกค้า (แสดงผลในหน้า Customer Profile ของ Insight Hub)</p>
-      <div class="kpiset-tier-grid" id="kpi-tier-grid">
-        ${kpiBuildTierGrid(state.tiers)}
-      </div>
-    </div>
   `;
 
   updateKpiFrequency();
@@ -433,29 +392,6 @@ function kpiBuildCustomerMonthlyTable(customerMonthly) {
   `;
 }
 
-function kpiTierRangeText(tierKey, tiers) {
-  if (tierKey === 'junior') return `&lt; ${kpiFormatNum(tiers.silver)}`;
-  if (tierKey === 'silver') return `${kpiFormatNum(tiers.silver)} - &lt;${kpiFormatNum(tiers.gold)}`;
-  if (tierKey === 'gold') return `${kpiFormatNum(tiers.gold)} - &lt;${kpiFormatNum(tiers.platinum)}`;
-  if (tierKey === 'platinum') return `${kpiFormatNum(tiers.platinum)} - &lt;${kpiFormatNum(tiers.diamond)}`;
-  return `&gt;= ${kpiFormatNum(tiers.diamond)}`;
-}
-
-function kpiBuildTierGrid(tiers) {
-  const order = ['junior', 'silver', 'gold', 'platinum', 'diamond'];
-  const names = { junior: 'Junior', silver: 'Silver', gold: 'Gold', platinum: 'Platinum', diamond: 'Diamond' };
-  return order.map(key => `
-    <div class="kpiset-tier-cell">
-      <div class="kpiset-tier-name kpiset-tier-${key}">${names[key]}</div>
-      ${key === 'junior'
-        ? `<div class="kpiset-tier-range" id="kpi-tier-range-junior">${kpiTierRangeText('junior', tiers)}</div>`
-        : `<input type="text" inputmode="decimal" class="kpiset-input" id="kpi-tier-${key}" value="${kpiFormatNum(tiers[key])}" placeholder="0" oninput="updateKpiTierRanges()">
-           <div class="kpiset-tier-range" id="kpi-tier-range-${key}">${kpiTierRangeText(key, tiers)}</div>`
-      }
-    </div>
-  `).join('');
-}
-
 // --- Live update handlers ---
 
 window.updateKpiRowTotal = function(prefix, r) {
@@ -486,19 +422,6 @@ window.updateKpiFrequency = function() {
   const aov = kpiParseNum(aovEl.value);
   const sph = kpiParseNum(sphEl.value);
   freqEl.textContent = aov > 0 ? (sph / aov).toFixed(2) : '0.00';
-};
-
-window.updateKpiTierRanges = function() {
-  const tiers = {
-    silver: kpiParseNum(document.getElementById('kpi-tier-silver').value),
-    gold: kpiParseNum(document.getElementById('kpi-tier-gold').value),
-    platinum: kpiParseNum(document.getElementById('kpi-tier-platinum').value),
-    diamond: kpiParseNum(document.getElementById('kpi-tier-diamond').value)
-  };
-  ['junior', 'silver', 'gold', 'platinum', 'diamond'].forEach(key => {
-    const el = document.getElementById(`kpi-tier-range-${key}`);
-    if (el) el.innerHTML = kpiTierRangeText(key, tiers);
-  });
 };
 
 window.syncKpiRowName = function(sectionKey, r, value) {
@@ -563,12 +486,31 @@ function kpiCollectStateFromDom() {
   state.crm.sph = kpiParseNum(document.getElementById('kpi-crm-sph').value) || null;
   state.crm.retention = kpiParseNum(document.getElementById('kpi-crm-retention').value) || null;
 
-  state.tiers.silver = kpiParseNum(document.getElementById('kpi-tier-silver').value) || 0;
-  state.tiers.gold = kpiParseNum(document.getElementById('kpi-tier-gold').value) || 0;
-  state.tiers.platinum = kpiParseNum(document.getElementById('kpi-tier-platinum').value) || 0;
-  state.tiers.diamond = kpiParseNum(document.getElementById('kpi-tier-diamond').value) || 0;
-
   return state;
+}
+
+// ส่งค่าไปยังคลัง window.kpiSettingsData ที่หน้า CRM Dashboard ใช้ (ปุ่ม KPI Compare + การ์ด 10 ใบ)
+// ใช้ร่วมกันทั้งตอนกดบันทึก และตอนโหลดไฟล์ครั้งแรก (preload จาก localStorage)
+function kpiApplyStateToGlobalSettings(state) {
+  window.kpiSettingsData = window.kpiSettingsData || {};
+
+  const onlineRow = (state.byChannel || []).find(r => (r.name || '').trim().toLowerCase() === 'online') || (state.byChannel || [])[0];
+  if (onlineRow) {
+    window.kpiSettingsData.salesYTD = kpiRowTotal(onlineRow.values); // รวมทั้งปี (fallback)
+    window.kpiSettingsData.monthlyOnlineSales = onlineRow.values.map(v => v || 0); // เป้าต่อเดือน ใช้คำนวณ YTD-to-date และการ์ดยอดขายรายเดือน
+  }
+
+  if (state.crm && state.crm.totalCustomers) window.kpiSettingsData.totalCust = state.crm.totalCustomers;
+  window.kpiSettingsData.aov = (state.crm && state.crm.aov) || 0;
+  window.kpiSettingsData.sph = (state.crm && state.crm.sph) || 0;
+  // Frequency เป้าหมาย = SPH/AOV เหมือนสูตร auto ในหน้านี้
+  window.kpiSettingsData.frequency = (state.crm && state.crm.aov && state.crm.sph) ? (state.crm.sph / state.crm.aov) : 0;
+
+  if (state.customerMonthly) {
+    window.kpiSettingsData.monthlyCustomerNew = (state.customerMonthly.new || []).map(v => v || 0);
+    window.kpiSettingsData.monthlyCustomerOld = (state.customerMonthly.old || []).map(v => v || 0);
+    window.kpiSettingsData.newCustYTD = kpiRowTotal(state.customerMonthly.new || []); // รวมทั้งปี (fallback)
+  }
 }
 
 window.saveKpiSettings = function() {
@@ -583,14 +525,7 @@ window.saveKpiSettings = function() {
     return;
   }
 
-  // ส่งค่าไปยังคลัง window.kpiSettingsData ที่หน้า Dashboard หลัก (ปุ่ม KPI Compare) ใช้อยู่แล้ว
-  window.kpiSettingsData = window.kpiSettingsData || {};
-  const onlineRow = state.byChannel.find(r => r.name.trim().toLowerCase() === 'online') || state.byChannel[0];
-  if (onlineRow) window.kpiSettingsData.salesYTD = kpiRowTotal(onlineRow.values);
-  if (state.crm.totalCustomers) window.kpiSettingsData.totalCust = state.crm.totalCustomers;
-  window.kpiSettingsData.newCustYTD = kpiRowTotal(state.customerMonthly.new);
-  // ระดับ Customer Tier ให้หน้า Insight Hub (Customer Profile) ใช้แทนค่า default
-  window.kpiSettingsData.customerTiers = { ...state.tiers };
+  kpiApplyStateToGlobalSettings(state);
 
   const container = document.getElementById('view-kpisetting');
   if (container) kpiRenderAll(container);
@@ -606,17 +541,14 @@ window.resetKpiSettings = function() {
   if (container) kpiRenderAll(container);
 };
 
-// โหลดค่า Customer Tier ที่บันทึกไว้ (ถ้ามี) เข้า window.kpiSettingsData ทันทีตอนไฟล์นี้ถูกโหลด
-// เพื่อให้หน้า Insight Hub ใช้ค่าที่ตั้งไว้ได้แม้ยังไม่เคยเปิดหน้า KPI Setting ในเซสชันนี้
-(function kpiPreloadTiers() {
+// โหลดค่าที่บันทึกไว้ (ถ้ามี) เข้า window.kpiSettingsData ทันทีตอนไฟล์นี้ถูกโหลด
+// เพื่อให้หน้า CRM Dashboard / Insight Hub ใช้ค่าที่ตั้งไว้ได้แม้ยังไม่เคยเปิดหน้า KPI Setting ในเซสชันนี้
+(function kpiPreloadSettings() {
   try {
     const raw = localStorage.getItem(KPI_STORAGE_KEY);
     if (!raw) return;
     const parsed = JSON.parse(raw);
-    if (parsed && parsed.tiers) {
-      window.kpiSettingsData = window.kpiSettingsData || {};
-      window.kpiSettingsData.customerTiers = parsed.tiers;
-    }
+    if (parsed) kpiApplyStateToGlobalSettings(parsed);
   } catch (e) {
     // ไม่มีข้อมูลเก่าหรือข้อมูลเสีย ใช้ค่า default ต่อไป
   }
