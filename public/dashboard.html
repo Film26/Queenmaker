@@ -55,6 +55,9 @@
     .kpi-change-new.up { color: #198754; background: rgba(25,135,84,0.1); }
     .kpi-change-new.down { color: #dc3545; background: rgba(220,53,69,0.1); }
     .kpi-change-new.neutral { color: #6c757d; background: rgba(108,117,125,0.1); }
+
+    /* badge เทียบเป้าหมาย KPI Setting: ปักไว้มุมล่างขวาของกรอบการ์ด (การ์ดมี position:relative อยู่แล้ว) */
+    .kpi-target-badge { position: absolute; bottom: 14px; right: 16px; }
     
     .chart-box {
       background: #fff; border-radius: 16px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);
@@ -179,64 +182,50 @@
             <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title">AOV (ยอดต่อบิลเฉลี่ย (บาท))</div></div>
               <div class="kpi-val" id="val-aov">฿0</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <span class="kpi-change-new neutral" id="change-aov">-</span>
-                <span class="kpi-change-new neutral" id="kpi-target-aov" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
+              <div><span class="kpi-change-new neutral" id="change-aov">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-aov" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
             </div>
 
             <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title" id="title-sales">ยอดขายประจำเดือน (บาท)</div></div>
               <div class="kpi-val" id="val-sales">฿0</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <span class="kpi-change-new neutral" id="change-sales">-</span>
-                <span class="kpi-change-new neutral" id="kpi-target-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
+              <div><span class="kpi-change-new neutral" id="change-sales">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
             </div>
 
             <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title">Active Customer (คน)</div></div>
               <div class="kpi-val" id="val-active-cust">0%</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <span class="kpi-change-new neutral" id="change-active-cust">-</span>
-                <span class="kpi-change-new neutral" id="kpi-target-active-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
+              <div><span class="kpi-change-new neutral" id="change-active-cust">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-active-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
             </div>
 
             <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title">New Customer (คน)</div></div>
               <div class="kpi-val" id="val-new-cust">0</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <span class="kpi-change-new neutral" id="change-new-cust">-</span>
-                <span class="kpi-change-new neutral" id="kpi-target-new-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
+              <div><span class="kpi-change-new neutral" id="change-new-cust">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-new-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
             </div>
 
             <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title">Retained Customer (คน)</div></div>
               <div class="kpi-val" id="val-ret-cust">0</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <span class="kpi-change-new neutral" id="change-ret-cust">-</span>
-                <span class="kpi-change-new neutral" id="kpi-target-ret-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
+              <div><span class="kpi-change-new neutral" id="change-ret-cust">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ret-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
             </div>
 
             <div class="kpi-card grid-span-2">
               <div class="kpi-header"><div class="kpi-title">Spending per Head (ยอดเฉลี่ยต่อคน)</div></div>
               <div class="kpi-val" id="val-sph">฿0</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <span class="kpi-change-new neutral" id="change-sph">-</span>
-                <span class="kpi-change-new neutral" id="kpi-target-sph" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
+              <div><span class="kpi-change-new neutral" id="change-sph">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-sph" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
             </div>
 
             <div class="kpi-card grid-span-2">
               <div class="kpi-header"><div class="kpi-title">Repeat Purchase</div></div>
               <div class="kpi-val" id="val-repeat">0.0 ครั้ง</div>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <span class="kpi-change-new neutral" id="change-repeat">-</span>
-                <span class="kpi-change-new neutral" id="kpi-target-repeat" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
+              <div><span class="kpi-change-new neutral" id="change-repeat">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-repeat" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
             </div>
           </div>
 
@@ -504,23 +493,23 @@
     }
 
     // badge ใหม่สำหรับเทียบ % กับเป้าหมายจากหน้า KPI Setting (แยกจาก updateChangeUI เดิมที่เทียบเดือนก่อนหน้า)
-    // ใช้ไอคอนเป้า (bullseye) แยกให้เห็นว่าเป็นคนละความหมายกับ badge เดิม
+    // ปักไว้มุมล่างขวาของกรอบการ์ด (ผ่าน class .kpi-target-badge) และใช้ป้าย "KPI" แยกให้เห็นว่าเป็นคนละความหมายกับ badge เดิม
     function updateKpiTargetUI(elId, current, target) {
       const el = document.getElementById(elId);
       if (!el) return;
-      const bullseye = '<i class="fas fa-bullseye" style="font-size:9px;"></i> ';
+      const kpiLabel = '<span style="font-size:9px; font-weight:800; letter-spacing:0.5px;">KPI</span> ';
       if (!target || target === 0) {
-        el.innerHTML = bullseye + '-';
-        el.className = 'kpi-change-new neutral';
+        el.innerHTML = kpiLabel + '-';
+        el.className = 'kpi-change-new neutral kpi-target-badge';
         return;
       }
       const change = (current - target) / target;
       const pct = formatPercent(change);
 
-      let icon = bullseye;
-      if (change > 0) { el.className = 'kpi-change-new up'; icon += '<i class="fas fa-arrow-up"></i> '; }
-      else if (change < 0) { el.className = 'kpi-change-new down'; icon += '<i class="fas fa-arrow-down"></i> '; }
-      else { el.className = 'kpi-change-new neutral'; }
+      let icon = kpiLabel;
+      if (change > 0) { el.className = 'kpi-change-new up kpi-target-badge'; icon += '<i class="fas fa-arrow-up"></i> '; }
+      else if (change < 0) { el.className = 'kpi-change-new down kpi-target-badge'; icon += '<i class="fas fa-arrow-down"></i> '; }
+      else { el.className = 'kpi-change-new neutral kpi-target-badge'; }
       el.innerHTML = icon + pct;
     }
 
