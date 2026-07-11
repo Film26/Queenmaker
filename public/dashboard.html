@@ -596,6 +596,12 @@
 
     function isSaleOrder(row) {
       if (!row) return false;
+      // [CLEANSED] ไฟล์ที่ผ่าน Data cleansing มีคอลัมน์ Order type (ผลจากชีต Config_OrderType_Map) มาแล้ว
+      // -> ยึดค่าจากชีตเป็นหลัก: นับเฉพาะ SALE (Other/ของขวัญวันเกิด/ของขวัญปีใหม่/เคลม ไม่นับเป็นยอดขาย)
+      if (row['Order type'] !== undefined || row['OrderType'] !== undefined) {
+        const ot = ((row['Order type'] !== undefined ? row['Order type'] : row['OrderType']) || '').toString().trim();
+        return ot.toUpperCase() === 'SALE';
+      }
       const remark = getRowValue(row, ['หมายเหตุ', 'Remark']);
       const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
       const revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim());
@@ -610,6 +616,12 @@
     }
 
     function getNormalizedChannel(rawChannel, row) {
+      // [CLEANSED] ไฟล์ที่ผ่าน Data cleansing มีคอลัมน์ Channel (MainChannel_STD จากชีต Config_SubChannel_Map)
+      // -> ใช้ค่าจากชีตตรงๆ ไม่ต้องเดาใหม่ (เช็คว่ามี Sub Channel ด้วย กันชนกับไฟล์เดิมที่อาจมีคอลัมน์ Channel เป็นค่าดิบ)
+      if (row && row['Channel'] !== undefined && row['Sub Channel'] !== undefined) {
+        const cStd = (row['Channel'] || '').toString().trim();
+        return cStd || 'Other';
+      }
       let ch = (rawChannel || '').toString().trim();
       if (!ch && row) {
         ch = getRowValue(row, ['หมายเหตุ', 'Remark']);
@@ -631,6 +643,12 @@
     
     function getNormalizedSubChannel(row) {
       if (!row) return 'Other';
+      // [CLEANSED] ใช้ค่า SubChannel_STD จากชีต Config_SubChannel_Map ตรงๆ (เช่น FB, LINE, L1, EMAIL)
+      // ไม่ส่งเข้ากติกา includes ด้านล่างซ้ำ เพราะจะเพี้ยน เช่น 'LINE' โดนแปลงเป็น 'Line', 'L1' หายไป
+      if (row['Sub Channel'] !== undefined && row['Order type'] !== undefined) {
+        const sStd = (row['Sub Channel'] || '').toString().trim();
+        return sStd || 'Other';
+      }
       let sub = getRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง']);
       if (!sub || sub.toString().trim() === '') {
         sub = getRowValue(row, ['ช่องทาง', 'Channel']) || 'Other';
@@ -708,6 +726,13 @@
 
     function getNormalizedAdmin(row) {
       if (!row) return 'Unknown';
+      // [CLEANSED] ยึด Admin_STD จากชีต Config_Admin_Map เป็นหลัก ไม่ว่า RawKey จะพิมพ์แบบไหนมา
+      // หมายเหตุ: ไฟล์ export มีหัวคอลัมน์ 'Admin Name' ซ้ำ 2 ตำแหน่ง (คอลัมน์ K ที่ว่าง กับคอลัมน์ขวาสุด
+      // ที่เป็น Admin_STD) PapaParse จะตั้งชื่อตัวหลังเป็น 'Admin Name_1' -> ต้องอ่านจากชื่อนี้
+      if (row['Admin_STD'] !== undefined || row['Admin Name_1'] !== undefined) {
+        const aStd = ((row['Admin_STD'] !== undefined ? row['Admin_STD'] : row['Admin Name_1']) || '').toString().trim();
+        return aStd || 'Unknown';
+      }
       let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
       if (!val) val = getRowValue(row, ['หมายเหตุ', 'Remark']);
       
