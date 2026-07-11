@@ -69,6 +69,36 @@ function kpiRowTotal(values) {
   return values.reduce((sum, v) => sum + (kpiParseNum(v) || 0), 0);
 }
 
+// 💡 ตัวช่วยสร้าง <input> พร้อมปุ่มย้อนกลับ (undo) เฉพาะช่องนั้นๆ
+// - data-orig เก็บค่าล่าสุดก่อนแก้ไข (อัปเดตทุกครั้งที่ focus เข้าไปในช่อง)
+// - ปุ่มย้อนกลับจะโผล่มาตอน hover/focus ที่ช่องนั้น กดแล้วคืนค่าเดิมของ "ช่องนี้ช่องเดียว"
+function kpiInputHTML(id, value, opts) {
+  opts = opts || {};
+  const evtAttr = opts.onchange ? `onchange="${opts.onchange}"` : (opts.oninput ? `oninput="${opts.oninput}"` : '');
+  const cls = opts.className || 'kpiset-input';
+  const extraAttrs = opts.extraAttrs || '';
+  const val = opts.raw ? (value || '') : (kpiFormatNum(value) || '');
+  return `<span class="kpiset-input-wrap">
+    <input type="text" inputmode="${opts.raw ? 'text' : 'decimal'}" class="${cls}" id="${id}" value="${val}" placeholder="0" data-orig="${val}" onfocus="kpiCaptureOrig(this)" ${evtAttr} ${extraAttrs}>
+    <button type="button" class="kpiset-undo-btn" title="ย้อนกลับค่าช่องนี้" onclick="kpiUndoCell('${id}')"><i class="fas fa-undo"></i></button>
+  </span>`;
+}
+
+// จำค่าปัจจุบันของช่องไว้ ณ จังหวะที่ผู้ใช้เริ่มโฟกัส/แก้ไข (ก่อนพิมพ์ทับ)
+window.kpiCaptureOrig = function(el) {
+  el.dataset.orig = el.value;
+};
+
+// คืนค่าช่องนั้นกลับไปเป็นค่าก่อนแก้ไขล่าสุด แล้วยิง event ให้ระบบคำนวณ Total/Frequency ใหม่เหมือนพิมพ์เอง
+window.kpiUndoCell = function(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.value = el.dataset.orig || '';
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  el.focus();
+};
+
 function renderKpiSetting() {
   const container = document.getElementById('view-kpisetting');
   if (!container) return;
@@ -158,19 +188,34 @@ function renderKpiSetting() {
         border-bottom: 1px solid #f5f5f5;
         white-space: nowrap;
       }
+
+      /* --- ช่องกรอก + ปุ่มย้อนกลับเฉพาะช่อง --- */
+      .kpiset-input-wrap { position: relative; display: inline-block; }
+      .kpiset-undo-btn {
+        position: absolute; top: 50%; right: 3px; transform: translateY(-50%);
+        border: none; background: #fff; color: #b0b6c0; cursor: pointer;
+        font-size: 10px; padding: 2px 4px; border-radius: 4px; line-height: 1;
+        opacity: 0; pointer-events: none; transition: opacity 0.12s, color 0.12s;
+      }
+      .kpiset-input-wrap:hover .kpiset-undo-btn,
+      .kpiset-input-wrap:focus-within .kpiset-undo-btn {
+        opacity: 1; pointer-events: auto;
+      }
+      .kpiset-undo-btn:hover { color: #d95f1d; }
+
       .kpiset-table .kpiset-row-name {
         min-width: 150px;
         font-size: 12px;
         font-weight: 600;
         border: none;
         background: transparent;
-        padding: 6px 4px;
+        padding: 6px 20px 6px 4px;
         width: 100%;
         box-sizing: border-box;
       }
       .kpiset-input {
         width: 80px;
-        padding: 6px 6px;
+        padding: 6px 20px 6px 6px;
         font-size: 12px;
         border: 1px solid #e2e8f0;
         border-radius: 6px;
@@ -286,7 +331,7 @@ function kpiRenderAll(container) {
 
       <div class="kpiset-setting-row">
         <span class="kpiset-setting-label">2.1 เพิ่มจำนวนลูกค้าเก่า</span>
-        <input type="text" inputmode="decimal" class="kpiset-input" id="kpi-cust-setting-old-value" value="${kpiFormatNum(state.customerSetting.old.value)}" placeholder="0">
+        ${kpiInputHTML('kpi-cust-setting-old-value', state.customerSetting.old.value, {})}
         <select class="kpiset-unit-select" id="kpi-cust-setting-old-unit">
           <option value="%" ${state.customerSetting.old.unit === '%' ? 'selected' : ''}>% ต่อเดือน</option>
           <option value="count" ${state.customerSetting.old.unit === 'count' ? 'selected' : ''}>จำนวนคน/เดือน</option>
@@ -294,7 +339,7 @@ function kpiRenderAll(container) {
       </div>
       <div class="kpiset-setting-row">
         <span class="kpiset-setting-label">2.1 เพิ่มจำนวนลูกค้าใหม่</span>
-        <input type="text" inputmode="decimal" class="kpiset-input" id="kpi-cust-setting-new-value" value="${kpiFormatNum(state.customerSetting.new.value)}" placeholder="0">
+        ${kpiInputHTML('kpi-cust-setting-new-value', state.customerSetting.new.value, {})}
         <select class="kpiset-unit-select" id="kpi-cust-setting-new-unit">
           <option value="%" ${state.customerSetting.new.unit === '%' ? 'selected' : ''}>% ต่อเดือน</option>
           <option value="count" ${state.customerSetting.new.unit === 'count' ? 'selected' : ''}>จำนวนคน/เดือน</option>
@@ -311,15 +356,15 @@ function kpiRenderAll(container) {
       <h3>3. KPI CRM Metric</h3>
       <div class="kpiset-metric-row">
         <span class="kpiset-metric-label">จำนวนลูกค้าทั้งหมด (คน)</span>
-        <input type="text" inputmode="decimal" class="kpiset-input" id="kpi-crm-totalCustomers" value="${kpiFormatNum(state.crm.totalCustomers)}" placeholder="0" oninput="updateKpiFrequency()">
+        ${kpiInputHTML('kpi-crm-totalCustomers', state.crm.totalCustomers, { oninput: 'updateKpiFrequency()' })}
       </div>
       <div class="kpiset-metric-row">
         <span class="kpiset-metric-label">AOV Average Order Value (ยอดเฉลี่ยต่อบิล)</span>
-        <input type="text" inputmode="decimal" class="kpiset-input" id="kpi-crm-aov" value="${kpiFormatNum(state.crm.aov)}" placeholder="0" oninput="updateKpiFrequency()">
+        ${kpiInputHTML('kpi-crm-aov', state.crm.aov, { oninput: 'updateKpiFrequency()' })}
       </div>
       <div class="kpiset-metric-row">
         <span class="kpiset-metric-label">SPH Spending per Head (เฉลี่ยซื้อต่อคน)</span>
-        <input type="text" inputmode="decimal" class="kpiset-input" id="kpi-crm-sph" value="${kpiFormatNum(state.crm.sph)}" placeholder="0" oninput="updateKpiFrequency()">
+        ${kpiInputHTML('kpi-crm-sph', state.crm.sph, { oninput: 'updateKpiFrequency()' })}
       </div>
       <div class="kpiset-metric-row">
         <span class="kpiset-metric-label">Frequency (SPH/AOV) (ความถี่ซื้อ) <span style="color:#94a3b8;">&lt;-- สูตร auto</span></span>
@@ -327,7 +372,7 @@ function kpiRenderAll(container) {
       </div>
       <div class="kpiset-metric-row">
         <span class="kpiset-metric-label">Retention rate (อัตราการซื้อซ้ำ) (%)</span>
-        <input type="text" inputmode="decimal" class="kpiset-input" id="kpi-crm-retention" value="${kpiFormatNum(state.crm.retention)}" placeholder="0">
+        ${kpiInputHTML('kpi-crm-retention', state.crm.retention, {})}
       </div>
     </div>
   `;
@@ -356,9 +401,9 @@ function kpiBuildRowTable(sectionKey, prefix, rows) {
 function kpiBuildRowTr(sectionKey, prefix, r, row) {
   return `
     <tr>
-      <td><input type="text" class="kpiset-row-name" id="kpi-${prefix}-name-${r}" value="${row.name}" onchange="syncKpiRowName('${sectionKey}', ${r}, this.value)"></td>
+      <td>${kpiInputHTML(`kpi-${prefix}-name-${r}`, row.name, { className: 'kpiset-row-name', raw: true, onchange: `syncKpiRowName('${sectionKey}', ${r}, this.value)` })}</td>
       ${row.values.map((v, m) => `
-        <td><input type="text" inputmode="decimal" class="kpiset-input" id="kpi-${prefix}-${r}-${m}" value="${kpiFormatNum(v)}" placeholder="0" oninput="updateKpiRowTotal('${prefix}', ${r})"></td>
+        <td>${kpiInputHTML(`kpi-${prefix}-${r}-${m}`, v, { oninput: `updateKpiRowTotal('${prefix}', ${r})` })}</td>
       `).join('')}
       <td class="kpiset-total-cell" id="kpi-${prefix}-total-${r}">${kpiFormatNum(kpiRowTotal(row.values)) || 0}</td>
       <td><button class="kpiset-remove-btn" onclick="removeKpiRow('${sectionKey}', '${prefix}', ${r})" title="ลบแถว"><i class="fas fa-times"></i></button></td>
@@ -382,7 +427,7 @@ function kpiBuildCustomerMonthlyTable(customerMonthly) {
           <tr>
             <td style="font-weight:600;">${labels[type]}</td>
             ${customerMonthly[type].map((v, m) => `
-              <td><input type="text" inputmode="decimal" class="kpiset-input" id="kpi-cust-${type}-${m}" value="${kpiFormatNum(v)}" placeholder="0" oninput="updateKpiCustomerMonthlyTotal('${type}')"></td>
+              <td>${kpiInputHTML(`kpi-cust-${type}-${m}`, v, { oninput: `updateKpiCustomerMonthlyTotal('${type}')` })}</td>
             `).join('')}
             <td class="kpiset-total-cell" id="kpi-cust-total-${type}">${kpiFormatNum(kpiRowTotal(customerMonthly[type])) || 0}</td>
           </tr>
