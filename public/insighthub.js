@@ -1,8 +1,4 @@
 // public/insighthub.js
-// ปรับให้รองรับรูปแบบไฟล์ RAW 2021 (OrderDate, Remark, CustomerName, Address, Phone,
-// Product Set, Net Sales, Promotion, Birth month, Sex)
-// จุดที่เปลี่ยนหลักๆ ถูกคอมเมนต์กำกับด้วย [RAW2021]
-
 if (!window.insightHubState) {
   window.insightHubState = {
     currentPage: 1,
@@ -874,16 +870,18 @@ function renderInsightHub(filteredData, rawData) {
       lastAdmin = window.getRowValue(lastOrder.row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']) || "-";
     }
 
-    // คำนวณยอดเงินสะสมจริงแยกรายปี
+    // คำนวณยอดเงินสะสมจริงแยกรายปี + จำนวนออร์เดอร์ต่อปี (ใช้แสดงในโปรไฟล์ลูกค้า)
     // [RAW2021] เพิ่ม 'Net Sales' ในลิสต์คอลัมน์ยอดขาย (เดิมมีแค่ ยอดขาย/ยอดโอน ทำให้ RAW 2021 ได้ 0 หมด)
     const annualSpending = {};
-    availableYears.forEach(y => annualSpending[y] = 0);
+    const annualOrders = {};
+    availableYears.forEach(y => { annualSpending[y] = 0; annualOrders[y] = 0; });
     sortedHistory.forEach(o => {
       const year = o.dateObj.getFullYear();
       if (annualSpending[year] !== undefined) {
         const revStr = window.getRowValue(o.row, ['ยอดขาย', 'ยอดโอน', 'Net Sales', 'ราคาสินค้ายังไม่รวมภาษี', 'Revenue', 'Amount']) || '0';
         const rev = parseFloat(revStr.replace(/,/g, ''));
         if (!isNaN(rev)) annualSpending[year] += rev;
+        annualOrders[year] += 1;
       }
     });
 
@@ -918,6 +916,7 @@ function renderInsightHub(filteredData, rawData) {
       lastChannel,
       lastAdmin,
       annualSpending,
+      annualOrders,
       firstPurchaseStr: formatDateDisplay(firstPurchaseDate),
       lastPurchaseStr: formatDateDisplay(lastPurchaseDate),
       nextPurchaseStr: formatDateDisplay(nextPurchaseDateObj),
@@ -1336,6 +1335,16 @@ window.setHubPage = function(pageNumber) {
   if (window.applyFilters) window.applyFilters();
 };
 
+// Tier รายปีในโปรไฟล์ลูกค้า: ใช้ threshold เดียวกับ ltvTier แต่คำนวณจากยอดของปีนั้นๆ
+// คืนค่า null ถ้ายอดปีนั้น = 0 (กรณีนี้ไม่ต้องแสดง Tier)
+function getAnnualTier(amount) {
+  if (!amount || amount <= 0) return null;
+  if (amount >= 25000) return "💎 VVIP Whale";
+  if (amount >= 12000) return "🐳 VIP Dolphin";
+  if (amount >= 4500) return "🐟 Regular Minnow";
+  return "🐚 General";
+}
+
 function getLtvClass(tier) {
   if (tier.includes("Whale")) return "ltv-whale";
   if (tier.includes("Dolphin")) return "ltv-dolphin";
@@ -1429,13 +1438,13 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
 
     <div style="text-align: center; margin-bottom: 30px;">
       <h2 style="font-size: 26px; font-weight: 700; color: #0f172a; margin: 0 0 8px 0; font-family: 'Outfit', sans-serif;">Customer Profile</h2>
-      <p style="color: #64748b; font-size: 14px; margin: 0;">Enter a customer key to view their complete profile</p>
+      <p style="color: #64748b; font-size: 14px; margin: 0;">กรอกเบอร์โทรศัพท์เพื่อดูข้อมูลลูกค้าแบบละเอียด</p>
     </div>
 
     <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 35px; max-width: 600px; margin-left: auto; margin-right: auto;">
       <div style="position: relative; flex-grow: 1;">
         <i class="fas fa-search" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #999;"></i>
-        <input type="text" id="profile-search-input" class="search-bar-input" style="padding-left: 45px; width: 100%; height: 45px; font-size: 14px; border: 1px solid #e2e8f0; border-radius: 8px;" placeholder="ค้นหาโดยใช้ชื่อ หรือ เบอร์โทรศัพท์..." value="${c.phone}">
+        <input type="text" id="profile-search-input" class="search-bar-input" style="padding-left: 45px; width: 100%; height: 45px; font-size: 14px; border: 1px solid #e2e8f0; border-radius: 8px;" placeholder="ค้นหาโดยใช้ชื่อ หรือ เบอร์โทรศัพท์..." value="${c.displayPhone}">
       </div>
       <button class="btn" style="background: #2563eb; color: white; border: none; padding: 0 25px; border-radius: 8px; font-weight: 600; cursor: pointer; height: 45px; font-size: 14px;" onclick="searchProfileKey()">Search</button>
     </div>
@@ -1447,7 +1456,7 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
         </div>
         <div>
           <h3 style="margin: 0 0 5px 0; font-size: 22px; font-weight: 700; color: #1e293b;">${c.name}</h3>
-          <p style="margin: 0; color: #64748b; font-size: 13px;">Customer Profile (Key: ${c.phone})</p>
+          <p style="margin: 0; color: #64748b; font-size: 13px;">Customer Profile (เบอร์โทรศัพท์: ${c.displayPhone})</p>
         </div>
       </div>
       <div>
@@ -1573,12 +1582,18 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
             <span style="font-size: 12px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">ยอดซื้อสะสมรายปี (2021 - 2026)</span>
           </div>
           ${[2021, 2022, 2023, 2024, 2025, 2026].map(year => {
+            // เรียงข้อมูลต่อปีตามลำดับ: 1.ปี 2.จำนวนออร์เดอร์ 3.ยอดซื้อสะสม 4.Tier
+            // ถ้ายอดปีนั้น = 0 ไม่ต้องแสดง Tier
             const amount = c.annualSpending[year] || 0;
+            const orders = (c.annualOrders && c.annualOrders[year]) || 0;
+            const tier = getAnnualTier(amount);
             return `
               <div class="profile-detail-row" style="padding: 6px 0;">
-                <span style="color: #64748b; font-size: 13px;"><i class="fas fa-coins" style="margin-right: 8px; width: 15px; color: #f59e0b;"></i> ยอดซื้อปี ${year}</span>
-                <span style="font-size: 13px; font-weight: bold; color: ${amount > 0 ? '#1e293b' : '#94a3b8'};">
-                  ${amount > 0 ? '฿' + amount.toLocaleString() : '-'}
+                <span style="color: #64748b; font-size: 13px;"><i class="fas fa-coins" style="margin-right: 8px; width: 15px; color: #f59e0b;"></i> ปี ${year}</span>
+                <span style="display: flex; align-items: center; gap: 14px;">
+                  <span style="font-size: 12px; color: #64748b;">ออร์เดอร์ <b style="color: #1e293b;">${orders}</b> ครั้ง</span>
+                  <span style="font-size: 13px; font-weight: bold; color: ${amount > 0 ? '#1e293b' : '#94a3b8'};">${amount > 0 ? '฿' + amount.toLocaleString() : '-'}</span>
+                  ${tier ? `<span class="badge-span ${getLtvClass(tier)}" style="font-size: 10px;">${tier}</span>` : ''}
                 </span>
               </div>
             `;
