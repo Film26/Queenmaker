@@ -214,8 +214,11 @@ function renderExecutive2(filteredData, rawData) {
     };
   });
 
+  // Drop sub-channels with no real purchases (e.g. placeholder rows with 0 revenue/buyers)
+  const realResults = results.filter(r => r.revenue > 0 && r.buyers > 0);
+
   // Sort by revenue descending
-  results.sort((a, b) => b.revenue - a.revenue);
+  realResults.sort((a, b) => b.revenue - a.revenue);
 
   // Formatting helpers
   const fmtNum = (num) => (Number(num) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
@@ -279,10 +282,10 @@ function renderExecutive2(filteredData, rawData) {
         <tbody>
   `;
 
-  if (results.length === 0) {
+  if (realResults.length === 0) {
     html += `<tr><td colspan="8" style="text-align:center; padding: 30px; color: #999;">No sub-channels found.</td></tr>`;
   } else {
-    results.forEach(r => {
+    realResults.forEach(r => {
       html += `
         <tr>
           <td style="font-weight: 700;">${r.subChannel}</td>
