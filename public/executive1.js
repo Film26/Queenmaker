@@ -1,7 +1,7 @@
 // public/executive1.js
 function renderExecutive1(filteredData, rawData) {
   const container = document.getElementById('view-executive1');
-  
+
   if (!filteredData || filteredData.length === 0) {
     container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">No data available. Please adjust filters or load data.</div>';
     return;
@@ -16,6 +16,90 @@ function renderExecutive1(filteredData, rawData) {
         background-color: #f8f9fa !important;
         box-sizing: border-box;
       }
+      .exec-section-title {
+        font-family: 'Outfit', 'Inter', sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 12px 2px;
+      }
+      .exec-section-title span {
+        font-size: 12px;
+        font-weight: 500;
+        color: #94a3b8;
+        margin-left: 6px;
+      }
+
+      /* ---- KPI stat cards ---- */
+      .kpi-card-row {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(140px, 1fr));
+        gap: 14px;
+        margin-bottom: 28px;
+      }
+      @media (max-width: 1400px) {
+        .kpi-card-row { grid-template-columns: repeat(4, 1fr); }
+      }
+      @media (max-width: 800px) {
+        .kpi-card-row { grid-template-columns: repeat(2, 1fr); }
+      }
+      .kpi-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-top: 4px solid var(--kpi-color, #d95f1d);
+        border-radius: 14px;
+        padding: 16px 16px 12px;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+      }
+      .kpi-card-label {
+        font-family: 'Inter', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        color: var(--kpi-color, #d95f1d);
+      }
+      .kpi-card-sublabel {
+        display: block;
+        font-size: 10.5px;
+        font-weight: 500;
+        text-transform: none;
+        letter-spacing: 0;
+        color: #94a3b8;
+        margin-top: 2px;
+      }
+      .kpi-card-value {
+        font-family: 'Outfit', 'Inter', sans-serif;
+        font-size: 22px;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .kpi-card-trend {
+        font-size: 12px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .kpi-card-trend .arrow { font-size: 10px; }
+      .kpi-card-trend.up { color: #16a34a; }
+      .kpi-card-trend.down { color: #dc2626; }
+      .kpi-card-trend.flat { color: #94a3b8; }
+      .kpi-card-spark {
+        height: 34px;
+        margin-top: 2px;
+      }
+      .kpi-card-spark svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+      /* ---- Monthly breakdown table ---- */
       .exec-table-wrapper {
         background: #fff;
         border-radius: 12px;
@@ -36,13 +120,14 @@ function renderExecutive1(filteredData, rawData) {
         border-radius: 12px;
         overflow: hidden;
         box-shadow: 0 4px 15px rgba(0,0,0,0.02);
-        margin-bottom: 30px;
+        margin-bottom: 0;
       }
       .exec-table th, .exec-table td {
         border-bottom: 1px solid #e2e8f0;
-        border-right: 1px solid #e2e8f0;
-        padding: 10px 8px;
+        border-right: 1px solid #eef2f7;
+        padding: 12px 10px;
         text-align: right;
+        white-space: nowrap;
       }
       .exec-table th:last-child, .exec-table td:last-child {
         border-right: none;
@@ -51,22 +136,26 @@ function renderExecutive1(filteredData, rawData) {
         border-bottom: none;
       }
       .exec-table th {
-        background-color: #f8fafc;
-        color: #1e293b;
+        background-color: #1e293b;
+        color: #fff;
         font-weight: 700;
         text-align: center;
-        border-bottom: 2px solid #cbd5e1;
+        border-bottom: none;
+        border-right: 1px solid rgba(255,255,255,0.08);
       }
       .exec-table th:first-child, .exec-table td.metric-label {
         text-align: left;
         font-weight: 600;
-        width: 22%;
+        width: 16%;
         color: #334155;
       }
       .exec-table td.col-total, .exec-table th.col-total {
         font-weight: bold;
         background-color: #f8fafc;
         color: #0f172a;
+      }
+      .exec-table tbody tr:nth-child(odd) td:not(.col-total) {
+        background-color: #fbfcfe;
       }
       .exec-table .bg-light-green {
         background-color: #f0fdf4 !important;
@@ -80,48 +169,6 @@ function renderExecutive1(filteredData, rawData) {
       .dot-blue { background-color: #38bdf8; }
       .dot-green { background-color: #22c55e; }
       .dot-orange { background-color: #ea580c; }
-      
-      .ytd-table {
-        border-collapse: separate;
-        border-spacing: 0;
-        font-family: 'Inter', sans-serif;
-        font-size: 13px;
-        background-color: #fff;
-        border: 1px solid #cbd5e1;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
-        margin-bottom: 25px;
-        width: 70%;
-      }
-      .ytd-table th, .ytd-table td {
-        border-bottom: 1px solid #e2e8f0;
-        border-right: 1px solid #e2e8f0;
-        padding: 10px 8px;
-        text-align: center;
-      }
-      .ytd-table th:last-child, .ytd-table td:last-child {
-        border-right: none;
-      }
-      .ytd-table tr:last-child td {
-        border-bottom: none;
-      }
-      .ytd-table th {
-        background-color: #1e293b;
-        color: #fff;
-        font-weight: 700;
-        border-bottom: 2px solid #0f172a;
-      }
-      .ytd-table td {
-        background-color: #fff;
-        font-weight: 700;
-        color: #1e293b;
-        font-size: 14px;
-      }
-      .ytd-table .bg-yellow {
-        background-color: #fffbeb !important;
-        color: #b45309;
-      }
     `;
     document.head.appendChild(style);
   }
@@ -176,11 +223,11 @@ function renderExecutive1(filteredData, rawData) {
     const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
     const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
     const revenueStr = getVal(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']);
-    
+
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
     if (!d) return;
-    
+
     const m = d.m;
     if (m >= 1 && m <= 12) {
       const rev = parseFloat((revenueStr || '0').toString().replace(/,/g, ''));
@@ -199,7 +246,7 @@ function renderExecutive1(filteredData, rawData) {
            agg[m].newGlobalBuyers.add(id);
         }
       }
-      // Check Migration (New to Sub). 
+      // Check Migration (New to Sub).
       // Rule (Placeholder): If their first purchase in THIS FILTER CONTEXT is this month, but they are NOT New Global.
       // We will count them as Migration.
       if (filterContextFirstPurchase[id]) {
@@ -236,61 +283,10 @@ function renderExecutive1(filteredData, rawData) {
   const fmtNum = (num) => (Number(num) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
   const fmtDec = (num) => (Number(num) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtPct = (num) => ((Number(num) || 0) * 100).toFixed(1) + '%';
+  const fmtMoney = (num) => '฿' + fmtNum(num);
   const getSafely = (a, b) => b === 0 ? 0 : a / b;
 
-  // Build Table HTML
-   let html = `
-    <div class="exec-table-wrapper">
-      <table class="ytd-table">
-        <thead>
-          <tr>
-            <th style="width: 30%;">YTD Revenue<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดขาย YTD (บาท)</span></th>
-            <th>YTD Buyer<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ลูกค้าจริง YTD (คน)</span></th>
-            <th>YTD New Customers<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ลูกค้าใหม่ YTD (คน)</span></th>
-            <th>YTD Old Customers<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ลูกค้าเก่า YTD (คน)</span></th>
-            <th>YTD AOV<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดต่อบิลเฉลี่ย YTD (บาท)</span></th>
-            <th>YTD SPH<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ยอดเฉลี่ยต่อคน YTD (บาท)</span></th>
-            <th>Repeat Purchase<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">การซื้อซ้ำ (ครั้ง)</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>${fmtNum(total.revenue)}</td>
-            <td>${fmtNum(total.uniqueBuyers.size)}</td>
-            <td class="bg-yellow">${fmtNum(total.newGlobalBuyers.size)}</td>
-            <td>${fmtNum(total.retainedBuyers.size)}</td>
-            <td>${fmtNum(getSafely(total.revenue, total.orders))}</td>
-            <td>${fmtNum(getSafely(total.revenue, total.uniqueBuyers.size))}</td>
-            <td>${fmtDec(getSafely(total.orders, total.uniqueBuyers.size))}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="exec-table-wrapper">
-      <table class="exec-table">
-      <thead>
-        <tr>
-         <th>Metric / Month<br><span style="font-size: 11px; font-weight: normal; color: #64748b;">ตัวชี้วัด / เดือน</span></th>
-          ${months.map(m => `<th>${m}</th>`).join('')}
-          <th class="col-total">Total Year<br><span style="font-size: 11px; font-weight: normal; color: #64748b;">ยอดรวมทั้งปี</span></th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
-  const renderRow = (label, values, isMoney = false, isDec = false, isPct = false, bgClass = '') => {
-    let rowHtml = `<tr><td class="metric-label ${bgClass}">${label}</td>`;
-    for (let m = 1; m <= 12; m++) {
-      let val = values[m - 1];
-      let displayStr = isMoney ? fmtNum(val) : isDec ? fmtDec(val) : isPct ? fmtPct(val) : fmtNum(val);
-      rowHtml += `<td>${displayStr}</td>`;
-    }
-    // Total
-    let valT = values[12];
-    let displayStrT = isMoney ? fmtNum(valT) : isDec ? fmtDec(valT) : isPct ? fmtPct(valT) : fmtNum(valT);
-    rowHtml += `<td class="col-total">${displayStrT}</td></tr>`;
-    return rowHtml;
-  };
-  // Metrics Array Construction
+  // Metrics Array Construction (per-month series, index 0 = Jan ... 11 = Dec, index 12 = Total Year)
   const revArr = [], ordArr = [], aovArr = [], ubArr = [], freqArr = [], sphArr = [], retArr = [], newGArr = [], newGShrArr = [], migArr = [], migRtArr = [];
   for (let m = 1; m <= 12; m++) {
     const r = agg[m].revenue;
@@ -299,7 +295,7 @@ function renderExecutive1(filteredData, rawData) {
     const ret = agg[m].retainedBuyers.size;
     const newG = agg[m].newGlobalBuyers.size;
     const mig = agg[m].newToSubBuyers.size;
-    
+
     revArr.push(r);
     ordArr.push(o);
     aovArr.push(getSafely(r, o));
@@ -325,6 +321,99 @@ function renderExecutive1(filteredData, rawData) {
   newGShrArr.push(getSafely(total.newGlobalBuyers.size, uT));
   migArr.push(total.newToSubBuyers.size);
   migRtArr.push(getSafely(total.newToSubBuyers.size, uT));
+
+  // ---- Build KPI stat cards (top row) ----
+  // Find the latest month that actually has activity, so the sparkline/MoM
+  // reflect real data instead of trailing empty months.
+  let latestM = 0;
+  for (let m = 12; m >= 1; m--) {
+    if (agg[m].uniqueBuyers.size > 0) { latestM = m; break; }
+  }
+  if (latestM === 0) latestM = 12;
+
+  const buildSparkline = (values, color) => {
+    if (!values || values.length < 2) return '';
+    const w = 110, h = 34, pad = 3;
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    const range = (max - min) || 1;
+    const stepX = (w - pad * 2) / (values.length - 1);
+    const pts = values.map((v, i) => [
+      pad + i * stepX,
+      h - pad - ((v - min) / range) * (h - pad * 2)
+    ]);
+    const path = pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+    const last = pts[pts.length - 1];
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.5" fill="${color}"/>
+    </svg>`;
+  };
+
+  const buildTrend = (arr) => {
+    const cur = arr[latestM - 1];
+    const prev = latestM >= 2 ? arr[latestM - 2] : null;
+    if (prev === null || prev === undefined || prev === 0 || cur === undefined) {
+      return '<span class="kpi-card-trend flat"><span class="arrow">&#9644;</span> n/a MoM</span>';
+    }
+    const pct = ((cur - prev) / prev) * 100;
+    const cls = pct > 0.05 ? 'up' : pct < -0.05 ? 'down' : 'flat';
+    const arrow = cls === 'up' ? '&#9650;' : cls === 'down' ? '&#9660;' : '&#9644;';
+    return `<span class="kpi-card-trend ${cls}"><span class="arrow">${arrow}</span> ${Math.abs(pct).toFixed(1)}% MoM</span>`;
+  };
+
+  const kpiCards = [
+    { label: 'YTD Revenue', sub: 'ยอดขาย YTD (บาท)', value: fmtMoney(total.revenue), arr: revArr, color: '#d95f1d' },
+    { label: 'YTD Buyer', sub: 'ลูกค้าจริง YTD (คน)', value: fmtNum(total.uniqueBuyers.size), arr: ubArr, color: '#198754' },
+    { label: 'New Customers', sub: 'ลูกค้าใหม่ YTD (คน)', value: fmtNum(total.newGlobalBuyers.size), arr: newGArr, color: '#198754' },
+    { label: 'Old Customers', sub: 'ลูกค้าเก่า YTD (คน)', value: fmtNum(total.retainedBuyers.size), arr: retArr, color: '#6c757d' },
+    { label: 'YTD AOV', sub: 'ยอดต่อบิลเฉลี่ย (บาท)', value: fmtMoney(getSafely(total.revenue, total.orders)), arr: aovArr, color: '#d95f1d' },
+    { label: 'YTD SPH', sub: 'ยอดเฉลี่ยต่อคน (บาท)', value: fmtMoney(getSafely(total.revenue, total.uniqueBuyers.size)), arr: sphArr, color: '#2d1e1a' },
+    { label: 'Repeat Purchase', sub: 'การซื้อซ้ำ (ครั้ง)', value: fmtDec(getSafely(total.orders, total.uniqueBuyers.size)), arr: freqArr, color: '#198754' }
+  ];
+
+  let kpiHtml = '<div class="kpi-card-row">';
+  kpiCards.forEach(card => {
+    const series = card.arr.slice(0, latestM);
+    kpiHtml += `
+      <div class="kpi-card" style="--kpi-color:${card.color}">
+        <div class="kpi-card-label">${card.label}<span class="kpi-card-sublabel">${card.sub}</span></div>
+        <div class="kpi-card-value">${card.value}</div>
+        ${buildTrend(card.arr)}
+        <div class="kpi-card-spark">${buildSparkline(series, card.color)}</div>
+      </div>`;
+  });
+  kpiHtml += '</div>';
+
+  // ---- Build Monthly Breakdown Table ----
+  let html = `
+    <div class="exec-section-title">YTD Overview<span>ภาพรวมยอดขายสะสม</span></div>
+    ${kpiHtml}
+    <div class="exec-section-title">Monthly Breakdown<span>รายละเอียดรายเดือน</span></div>
+    <div class="exec-table-wrapper">
+      <table class="exec-table">
+      <thead>
+        <tr>
+         <th>Metric / Month<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ตัวชี้วัด / เดือน</span></th>
+          ${months.map(m => `<th>${m}</th>`).join('')}
+          <th class="col-total">Total Year<br><span style="font-size: 11px; font-weight: normal; color: #64748b;">ยอดรวมทั้งปี</span></th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+  const renderRow = (label, values, isMoney = false, isDec = false, isPct = false, bgClass = '') => {
+    let rowHtml = `<tr><td class="metric-label ${bgClass}">${label}</td>`;
+    for (let m = 1; m <= 12; m++) {
+      let val = values[m - 1];
+      let displayStr = isMoney ? fmtNum(val) : isDec ? fmtDec(val) : isPct ? fmtPct(val) : fmtNum(val);
+      rowHtml += `<td>${displayStr}</td>`;
+    }
+    // Total
+    let valT = values[12];
+    let displayStrT = isMoney ? fmtNum(valT) : isDec ? fmtDec(valT) : isPct ? fmtPct(valT) : fmtNum(valT);
+    rowHtml += `<td class="col-total">${displayStrT}</td></tr>`;
+    return rowHtml;
+  };
   html += renderRow('Revenue<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดขาย </span>', revArr, true, false, false, 'bg-light-green');
   html += renderRow('Orders<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ออเดอร์</span>', ordArr, true, false, false, 'bg-light-blue');
   html += renderRow('AOV (Average Order Value)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดต่อบิลเฉลี่ย </span>', aovArr, true, false, false, 'bg-light-blue');
