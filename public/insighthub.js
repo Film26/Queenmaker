@@ -1,4 +1,8 @@
 // public/insighthub.js
+// ปรับให้รองรับรูปแบบไฟล์ RAW 2021 (OrderDate, Remark, CustomerName, Address, Phone,
+// Product Set, Net Sales, Promotion, Birth month, Sex)
+// จุดที่เปลี่ยนหลักๆ ถูกคอมเมนต์กำกับด้วย [RAW2021]
+
 if (!window.insightHubState) {
   window.insightHubState = {
     currentPage: 1,
@@ -6,9 +10,9 @@ if (!window.insightHubState) {
     searchTerm: "",
     sortColumn: "totalRevenue",
     sortAsc: false,
-    excelFilters: {},
-    excelSearchTerms: {},
-    activeDropdown: null,
+    excelFilters: {}, 
+    excelSearchTerms: {}, 
+    activeDropdown: null, 
     selectedCustomerPhone: null,
     allCustomers: []
   };
@@ -133,8 +137,13 @@ function getCustomerKey(row) {
 }
 
 // Mapping ช่องทางดิบ (RawKey) -> { sub: SubChannel_STD, main: MainChannel_STD }
-// source of truth เดียว ใช้ทั้ง FirstChannel (Main) และ LastChannel (Main)
+// [CLEANSED] ปรับค่าให้ตรงกับชีต Config_SubChannel_Map จริง (ถอดจากไฟล์ที่ผ่าน Data cleansing
+// โดยเทียบ RawKey ใน Remark กับคอลัมน์ Sub Channel/Channel ทั้ง 56,391 แถว):
+// FB คงเป็น FB (ไม่ใช่ FBH), LINE/L1/L2/L3 คงค่าเดิมไม่ยุบรวม, EMAIL/TELESALE/PHONE/CALL/OTHER ตัวพิมพ์ใหญ่ตามชีต
+// map นี้ใช้เป็น fallback เฉพาะไฟล์ดิบที่ยังไม่มีคอลัมน์มาตรฐานมาให้ (ไฟล์ cleansed อ่านคอลัมน์ตรงๆ)
 const CHANNEL_MAP = {
+  'FB':        { sub: 'FB',       main: 'Facebook' },
+  'FACEBOOK':  { sub: 'FB',       main: 'Facebook' },
   'FBH':       { sub: 'FBH',      main: 'Facebook' },
   'FBP':       { sub: 'FBP',      main: 'Facebook' },
   'FBSS':      { sub: 'FBSS',     main: 'Facebook' },
@@ -144,10 +153,10 @@ const CHANNEL_MAP = {
   'FBK':       { sub: 'FBK',      main: 'Facebook' },
   'FBG':       { sub: 'FBG',      main: 'Facebook' },
   'FBC':       { sub: 'FBC',      main: 'Facebook' },
-  'FBP-W':     { sub: 'FBP-W',    main: 'Facebook' },
-  'FB':        { sub: 'FBH',      main: 'Facebook' },
-  'FACEBOOK':  { sub: 'FBH',      main: 'Facebook' },
-  // [RAW2021] sub-channel ที่พบจริงใน Remark ของ RAW 2021
+  'FBP-W':     { sub: 'FBP',      main: 'Facebook' },
+  'FBH-IG':    { sub: 'FBH',      main: 'Facebook' },
+  'FBบอกลา':   { sub: 'FB',       main: 'Facebook' },
+  'FBย':       { sub: 'FB',       main: 'Facebook' },
   'FBA':       { sub: 'FBA',      main: 'Facebook' },
   'FBS':       { sub: 'FBS',      main: 'Facebook' },
   'FBB':       { sub: 'FBB',      main: 'Facebook' },
@@ -156,31 +165,32 @@ const CHANNEL_MAP = {
   'FBF':       { sub: 'FBF',      main: 'Facebook' },
   'PBP':       { sub: 'FBP',      main: 'Facebook' },
   'IG':        { sub: 'IG',       main: 'Instagram' },
+  'INSTAGRAM': { sub: 'IG',       main: 'Instagram' },
+  'IG-FBH':    { sub: 'IG-FBH',   main: 'Instagram' },
   'IG-FBW':    { sub: 'IG-FBW',   main: 'Instagram' },
   'IG-FBSS':   { sub: 'IG-FBSS',  main: 'Instagram' },
-  'IG-FBH':    { sub: 'IG-FBH',   main: 'Instagram' },
-  'FBH-IG':    { sub: 'FBH-IG',   main: 'Instagram' },
-  'INSTAGRAM': { sub: 'IG',       main: 'Instagram' },
-  'LINE':      { sub: 'Line',     main: 'Line' },
-  'LINE_OA':   { sub: 'Line',     main: 'Line' },
-  'L1':        { sub: 'Line',     main: 'Line' },
-  'L2':        { sub: 'Line',     main: 'Line' },
-  'L3':        { sub: 'Line',     main: 'Line' },
+  'IG-FBM':    { sub: 'IG',       main: 'Instagram' },
+  'IG-FBK':    { sub: 'IG',       main: 'Instagram' },
+  'LINE':      { sub: 'LINE',     main: 'Line' },
+  'LINE_OA':   { sub: 'LINE',     main: 'Line' },
+  'L1':        { sub: 'L1',       main: 'Line' },
+  'L2':        { sub: 'L2',       main: 'Line' },
+  'L3':        { sub: 'L3',       main: 'Line' },
   'LAZADA':    { sub: 'Lazada',   main: 'Lazada' },
   'SHOPEE':    { sub: 'Shopee',   main: 'Shopee' },
   'TIKTOK':    { sub: 'Tiktok',   main: 'Tiktok' },
-  'WEB':       { sub: 'Website',  main: 'Website' },
-  'WWW':       { sub: 'Website',  main: 'Website' },
-  'WEBSITE':   { sub: 'Website',  main: 'Website' },
-  'โทรศัพท์':   { sub: 'Call',     main: 'Call' },
-  'CALL':      { sub: 'Call',     main: 'Call' },
-  'PHONE':     { sub: 'Call',     main: 'Call' },
-  'EMAIL':     { sub: 'Email',    main: 'Email' },
+  'WEB':       { sub: 'WEB',      main: 'Website' },
+  'WWW':       { sub: 'WWW',      main: 'Website' },
+  'WEBSITE':   { sub: 'WEBSITE',  main: 'Website' },
+  'โทรศัพท์':   { sub: 'CALL',     main: 'Call' },
+  'CALL':      { sub: 'CALL',     main: 'Call' },
+  'PHONE':     { sub: 'PHONE',    main: 'Call' },
+  'EMAIL':     { sub: 'EMAIL',    main: 'Email' },
   'CRM':       { sub: 'CRM',      main: 'CRM' },
   'PC':        { sub: 'PC',       main: 'PC' },
-  'OTHER':     { sub: 'Other',    main: 'Other' },
-  'TELESALE':  { sub: 'Telesale', main: 'Telesale' },
-  'TELESALES': { sub: 'Telesale', main: 'Telesale' }
+  'OTHER':     { sub: 'OTHER',    main: 'Other' },
+  'TELESALE':  { sub: 'TELESALE', main: 'Telesale' },
+  'TELESALES': { sub: 'TELESALE', main: 'Telesale' }
 };
 
 // [RAW2021] แปลง token ช่องทางดิบ -> entry ใน CHANNEL_MAP (คืน null ถ้าไม่รู้จัก)
@@ -210,7 +220,7 @@ function resolveChannel(rawChannel) {
   if (compact.indexOf('IG') === 0) return CHANNEL_MAP['IG'];
   if (compact.indexOf('FBP') === 0) return CHANNEL_MAP['FBP'];
   if (compact.indexOf('FB') === 0) {
-    const sub = compact.length > 2 && compact.length <= 6 && /^FB[A-Z\-]+$/.test(compact) ? compact : 'FBH';
+    const sub = compact.length > 2 && compact.length <= 6 && /^FB[A-Z\-]+$/.test(compact) ? compact : 'FB';
     return { sub: sub, main: 'Facebook' };
   }
   if (compact.indexOf('WEB') === 0 || compact === 'WWW') return CHANNEL_MAP['WEB'];
@@ -249,7 +259,7 @@ function extractChannelFromRemark(remark) {
     const line = lines[i].replace(/[\u200b\u200c\u200d\ufeff]/g, '').trim();
     if (!line) continue;
     if (/tracking/i.test(line) || line.indexOf('เลข') === 0) continue;
-    const sep = line.search(/[:：,]/);
+    const sep = line.search(/[:：,;；]/);
     const candidate = (sep >= 0 ? line.slice(0, sep) : line).trim();
     if (!candidate || candidate.length > 25) continue;
     if (resolveChannel(candidate)) return candidate;
@@ -263,6 +273,21 @@ function getChannelRaw(row) {
   const direct = window.getRowValue(row, ['ช่องทาง', 'Channel']);
   if (direct && direct.toString().trim()) return direct.toString().trim();
   return extractChannelFromRemark(window.getRowValue(row, ['Remark', 'หมายเหตุ']));
+}
+
+// [CLEANSED] จุดอ่านช่องทางมาตรฐานของแถว (ใช้ทั้ง FirstChannel/LastChannel):
+// 1) ไฟล์ที่ผ่าน Data cleansing มีคอลัมน์ Sub Channel/Channel (ผลจากชีต Config_SubChannel_Map)
+//    -> ยึดค่าจากชีตแบบเด็ดขาด "รวมถึงค่าว่าง" (ว่าง = ชีตระบุว่าแถวนี้ไม่มีช่องทาง) ไม่เดาเพิ่มจาก Remark
+// 2) ไฟล์ดิบที่ไม่มีคอลัมน์เหล่านี้ -> fallback ไปอ่านคอลัมน์ช่องทางดิบ/แกะจาก Remark แล้ว map ด้วย CHANNEL_MAP
+function getRowChannelStd(row) {
+  if (row && (row['Sub Channel'] !== undefined || row['SubChannel_STD'] !== undefined)) {
+    const subCol = ((row['SubChannel_STD'] !== undefined ? row['SubChannel_STD'] : row['Sub Channel']) || '').toString().trim();
+    const mainCol = ((row['MainChannel_STD'] !== undefined ? row['MainChannel_STD'] : row['Channel']) || '').toString().trim();
+    return { subChannel: subCol, mainChannel: mainCol };
+  }
+  const raw = getChannelRaw(row);
+  if (!raw) return { subChannel: '', mainChannel: '' };
+  return standardizeChannel(raw);
 }
 
 function getMainChannel(rawChannel) {
@@ -324,22 +349,6 @@ function renderInsightHub(filteredData, rawData) {
         font-family: 'Outfit', sans-serif;
       }
       .hub-header h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
-      .hub-header-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-      .hub-export-btn {
-        background: #15803d;
-        color: white;
-        border: none;
-        border-radius: 20px;
-        padding: 8px 18px;
-        font-weight: 600;
-        font-size: 13px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        transition: background 0.15s;
-      }
-      .hub-export-btn:hover { background: #106b32; }
       
       .hub-summary-sections {
         display: grid;
@@ -653,25 +662,6 @@ function renderInsightHub(filteredData, rawData) {
       .profile-detail-card h3 { font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 15px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; }
       .profile-detail-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f8fafc; }
       .profile-detail-row:last-child { border-bottom: none; }
-
-      .yearly-tier-table { margin-top: 8px; }
-      .yearly-tier-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr auto;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 0;
-        border-bottom: 1px solid #f8fafc;
-      }
-      .yearly-tier-row:last-child { border-bottom: none; }
-      .yearly-tier-year { font-size: 13px; color: #64748b; }
-      .yearly-tier-amount { font-size: 13px; font-weight: 700; text-align: right; }
-
-      .yr-tier-junior { background: #f5f5f5; color: #666666; }
-      .yr-tier-silver { background: #e5e7eb; color: #374151; }
-      .yr-tier-gold { background: #fef3c7; color: #b45309; }
-      .yr-tier-platinum { background: #ede9fe; color: #6d28d9; }
-      .yr-tier-diamond { background: #e0f2fe; color: #0369a1; }
     `;
     document.head.appendChild(style);
 
@@ -709,7 +699,7 @@ function renderInsightHub(filteredData, rawData) {
   // -> ไฟล์รูปแบบนี้ให้นับทุกแถวเป็นรายการขาย ส่วนไฟล์รูปแบบเดิมยังผ่าน isSaleOrder ตามปกติทุกอย่าง
   const sampleRows = rawData.slice(0, 50);
   const hasNetSalesCol = sampleRows.some(r => (window.getRowValue(r, ['Net Sales']) || '').toString().trim() !== '');
-  const hasDocTypeCol = sampleRows.some(r => (window.getRowValue(r, ['ประเภทเอกสาร', 'ประเภท', 'สถานะ', 'DocType', 'Document Type', 'Status', 'Type']) || '').toString().trim() !== '');
+  const hasDocTypeCol = sampleRows.some(r => (window.getRowValue(r, ['Order type', 'OrderType', 'ประเภทเอกสาร', 'ประเภท', 'สถานะ', 'DocType', 'Document Type', 'Status', 'Type']) || '').toString().trim() !== '');
   const isRaw2021Format = hasNetSalesCol && !hasDocTypeCol;
   const rawSaleOrders = isRaw2021Format ? rawData.slice() : rawData.filter(row => isSaleRow(row));
   
@@ -865,14 +855,16 @@ function renderInsightHub(filteredData, rawData) {
       return { row, dateObj: parseToDateObj(dateStr) };
     }).filter(item => item.dateObj !== null).sort((a, b) => a.dateObj - b.dateObj);
 
-    const firstChannel = allOrdersSorted.length > 0
-      ? getMainChannel(getChannelRaw(allOrdersSorted[0].row))
-      : "-";
+    let firstChannel = "-";
+    if (allOrdersSorted.length > 0) {
+      const stdFirst = getRowChannelStd(allOrdersSorted[0].row);
+      firstChannel = stdFirst.mainChannel || "-";
+    }
 
     let lastChannel = "-";
     for (let i = allOrdersSorted.length - 1; i >= 0; i--) {
-      const ch = getChannelRaw(allOrdersSorted[i].row);
-      if (ch) { lastChannel = getSubChannel(ch); break; }
+      const stdRow = getRowChannelStd(allOrdersSorted[i].row);
+      if (stdRow.subChannel || stdRow.mainChannel) { lastChannel = stdRow.subChannel || stdRow.mainChannel; break; }
     }
     
     let lastAdmin = "-";
@@ -1088,20 +1080,9 @@ function renderInsightHub(filteredData, rawData) {
     `;
   }
 
-  // [Export] เก็บ reference คอลัมน์ + ลูกค้าที่ผ่านการกรอง/ค้นหาแล้ว (ไม่ตัดหน้า) ไว้ให้ปุ่ม Export ใช้
-  window.__hubExportState = {
-    customers: displayedCustomers,
-    availableYears: state.availableYears
-  };
-
   let html = `
     <div class="hub-header">
-      <div class="hub-header-row">
-        <h2>Customer Insight Hub</h2>
-        <button class="hub-export-btn" onclick="exportInsightHubExcel()">
-          <i class="fas fa-file-excel"></i> Export Excel
-        </button>
-      </div>
+      <h2>Customer Insight Hub</h2>
     </div>
 
     <div class="hub-summary-sections">
@@ -1246,85 +1227,6 @@ function renderInsightHub(filteredData, rawData) {
   container.innerHTML = html;
 }
 
-// [Export] โหลดไลบรารี SheetJS (xlsx) แบบ dynamic เฉพาะตอนกดปุ่ม Export (ไม่ต้องแก้ dashboard.html)
-function loadXLSXLibrary(onReady) {
-  if (typeof XLSX !== 'undefined') { onReady(); return; }
-  if (window.__xlsxLoading) {
-    window.__xlsxLoadCallbacks = window.__xlsxLoadCallbacks || [];
-    window.__xlsxLoadCallbacks.push(onReady);
-    return;
-  }
-  window.__xlsxLoading = true;
-  window.__xlsxLoadCallbacks = [onReady];
-  const script = document.createElement('script');
-  script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-  script.onload = function() {
-    window.__xlsxLoading = false;
-    const callbacks = window.__xlsxLoadCallbacks || [];
-    window.__xlsxLoadCallbacks = [];
-    callbacks.forEach(cb => cb());
-  };
-  script.onerror = function() {
-    window.__xlsxLoading = false;
-    window.__xlsxLoadCallbacks = [];
-    alert('ไม่สามารถโหลดไลบรารี Export Excel ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
-  };
-  document.head.appendChild(script);
-}
-
-// [Export] ส่งออกลูกค้าที่ผ่านการค้นหา/กรองแล้ว (ไม่รวมผลของการแบ่งหน้า) เป็นไฟล์ Excel (.xlsx)
-window.exportInsightHubExcel = function() {
-  const exportState = window.__hubExportState;
-  if (!exportState || !exportState.customers || exportState.customers.length === 0) {
-    alert('ไม่มีข้อมูลสำหรับ Export');
-    return;
-  }
-  loadXLSXLibrary(() => runInsightHubExcelExport(exportState));
-};
-
-function runInsightHubExcelExport(exportState) {
-  const years = exportState.availableYears || [];
-  const rows = exportState.customers.map(c => {
-    const row = {
-      'CustomerKey (Phone)': c.displayPhone,
-      'CustomerName (Latest)': c.name,
-      'FirstPurchaseDate': c.firstPurchaseStr,
-      'LastPurchaseDate': c.lastPurchaseStr,
-      'TotalOrders (SALE only)': c.totalOrders,
-      'TotalRevenue (SALE only)': Math.round(c.totalRevenue),
-      'AOV': Math.round(c.aov),
-      'DaysSinceLast': Number(c.daysSinceLast.toFixed(1)),
-      'Last Product': c.lastProductStr,
-      'Next Purchase Date': c.nextPurchaseStr,
-      'Life time value': c.ltvTier,
-      'Loyalty Index': c.loyaltyTier,
-      'Entry Product (สินค้าเปิดใจ)': c.entryProduct,
-      'Current Favorite (สินค้าตัวโปรด)': c.currentFavorite,
-      'Admin Priority': c.adminPriority,
-      'Segment 1 : Standard Period': c.segment1,
-      'Segment 2 : Dynamic Refill': c.segment2,
-      'Action Strategy Guideline': c.actionStrategy,
-      'FirstChannel (Main)': c.firstChannel,
-      'LastChannel (Main)': c.lastChannel,
-      'Last Admin': c.lastAdmin
-    };
-    years.forEach(y => {
-      row['ยอดซื้อปี ' + y] = Math.round((c.annualSpending && c.annualSpending[y]) || 0);
-    });
-    return row;
-  });
-
-  const worksheet = XLSX.utils.json_to_sheet(rows);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Customer Insight Hub');
-
-  const now = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  const fileName = `CustomerInsightHub_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.xlsx`;
-
-  XLSX.writeFile(workbook, fileName);
-}
-
 window.toggleExcelDropdown = function(colId) {
   if (window.insightHubState.activeDropdown === colId) {
     window.insightHubState.activeDropdown = null;
@@ -1462,29 +1364,6 @@ function getSegClass(seg) {
   if (seg === "NEW") return "seg-new";
   if (seg === "REFILL") return "seg-refill";
   return "";
-}
-
-// Customer Tier ต่อปี: อิงยอดซื้อสะสมของปีนั้นๆ (annualSpending[year])
-// ใช้เกณฑ์จากหน้า KPI Setting ถ้าเคยตั้งค่าไว้ (window.kpiSettingsData.customerTiers) ไม่งั้น fallback ค่า default
-function getYearlyTier(amount) {
-  const t = (window.kpiSettingsData && window.kpiSettingsData.customerTiers) || {};
-  const silver = t.silver || 5900;
-  const gold = t.gold || 25000;
-  const platinum = t.platinum || 35000;
-  const diamond = t.diamond || 45000;
-  if (amount >= diamond) return "Diamond";
-  if (amount >= platinum) return "Platinum";
-  if (amount >= gold) return "Gold";
-  if (amount >= silver) return "Silver";
-  return "Junior";
-}
-
-function getYearlyTierClass(tier) {
-  if (tier === "Diamond") return "yr-tier-diamond";
-  if (tier === "Platinum") return "yr-tier-platinum";
-  if (tier === "Gold") return "yr-tier-gold";
-  if (tier === "Silver") return "yr-tier-silver";
-  return "yr-tier-junior";
 }
 
 function getSortIcon(colName) {
@@ -1693,19 +1572,17 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
           <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #e2e8f0;">
             <span style="font-size: 12px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">ยอดซื้อสะสมรายปี (2021 - 2026)</span>
           </div>
-          <div class="yearly-tier-table">
-            ${[2021, 2022, 2023, 2024, 2025, 2026].map(year => {
-              const amount = c.annualSpending[year] || 0;
-              const tier = getYearlyTier(amount);
-              return `
-                <div class="yearly-tier-row">
-                  <div class="yearly-tier-year"><i class="fas fa-coins" style="margin-right: 6px; color: #f59e0b;"></i>ยอดซื้อปี ${year}</div>
-                  <div class="yearly-tier-amount" style="color: ${amount > 0 ? '#1e293b' : '#94a3b8'};">${amount > 0 ? '฿' + amount.toLocaleString() : '-'}</div>
-                  <span class="badge-span ${getYearlyTierClass(tier)}">${tier}</span>
-                </div>
-              `;
-            }).join('')}
-          </div>
+          ${[2021, 2022, 2023, 2024, 2025, 2026].map(year => {
+            const amount = c.annualSpending[year] || 0;
+            return `
+              <div class="profile-detail-row" style="padding: 6px 0;">
+                <span style="color: #64748b; font-size: 13px;"><i class="fas fa-coins" style="margin-right: 8px; width: 15px; color: #f59e0b;"></i> ยอดซื้อปี ${year}</span>
+                <span style="font-size: 13px; font-weight: bold; color: ${amount > 0 ? '#1e293b' : '#94a3b8'};">
+                  ${amount > 0 ? '฿' + amount.toLocaleString() : '-'}
+                </span>
+              </div>
+            `;
+          }).join('')}
 
         </div>
       </div>
