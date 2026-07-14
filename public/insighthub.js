@@ -574,7 +574,18 @@ function renderInsightHub(filteredData, rawData) {
       .ltv-dolphin { background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; }
       .ltv-minnow { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
       .ltv-general { background: #f5f5f5; color: #555555; border: 1px solid #e5e5e5; }
-      
+
+      .ctier-junior { background: #f5f5f5; color: #616161; border: 1px solid #e0e0e0; }
+      .ctier-silver { background: #eef2f7; color: #546679; border: 1px solid #cbd5e1; }
+      .ctier-gold { background: #fff8e1; color: #b7791f; border: 1px solid #f5d78e; }
+      .ctier-platinum { background: #e6fbfb; color: #0e7490; border: 1px solid #a5f3fc; }
+      .ctier-diamond { background: #f2e9ff; color: #6d28d9; border: 1px solid #ddd0fb; }
+
+      .annual-tier-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      .annual-tier-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; text-align: left; padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
+      .annual-tier-table td { font-size: 13px; padding: 8px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+      .annual-tier-table th:not(:first-child), .annual-tier-table td:not(:first-child) { text-align: right; }
+
       .loy-legendary { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
       .loy-veteran { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
       .loy-regular { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
@@ -1405,14 +1416,24 @@ window.setHubPage = function(pageNumber) {
   if (window.applyFilters) window.applyFilters();
 };
 
-// Tier รายปีในโปรไฟล์ลูกค้า: ใช้ threshold เดียวกับ ltvTier แต่คำนวณจากยอดของปีนั้นๆ
+// Customer Tier รายปีในโปรไฟล์ลูกค้า: คำนวณจากยอดซื้อสะสมของปีนั้นๆ เท่านั้น
+// Junior < 5,900 | Silver 5,900-<25,000 | Gold 25,000-<35,000 | Platinum 35,000-<45,000 | Diamond >= 45,000
 // คืนค่า null ถ้ายอดปีนั้น = 0 (กรณีนี้ไม่ต้องแสดง Tier)
 function getAnnualTier(amount) {
   if (!amount || amount <= 0) return null;
-  if (amount >= 25000) return "💎 VVIP Whale";
-  if (amount >= 12000) return "🐳 VIP Dolphin";
-  if (amount >= 4500) return "🐟 Regular Minnow";
-  return "🐚 General";
+  if (amount < 5900) return "Junior";
+  if (amount < 25000) return "Silver";
+  if (amount < 35000) return "Gold";
+  if (amount < 45000) return "Platinum";
+  return "Diamond";
+}
+
+function getCustomerTierClass(tier) {
+  if (tier === "Diamond") return "ctier-diamond";
+  if (tier === "Platinum") return "ctier-platinum";
+  if (tier === "Gold") return "ctier-gold";
+  if (tier === "Silver") return "ctier-silver";
+  return "ctier-junior";
 }
 
 function getLtvClass(tier) {
@@ -1646,23 +1667,33 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
           <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #e2e8f0;">
             <span style="font-size: 12px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">ยอดซื้อสะสมรายปี (2021 - 2026)</span>
           </div>
-          ${[2021, 2022, 2023, 2024, 2025, 2026].map(year => {
-            // เรียงข้อมูลต่อปีตามลำดับ: 1.ปี 2.จำนวนออร์เดอร์ 3.ยอดซื้อสะสม 4.Tier
-            // ถ้ายอดปีนั้น = 0 ไม่ต้องแสดง Tier
-            const amount = c.annualSpending[year] || 0;
-            const orders = (c.annualOrders && c.annualOrders[year]) || 0;
-            const tier = getAnnualTier(amount);
-            return `
-              <div class="profile-detail-row" style="padding: 6px 0;">
-                <span style="color: #64748b; font-size: 13px;"><i class="fas fa-coins" style="margin-right: 8px; width: 15px; color: #f59e0b;"></i> ปี ${year}</span>
-                <span style="display: flex; align-items: center; gap: 14px;">
-                  <span style="font-size: 12px; color: #64748b;">ออร์เดอร์ <b style="color: #1e293b;">${orders}</b> ครั้ง</span>
-                  <span style="font-size: 13px; font-weight: bold; color: ${amount > 0 ? '#1e293b' : '#94a3b8'};">${amount > 0 ? '฿' + amount.toLocaleString() : '-'}</span>
-                  ${tier ? `<span class="badge-span ${getLtvClass(tier)}" style="font-size: 10px;">${tier}</span>` : ''}
-                </span>
-              </div>
-            `;
-          }).join('')}
+          <table class="annual-tier-table">
+            <thead>
+              <tr>
+                <th>ปี</th>
+                <th>จำนวนออร์เดอร์</th>
+                <th>ยอดซื้อสะสม</th>
+                <th>Tier</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${[2021, 2022, 2023, 2024, 2025, 2026].map(year => {
+                // คอลัมน์เรียงตามลำดับ: 1.ปี 2.จำนวนออร์เดอร์ 3.ยอดซื้อสะสม 4.Tier
+                // ถ้ายอดปีนั้น = 0 ไม่ต้องแสดง Tier
+                const amount = c.annualSpending[year] || 0;
+                const orders = (c.annualOrders && c.annualOrders[year]) || 0;
+                const tier = getAnnualTier(amount);
+                return `
+                  <tr>
+                    <td style="text-align: left; font-weight: 600;">${year}</td>
+                    <td>${orders}</td>
+                    <td style="font-weight: bold; color: ${amount > 0 ? '#1e293b' : '#94a3b8'};">${amount > 0 ? '฿' + amount.toLocaleString() : '-'}</td>
+                    <td>${tier ? `<span class="badge-span ${getCustomerTierClass(tier)}" style="font-size: 10px;">${tier}</span>` : '-'}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
 
         </div>
       </div>
