@@ -326,10 +326,14 @@ const HUB_OPTION_RENDER_LIMIT = 500;
 
 function renderInsightHub(filteredData, rawData) {
   const container = document.getElementById('view-insighthub');
-  // แก้ปัญหาหน้าเด้งกลับขึ้นบนสุดทุกครั้งที่เปลี่ยนหน้า/กรอง/เรียงลำดับ (ทุกอย่างวนกลับมาเรียกฟังก์ชันนี้ใหม่)
-  // -> จำตำแหน่ง scroll ของ container ที่ scroll จริง (.main-content) ไว้ก่อน แล้วคืนค่าหลัง render เสร็จ
+  // แก้ปัญหาหน้าเด้งกลับขึ้นบนสุดทุกครั้งที่เปลี่ยนหน้า/กรอง/เรียงลำดับ (ทุกอย่างวนกลับมาเรียกฟังก์ชันนี้ใหม่
+  // ซึ่ง innerHTML ทั้ง container ทำให้ scroll ของทั้งหน้าและ scroll ภายในตารางเอง (.table-wrapper ที่ freeze
+  // หัวตาราง มี overflow-y ของตัวเอง) รีเซ็ตกลับเป็น 0 ทุกครั้ง) -> จำตำแหน่ง scroll ทั้งสองจุดไว้ก่อน แล้วคืนค่าหลัง render เสร็จ
   const __scrollBox = container.closest('.main-content') || document.scrollingElement || document.documentElement;
   const __savedScrollTop = __scrollBox.scrollTop;
+  const __oldTableWrapper = container.querySelector('.table-wrapper');
+  const __savedTableScrollTop = __oldTableWrapper ? __oldTableWrapper.scrollTop : 0;
+  const __oldTableScrollLeft = __oldTableWrapper ? __oldTableWrapper.scrollLeft : 0;
   try {
 
   if (!rawData || rawData.length === 0) {
@@ -1255,6 +1259,11 @@ function renderInsightHub(filteredData, rawData) {
 
   } finally {
     __scrollBox.scrollTop = __savedScrollTop;
+    const __newTableWrapper = container.querySelector('.table-wrapper');
+    if (__newTableWrapper) {
+      __newTableWrapper.scrollTop = __savedTableScrollTop;
+      __newTableWrapper.scrollLeft = __oldTableScrollLeft;
+    }
   }
 }
 
@@ -1510,19 +1519,20 @@ window.searchProfileKey = function() {
   }
 };
 
-// AI Summary: แบ่งเป็นประเด็นทีละข้อ (ระดับความภักดี / ออร์เดอร์-AOV / สินค้าโปรด / วันที่ซื้อล่าสุด-คาดซื้อครั้งถัดไป)
+// AI Summary: ข้อความปกติ (ไม่ใช่ list เลขข้อ) แต่เว้นวรรคแยกแต่ละประเด็นให้อ่านง่าย
+// ตามลำดับ: ระดับความภักดี / ออร์เดอร์-AOV / สินค้าโปรด / วันที่ซื้อล่าสุด-คาดซื้อครั้งถัดไป
 // ส่วน "จัดกลุ่ม" (Admin Priority) และ "ระดับ" (LTV Tier) ย้ายไปแสดงเป็นไอคอนไฮไลท์ข้างชื่อลูกค้าด้านบนแทน (ดู renderCustomerProfileView)
 function generateAiSummary(c) {
-  const loyaltyClean = c.loyaltyTier.replace(/[^a-zA-Z0-9\s\(\)>.\-฀-๿]/g, '').trim();
+  const loyaltyClean = c.loyaltyTier.replace(/[^a-zA-Z0-9\s()>.\-฀-๿]/g, '').trim();
   const points = [
     'ระดับความภักดี: <strong>' + loyaltyClean + '</strong>',
     'สั่งซื้อไปแล้ว <strong>' + c.totalOrders + ' ครั้ง</strong> · ยอดสั่งซื้อเฉลี่ยต่อบิล (AOV) <strong>฿' + c.aov.toLocaleString(undefined, {maximumFractionDigits: 0}) + '</strong>',
     'มีความชอบในผลิตภัณฑ์ <strong>' + (c.currentFavorite || '-') + '</strong>',
     'สั่งซื้อล่าสุดเมื่อ <strong>' + c.lastPurchaseStr + '</strong> (' + c.daysSinceLast.toFixed(0) + ' วันที่แล้ว) &rarr; คาดว่าจะกลับมาสั่งซื้ออีกครั้งวันที่ <strong>' + c.nextPurchaseStr + '</strong>'
   ];
-  return '<strong>AI Summary:</strong><ol style="margin: 8px 0 0 0; padding-left: 20px; line-height: 1.9;">' +
-    points.map(function(p) { return '<li>' + p + '</li>'; }).join('') +
-    '</ol>';
+  return '<strong>AI Summary:</strong><div style="margin-top: 8px; display: flex; flex-direction: column; gap: 8px;">' +
+    points.map(function(p) { return '<div>' + p + '</div>'; }).join('') +
+    '</div>';
 }
 
 function renderCustomerProfileView(c, container, filteredData, rawData) {
