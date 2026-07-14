@@ -2,7 +2,7 @@
 if (!window.insightHubState) {
   window.insightHubState = {
     currentPage: 1,
-    rowsPerPage: 10,
+    rowsPerPage: 100,
     searchTerm: "",
     sortColumn: "totalRevenue",
     sortAsc: false,
@@ -326,7 +326,12 @@ const HUB_OPTION_RENDER_LIMIT = 500;
 
 function renderInsightHub(filteredData, rawData) {
   const container = document.getElementById('view-insighthub');
-  
+  // แก้ปัญหาหน้าเด้งกลับขึ้นบนสุดทุกครั้งที่เปลี่ยนหน้า/กรอง/เรียงลำดับ (ทุกอย่างวนกลับมาเรียกฟังก์ชันนี้ใหม่)
+  // -> จำตำแหน่ง scroll ของ container ที่ scroll จริง (.main-content) ไว้ก่อน แล้วคืนค่าหลัง render เสร็จ
+  const __scrollBox = container.closest('.main-content') || document.scrollingElement || document.documentElement;
+  const __savedScrollTop = __scrollBox.scrollTop;
+  try {
+
   if (!rawData || rawData.length === 0) {
     container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">No data loaded. Please import or load sample data.</div>';
     return;
@@ -421,6 +426,8 @@ function renderInsightHub(filteredData, rawData) {
       }
       .table-wrapper {
         overflow-x: auto;
+        overflow-y: auto;
+        max-height: 70vh;
         max-width: 100%;
         scrollbar-width: thin;
       }
@@ -439,7 +446,9 @@ function renderInsightHub(filteredData, rawData) {
         background-color: #fafafa;
         color: #444;
         user-select: none;
-        position: relative;
+        position: sticky;
+        top: 0;
+        z-index: 3;
       }
       .customer-table td {
         padding: 8px 12px;
@@ -869,6 +878,8 @@ function renderInsightHub(filteredData, rawData) {
     } else {
       lastAdmin = window.getRowValue(lastOrder.row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']) || "-";
     }
+    // ไม่มีชื่อแอดมิน (getNormalizedAdmin คืน 'Unknown' เป็นค่า default) -> แสดง "-" แทน
+    if (!lastAdmin || lastAdmin === 'Unknown') lastAdmin = "-";
 
     // คำนวณยอดเงินสะสมจริงแยกรายปี + จำนวนออร์เดอร์ต่อปี (ใช้แสดงในโปรไฟล์ลูกค้า)
     // [RAW2021] เพิ่ม 'Net Sales' ในลิสต์คอลัมน์ยอดขาย (เดิมมีแค่ ยอดขาย/ยอดโอน ทำให้ RAW 2021 ได้ 0 หมด)
@@ -1014,6 +1025,9 @@ function renderInsightHub(filteredData, rawData) {
     }
   });
 
+  // เก็บผลลัพธ์ที่กรอง/เรียงแล้ว (ไม่ตัดหน้า) ไว้ให้ปุ่ม Export ใช้ export ทั้งหมดที่ตรงเงื่อนไข ไม่ใช่แค่หน้าที่เห็น
+  state.displayedCustomers = displayedCustomers;
+
   const totalEntries = displayedCustomers.length;
   const totalPages = Math.ceil(totalEntries / state.rowsPerPage) || 1;
   if (state.currentPage > totalPages) state.currentPage = totalPages;
@@ -1080,8 +1094,11 @@ function renderInsightHub(filteredData, rawData) {
   }
 
   let html = `
-    <div class="hub-header">
+    <div class="hub-header" style="display: flex; align-items: center; justify-content: space-between;">
       <h2>Customer Insight Hub</h2>
+      <button class="pag-btn" style="background: #15803d; color: white; border-color: #15803d; font-weight: 600;" onclick="exportInsightHubExcel()">
+        <i class="fas fa-file-excel"></i> Export Excel
+      </button>
     </div>
 
     <div class="hub-summary-sections">
@@ -1224,6 +1241,10 @@ function renderInsightHub(filteredData, rawData) {
   `;
 
   container.innerHTML = html;
+
+  } finally {
+    __scrollBox.scrollTop = __savedScrollTop;
+  }
 }
 
 window.toggleExcelDropdown = function(colId) {
@@ -1306,7 +1327,7 @@ window.confirmExcelFilter = function() {
 window.resetHubFilters = function() {
   window.insightHubState = {
     currentPage: 1,
-    rowsPerPage: 10,
+    rowsPerPage: 100,
     searchTerm: "",
     sortColumn: "totalRevenue",
     sortAsc: false,
@@ -1317,6 +1338,55 @@ window.resetHubFilters = function() {
     allCustomers: window.insightHubState.allCustomers
   };
   if (window.applyFilters) window.applyFilters();
+};
+
+// Export ข้อมูลลูกค้าที่กรอง/เรียงลำดับอยู่ตอนนี้ (ไม่ใช่แค่หน้าที่แบ่งไว้) ออกเป็นไฟล์ Excel (.xlsx)
+window.exportInsightHubExcel = function() {
+  if (typeof XLSX === 'undefined') {
+    alert('ไม่สามารถโหลดไลบรารี Excel ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
+    return;
+  }
+  const state = window.insightHubState;
+  const rows = state.displayedCustomers || state.allCustomers || [];
+  if (rows.length === 0) {
+    alert('ไม่มีข้อมูลลูกค้าให้ export');
+    return;
+  }
+  const years = state.availableYears || [];
+
+  const exportRows = rows.map(c => {
+    const row = {
+      'CustomerKey (Phone)': c.displayPhone,
+      'CustomerName (Latest)': c.name,
+      'FirstPurchaseDate': c.firstPurchaseStr,
+      'LastPurchaseDate': c.lastPurchaseStr,
+      'TotalOrders (SALE only)': c.totalOrders,
+      'TotalRevenue (SALE only)': c.totalRevenue,
+      'AOV': c.aov,
+      'DaysSinceLast': Number(c.daysSinceLastStr),
+      'Last Product': c.lastProductStr || '-',
+      'Next Purchase Date': c.nextPurchaseStr,
+      'Life time value': c.ltvTier,
+      'Loyalty Index': c.loyaltyTier,
+      'Entry Product (สินค้าเปิดใจ)': c.entryProduct || '-',
+      'Current Favorite (สินค้าตัวโปรด)': c.currentFavorite || '-',
+      'Admin Priority': c.adminPriority,
+      'Segment 1 : Standard Period': c.segment1,
+      'Segment 2 : Dynamic Refill': c.segment2,
+      'Action Strategy Guideline': c.actionStrategy,
+      'FirstChannel (Main)': c.firstChannel,
+      'LastChannel (Main)': c.lastChannel,
+      'Last Admin': c.lastAdmin
+    };
+    years.forEach(y => { row[`ยอดซื้อปี ${y}`] = c['tier' + y]; });
+    return row;
+  });
+
+  const ws = XLSX.utils.json_to_sheet(exportRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'InsightHub');
+  const dateTag = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `InsightHub_Export_${dateTag}.xlsx`);
 };
 
 window.setHubSort = function(colName) {
@@ -1419,13 +1489,19 @@ window.searchProfileKey = function() {
   }
 };
 
+// AI Summary: แบ่งเป็นประเด็นทีละข้อ (ระดับความภักดี / ออร์เดอร์-AOV / สินค้าโปรด / วันที่ซื้อล่าสุด-คาดซื้อครั้งถัดไป)
+// ส่วน "จัดกลุ่ม" (Admin Priority) และ "ระดับ" (LTV Tier) ย้ายไปแสดงเป็นไอคอนไฮไลท์ข้างชื่อลูกค้าด้านบนแทน (ดู renderCustomerProfileView)
 function generateAiSummary(c) {
-  const name = c.name || c.phone;
-  const ltvClean = c.ltvTier.replace(/[^\w\s\(\)>.\-\u0e00-\u0e7f]/g, '').trim();
-  const loyaltyClean = c.loyaltyTier.replace(/[^\w\s\(\)>.\-\u0e00-\u0e7f]/g, '').trim();
-  const priorityClean = c.adminPriority.replace(/[^\w\s\(\)>.\-\u0e00-\u0e7f]/g, '').trim();
-  
-  return `<strong>AI Summary:</strong> ลูกค้า <strong>${name}</strong> เป็นสมาชิกระดับ <strong>${ltvClean}</strong> และมีระดับความภักดีเป็น <strong>${loyaltyClean}</strong> ซึ่งสั่งซื้อไปแล้ว <strong>${c.totalOrders} ครั้ง</strong> รวมยอดสั่งซื้อสะสม <strong>฿${c.totalRevenue.toLocaleString()}</strong> โดยมียอดสั่งซื้อเฉลี่ยต่อบิล (AOV) <strong>฿${c.aov.toLocaleString(undefined, {maximumFractionDigits: 0})}</strong> และมีความชอบในผลิตภัณฑ์ <strong>${c.currentFavorite || '-'}</strong> ปัจจุบันจัดอยู่ในกลุ่ม segment 1: <strong>${c.segment1}</strong> และ segment 2: <strong>${c.segment2}</strong> จากการสั่งซื้อล่าสุดเมื่อ <strong>${c.daysSinceLast.toFixed(0)} วันที่แล้ว</strong> คาดว่าลูกค้าจะกลับมาสั่งซื้ออีกครั้งในช่วงวันที่ <strong>${c.nextPurchaseStr}</strong> และควรได้รับการดูแลจากแอดมินในลำดับความสำคัญระดับ <strong>${priorityClean}</strong>`;
+  const loyaltyClean = c.loyaltyTier.replace(/[^a-zA-Z0-9\s\(\)>.\-฀-๿]/g, '').trim();
+  const points = [
+    'ระดับความภักดี: <strong>' + loyaltyClean + '</strong>',
+    'สั่งซื้อไปแล้ว <strong>' + c.totalOrders + ' ครั้ง</strong> · ยอดสั่งซื้อเฉลี่ยต่อบิล (AOV) <strong>฿' + c.aov.toLocaleString(undefined, {maximumFractionDigits: 0}) + '</strong>',
+    'มีความชอบในผลิตภัณฑ์ <strong>' + (c.currentFavorite || '-') + '</strong>',
+    'สั่งซื้อล่าสุดเมื่อ <strong>' + c.lastPurchaseStr + '</strong> (' + c.daysSinceLast.toFixed(0) + ' วันที่แล้ว) &rarr; คาดว่าจะกลับมาสั่งซื้ออีกครั้งวันที่ <strong>' + c.nextPurchaseStr + '</strong>'
+  ];
+  return '<strong>AI Summary:</strong><ol style="margin: 8px 0 0 0; padding-left: 20px; line-height: 1.9;">' +
+    points.map(function(p) { return '<li>' + p + '</li>'; }).join('') +
+    '</ol>';
 }
 
 function renderCustomerProfileView(c, container, filteredData, rawData) {
@@ -1455,12 +1531,13 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
           <i class="fas fa-user"></i>
         </div>
         <div>
-          <h3 style="margin: 0 0 5px 0; font-size: 22px; font-weight: 700; color: #1e293b;">${c.name}</h3>
+          <h3 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: #1e293b; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
+            ${c.name}
+            <span class="badge-span ${getLtvClass(c.ltvTier)}" style="font-size: 11px; padding: 5px 12px; border-radius: 20px;">${c.ltvTier}</span>
+            <span class="${getAdminPriClass(c.adminPriority)}" style="font-size: 11px; padding: 5px 12px; border-radius: 20px; background: #f5f5f5; border: 1px solid #e5e5e5;">${c.adminPriority}</span>
+          </h3>
           <p style="margin: 0; color: #64748b; font-size: 13px;">Customer Profile (เบอร์โทรศัพท์: ${c.displayPhone})</p>
         </div>
-      </div>
-      <div>
-        <span class="badge-span ${getLtvClass(c.ltvTier)}" style="font-size: 12px; padding: 6px 15px; border-radius: 20px;">${c.ltvTier}</span>
       </div>
     </div>
 
@@ -1525,20 +1602,8 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
 
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 40px;">
       <div class="profile-detail-card" style="background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.02);">
-        <h3>Status & Segmentation</h3>
+        <h3>Action</h3>
         <div style="display: flex; flex-direction: column; gap: 5px;">
-          <div class="profile-detail-row">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-flag" style="margin-right: 8px; width: 15px;"></i> Priority</span>
-            <span style="font-size: 13px;"><span class="badge-span ${getAdminPriClass(c.adminPriority)}">${c.adminPriority}</span></span>
-          </div>
-          <div class="profile-detail-row">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-layer-group" style="margin-right: 8px; width: 15px;"></i> Segment 1</span>
-            <span style="font-size: 13px;"><span class="badge-span ${getSegClass(c.segment1)}">${c.segment1}</span></span>
-          </div>
-          <div class="profile-detail-row">
-            <span style="color: #64748b; font-size: 13px;"><i class="fas fa-tag" style="margin-right: 8px; width: 15px;"></i> Segment 2</span>
-            <span style="font-size: 13px;"><span class="badge-span ${getSegClass(c.segment2)}">${c.segment2}</span></span>
-          </div>
           <div class="profile-detail-row" style="flex-direction: column; gap: 5px; align-items: flex-start; border-bottom: none;">
             <span style="color: #64748b; font-size: 13px;"><i class="fas fa-book" style="margin-right: 8px; width: 15px;"></i> Action Strategy Guideline</span>
             <span style="font-size: 13px; color: #334155; font-weight: 500; margin-left: 23px; padding-top: 5px;">${c.actionStrategy || 'No guideline available.'}</span>
