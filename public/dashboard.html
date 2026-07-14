@@ -280,6 +280,7 @@
   <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script>
     // --- โครงสร้างตัวแปรหลักดั้งเดิม ---
     const sampleUrl = `/assets/RAW%20\${targetYear}.csv`;
@@ -630,13 +631,21 @@
       return 'Other'; 
     }
     
+    // ชื่อ SubChannel_STD บางตัวจากชีต Config_SubChannel_Map เป็นตัวย่อ/ไม่ตรงกับที่อยากแสดง
+    // -> map เป็น alias ตรงตัว (exact match) แทน ไม่ใช้ includes เพื่อไม่ให้ไปเพี้ยนค่าอื่น เช่น 'L1', 'LINE'
+    const SUBCHANNEL_DISPLAY_ALIASES = { 'WWW': 'Website' };
+    function applySubChannelAlias(val) {
+      const key = (val || '').toString().trim().toUpperCase();
+      return SUBCHANNEL_DISPLAY_ALIASES[key] || val;
+    }
+
     function getNormalizedSubChannel(row) {
       if (!row) return 'Other';
       // [CLEANSED] ใช้ค่า SubChannel_STD จากชีต Config_SubChannel_Map ตรงๆ (เช่น FB, LINE, L1, EMAIL)
       // ไม่ส่งเข้ากติกา includes ด้านล่างซ้ำ เพราะจะเพี้ยน เช่น 'LINE' โดนแปลงเป็น 'Line', 'L1' หายไป
       if (row['Sub Channel'] !== undefined && row['Order type'] !== undefined) {
         const sStd = (row['Sub Channel'] || '').toString().trim();
-        return sStd || 'Other';
+        return applySubChannelAlias(sStd) || 'Other';
       }
       let sub = getRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง']);
       if (!sub || sub.toString().trim() === '') {
@@ -673,11 +682,11 @@
       if (lower.includes('tiktok')) return 'Tiktok';
       if (lower.includes('pc')) return 'PC';
       if (lower.includes('telesale')) return 'Telesale';
-      if (lower.includes('website') || lower.includes('web')) return 'Website';
+      if (lower.includes('website') || lower.includes('web') || lower === 'www') return 'Website';
       if (lower.includes('email')) return 'Email';
       if (lower.includes('crm')) return 'CRM';
       if (lower.includes('call') || lower.includes('phone')) return 'Call';
-      return cleanSub;
+      return applySubChannelAlias(cleanSub);
     }
 
     function getNormalizedProduct(rawProductName) {
@@ -830,6 +839,13 @@
     }
 
     function applyFilters() {
+      // แก้ปัญหาหน้าเด้งกลับขึ้นบนสุดทุกครั้งที่กด Filter (ทั้ง global filter บนสุด และ filter ภายในแต่ละ view
+      // ล้วนเรียกฟังก์ชันนี้ซึ่ง re-render ทุก view ที่เปิดอยู่ ทำให้ความสูงหน้าเปลี่ยนแล้วเลื่อนขึ้นบนสุด)
+      // -> จำตำแหน่ง scroll ของ .main-content ไว้ก่อน แล้วคืนค่าหลัง re-render ทุก view เสร็จสิ้น
+      const __scrollBox = document.querySelector('.main-content') || document.scrollingElement || document.documentElement;
+      const __savedScrollTop = __scrollBox.scrollTop;
+      try {
+
       if (rawData.length > 0 && document.getElementById('menu-Year').children.length === 0) populateDropdowns();
       filteredData = rawData.filter(row => {
         if (!isSaleOrder(row)) return false;
@@ -862,6 +878,10 @@
       try { if (document.getElementById('view-executive2').style.display === 'block' && typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, rawData); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-insighthub').style.display === 'block' && typeof renderInsightHub === 'function') { renderInsightHub(filteredData, rawData); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-retention').style.display === 'block' && typeof renderRetention === 'function') { renderRetention(filteredData, rawData); } } catch(e) { console.error(e); }
+
+      } finally {
+        __scrollBox.scrollTop = __savedScrollTop;
+      }
     }
 
     function processData(data) {
@@ -1152,7 +1172,7 @@
   <script src="cohort.js?v=13"></script>
   <script src="executive1.js?v=15"></script>
   <script src="executive2.js?v=13"></script>
-  <script src="insighthub.js?v=13"></script>
+  <script src="insighthub.js?v=15"></script>
   <script src="retention.js?v=1"></script>
   <script src="kpisetting.js?v=1"></script>
 </body>
