@@ -96,13 +96,20 @@
     </aside>
     <main class="main-content" style="padding:0;">
       <header class="top-bar" style="background: transparent; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center;">
-        <div style="display: flex; align-items: center; gap: 20px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
           <button id="menuToggle" class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active');" style="background: none; border: none; font-size: 24px; cursor: pointer;">
             <i class="fas fa-bars"></i>
           </button>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <img src="./369223.png" alt="QueenMaker" style="width: 30px; height: 30px; object-fit: contain; border-radius: 6px;" onerror="this.style.display='none'">
+            <span style="font-family:'Outfit', sans-serif; font-size: 18px; font-weight: 700; color: #1e293b; letter-spacing: 0.3px;">QueenMaker</span>
+          </div>
         </div>
-        
+
         <div class="user-actions" style="display: flex; gap: 15px; align-items: center;">
+          <button id="freezeBtn" class="btn" onclick="toggleFreeze()" title="Freeze the currently loaded data so Import/Load Sample can't overwrite it" style="background: #eee; color: #333; border: 1px solid #ddd; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-lock-open"></i> Freeze
+          </button>
           <button id="importBtn" class="btn" style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
             <i class="fas fa-file-import"></i> Import Data
           </button>
@@ -122,12 +129,12 @@
         </div>
         <div class="filters-bar">
           <div class="filter-dropdown">
-            <button class="filter-btn-new" id="btn-Month" onclick="toggleFilter('menu-Month')">Month: <span id="lbl-Month">All</span> <i class="fas fa-caret-down"></i></button>
-            <div id="menu-Month" class="filter-content"></div>
-          </div>
-          <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Year" onclick="toggleFilter('menu-Year')">Year: <span id="lbl-Year">All</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Year" class="filter-content"></div>
+          </div>
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-Month" onclick="toggleFilter('menu-Month')">Month: <span id="lbl-Month">All</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-Month" class="filter-content"></div>
           </div>
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Channel" onclick="toggleFilter('menu-Channel')">Channel: <span id="lbl-Channel">All</span> <i class="fas fa-caret-down"></i></button>
@@ -332,6 +339,13 @@
         fileInput.addEventListener('change', (e) => {
           const file = e.target.files[0];
           if (file) {
+            if (window.__dataFrozen) {
+              if (!confirm('Data is currently Frozen. Unfreeze and load this file, replacing the current data?')) {
+                e.target.value = '';
+                return;
+              }
+              setFreeze(false);
+            }
             showLoading(true);
             Papa.parse(file, {
               header: true,
@@ -365,6 +379,12 @@
       const loadSampleBtn = document.getElementById('loadSampleBtn');
       if (loadSampleBtn) {
         loadSampleBtn.addEventListener('click', () => {
+          if (window.__dataFrozen) {
+            if (!confirm('Data is currently Frozen. Unfreeze and load sample data, replacing the current data?')) {
+              return;
+            }
+            setFreeze(false);
+          }
           showLoading(true);
           fetch(sampleUrl)
             .then(res => res.text())
@@ -469,6 +489,27 @@
 
     function toggleFilter(id) { document.getElementById(id).classList.toggle("show"); }
     function showLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none'; }
+
+    // --- Freeze: lock currently loaded data so Import/Load Sample can't silently overwrite it ---
+    window.__dataFrozen = false;
+    function setFreeze(frozen) {
+      window.__dataFrozen = frozen;
+      const btn = document.getElementById('freezeBtn');
+      if (!btn) return;
+      if (frozen) {
+        btn.innerHTML = '<i class="fas fa-lock"></i> Frozen';
+        btn.style.background = '#fdecea';
+        btn.style.color = '#b91c1c';
+        btn.style.borderColor = '#f3c9c9';
+      } else {
+        btn.innerHTML = '<i class="fas fa-lock-open"></i> Freeze';
+        btn.style.background = '#eee';
+        btn.style.color = '#333';
+        btn.style.borderColor = '#ddd';
+      }
+    }
+    function toggleFreeze() { setFreeze(!window.__dataFrozen); }
+    window.setFreeze = setFreeze; window.toggleFreeze = toggleFreeze;
     function formatCurrency(num) { return '฿' + num.toLocaleString('th-TH', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
     function formatPercent(num) { 
       if (!isFinite(num) || isNaN(num)) return '-';
@@ -759,17 +800,9 @@
 
     // --- Dropdowns & Filters Logic ---
     function populateDropdowns() {
-      const yearsSet = new Set();
-      const monthsSet = new Set();
-      
-      rawData.forEach(row => {
-        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
-        if (!dateStr) return;
-        const d = parseDate(dateStr);
-        if (!d) return;
-        yearsSet.add(d.y.toString());
-        monthsSet.add(d.str);
-      });
+      populateYearMenu();
+      populateMonthMenu(filters.Year);
+
       const fixedLists = {
         Channel: ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'],
         SubChannel: ['Call', 'CRM', 'Email', 'FB', 'FBC', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'IG-FBH', 'IG-FBSS', 'IG-FBW', 'Lazada', 'Line', 'Other', 'PC', 'Shopee', 'Telesale', 'Tiktok', 'Website'],
@@ -777,22 +810,6 @@
         SubProduct: ['Plus', 'Gold', 'Wiss', 'Kides original', 'Kidesส้ม', 'Kides แตงโม', 'Callagen'],
         Admin: ['May', 'บี', 'มิ้ว', 'แอน', 'แอล']
      };
-
-      const yearMenu = document.getElementById('menu-Year');
-      if (yearMenu) {
-        yearMenu.innerHTML = `<div onclick="setFilter('Year', 'All')">All</div>`;
-        Array.from(yearsSet).sort().forEach(val => {
-          yearMenu.innerHTML += `<div onclick="setFilter('Year', '${val}')">${val}</div>`;
-        });
-      }
-
-      const monthMenu = document.getElementById('menu-Month');
-      if (monthMenu) {
-        monthMenu.innerHTML = `<div onclick="setFilter('Month', 'All')">All</div>`;
-        Array.from(monthsSet).sort().reverse().forEach(val => {
-          monthMenu.innerHTML += `<div onclick="setFilter('Month', '${val}')">${val}</div>`;
-        });
-      }
 
       ['Channel', 'SubChannel', 'Product', 'SubProduct' , 'Admin' ].forEach(type => {
         const menu = document.getElementById('menu-' + type);
@@ -802,6 +819,53 @@
           menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
         });
       });
+    }
+
+    // Year list never depends on the current filter selection - built once from all raw data.
+    function populateYearMenu() {
+      const yearsSet = new Set();
+      rawData.forEach(row => {
+        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
+        if (!dateStr) return;
+        const d = parseDate(dateStr);
+        if (!d) return;
+        yearsSet.add(d.y.toString());
+      });
+      const yearMenu = document.getElementById('menu-Year');
+      if (yearMenu) {
+        yearMenu.innerHTML = `<div onclick="setFilter('Year', 'All')">All</div>`;
+        Array.from(yearsSet).sort().forEach(val => {
+          yearMenu.innerHTML += `<div onclick="setFilter('Year', '${val}')">${val}</div>`;
+        });
+      }
+    }
+
+    // Month list is scoped to the selected Year so you don't have to re-pick the month
+    // after switching years. Resets the Month filter if it's no longer valid for the new year.
+    function populateMonthMenu(selectedYear) {
+      const monthsSet = new Set();
+      rawData.forEach(row => {
+        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
+        if (!dateStr) return;
+        const d = parseDate(dateStr);
+        if (!d) return;
+        if (selectedYear && selectedYear !== 'All' && d.y.toString() !== selectedYear) return;
+        monthsSet.add(d.str);
+      });
+      const monthMenu = document.getElementById('menu-Month');
+      if (monthMenu) {
+        monthMenu.innerHTML = `<div onclick="setFilter('Month', 'All')">All</div>`;
+        Array.from(monthsSet).sort().reverse().forEach(val => {
+          monthMenu.innerHTML += `<div onclick="setFilter('Month', '${val}')">${val}</div>`;
+        });
+      }
+      if (filters.Month !== 'All' && !monthsSet.has(filters.Month)) {
+        filters.Month = 'All';
+        const lbl = document.getElementById('lbl-Month');
+        if (lbl) lbl.textContent = 'All';
+        const btn = document.getElementById('btn-Month');
+        if (btn) btn.classList.remove('active');
+      }
     }
 
     function setFilter(type, val) {
@@ -817,6 +881,11 @@
       } else {
         document.getElementById('btn-' + type).classList.remove('active');
       }
+
+      if (type === 'Year') {
+        populateMonthMenu(val);
+      }
+
       applyFilters();
     }
 
@@ -834,6 +903,7 @@
       if(document.getElementById('clearFilterBtn')) {
         document.getElementById('clearFilterBtn').style.display = 'none';
       }
+      populateMonthMenu('All');
       applyFilters();
     }
 
@@ -1169,10 +1239,10 @@
     window.switchTab = switchTab; window.applyFilters = applyFilters; window.setFilter = setFilter; window.clearFilters = clearFilters; window.toggleFilter = toggleFilter;
   </script>
   <script src="cohort.js?v=13"></script>
-  <script src="executive1.js?v=15"></script>
-  <script src="executive2.js?v=13"></script>
+  <script src="executive1.js?v=16"></script>
+  <script src="executive2.js?v=14"></script>
   <script src="insighthub.js?v=15"></script>
   <script src="retention.js?v=1"></script>
-  <script src="kpisetting.js?v=1"></script>
+  <script src="kpisetting.js?v=2"></script>
 </body>
 </html>
