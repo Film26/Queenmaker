@@ -69,34 +69,58 @@ function kpiRowTotal(values) {
   return values.reduce((sum, v) => sum + (kpiParseNum(v) || 0), 0);
 }
 
-// 💡 ตัวช่วยสร้าง <input> พร้อมปุ่มย้อนกลับ (undo) เฉพาะช่องนั้นๆ
-// - data-orig เก็บค่าล่าสุดก่อนแก้ไข (อัปเดตทุกครั้งที่ focus เข้าไปในช่อง)
-// - ปุ่มย้อนกลับจะโผล่มาตอน hover/focus ที่ช่องนั้น กดแล้วคืนค่าเดิมของ "ช่องนี้ช่องเดียว"
-function kpiInputHTML(id, value, opts) {
-  opts = opts || {};
-  const evtAttr = opts.onchange ? `onchange="${opts.onchange}"` : (opts.oninput ? `oninput="${opts.oninput}"` : '');
-  const cls = opts.className || 'kpiset-input';
-  const extraAttrs = opts.extraAttrs || '';
-  const val = opts.raw ? (value || '') : (kpiFormatNum(value) || '');
-  return `<span class="kpiset-input-wrap">
-    <input type="text" inputmode="${opts.raw ? 'text' : 'decimal'}" class="${cls}" id="${id}" value="${val}" placeholder="0" data-orig="${val}" onfocus="kpiCaptureOrig(this)" ${evtAttr} ${extraAttrs}>
-    <button type="button" class="kpiset-undo-btn" title="ย้อนกลับค่าช่องนี้" onclick="kpiUndoCell('${id}')"><i class="fas fa-undo"></i></button>
-  </span>`;
+// Splits pasted clipboard text (e.g. copied from Excel/Sheets) into a grid: rows on newline,
+// columns on tab. A single pasted value degenerates to a 1x1 grid, so this also covers normal paste.
+function kpiParsePasteGrid(text) {
+  const rows = text.replace(/\r/g, '').split('\n');
+  if (rows.length > 1 && rows[rows.length - 1] === '') rows.pop();
+  return rows.map(row => row.split('\t'));
 }
 
-// จำค่าปัจจุบันของช่องไว้ ณ จังหวะที่ผู้ใช้เริ่มโฟกัส/แก้ไข (ก่อนพิมพ์ทับ)
-window.kpiCaptureOrig = function(el) {
-  el.dataset.orig = el.value;
+// Pastes a block of cells into a monthly product/channel row table, starting at (r0, m0) and
+// filling across months and, for a multi-row paste, down into subsequent rows.
+window.handleKpiRowPaste = function(event, sectionKey, prefix, r0, m0) {
+  const clipboard = event.clipboardData || window.clipboardData;
+  const text = clipboard ? clipboard.getData('text') : '';
+  if (!text) return;
+  event.preventDefault();
+
+  const grid = kpiParsePasteGrid(text);
+  const rows = window.__kpiState[sectionKey] || [];
+  grid.forEach((rowVals, i) => {
+    const r = r0 + i;
+    if (r >= rows.length) return;
+    rowVals.forEach((val, j) => {
+      const m = m0 + j;
+      if (m > 11) return;
+      const el = document.getElementById(`kpi-${prefix}-${r}-${m}`);
+      if (el) el.value = kpiFormatNum(kpiParseNum(val));
+    });
+    updateKpiRowTotal(prefix, r);
+  });
 };
 
-// คืนค่าช่องนั้นกลับไปเป็นค่าก่อนแก้ไขล่าสุด แล้วยิง event ให้ระบบคำนวณ Total/Frequency ใหม่เหมือนพิมพ์เอง
-window.kpiUndoCell = function(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.value = el.dataset.orig || '';
-  el.dispatchEvent(new Event('input', { bubbles: true }));
-  el.dispatchEvent(new Event('change', { bubbles: true }));
-  el.focus();
+// Same idea for the KPI Customer monthly table (2 rows: old, new).
+window.handleKpiCustomerPaste = function(event, type0, m0) {
+  const clipboard = event.clipboardData || window.clipboardData;
+  const text = clipboard ? clipboard.getData('text') : '';
+  if (!text) return;
+  event.preventDefault();
+
+  const grid = kpiParsePasteGrid(text);
+  const order = ['old', 'new'];
+  const startIdx = order.indexOf(type0);
+  grid.forEach((rowVals, i) => {
+    const type = order[startIdx + i];
+    if (!type) return;
+    rowVals.forEach((val, j) => {
+      const m = m0 + j;
+      if (m > 11) return;
+      const el = document.getElementById(`kpi-cust-${type}-${m}`);
+      if (el) el.value = kpiFormatNum(kpiParseNum(val));
+    });
+    updateKpiCustomerMonthlyTotal(type);
+  });
 };
 
 function renderKpiSetting() {
@@ -123,6 +147,10 @@ function renderKpiSetting() {
       .kpiset-header h2 { margin: 0 0 4px 0; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
       .kpiset-header p { margin: 0; font-size: 12px; color: #b9c6db; }
       .kpiset-header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+      .kpiset-header-totals { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 10px; }
+      .kpiset-header-totals .stat { display: flex; flex-direction: column; gap: 2px; }
+      .kpiset-header-totals .stat-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; color: #8fa1bd; }
+      .kpiset-header-totals .stat-value { font-size: 18px; font-weight: 700; color: #fce268; font-family: 'Outfit', sans-serif; }
       .kpiset-btn {
         border: none;
         border-radius: 20px;
@@ -188,34 +216,19 @@ function renderKpiSetting() {
         border-bottom: 1px solid #f5f5f5;
         white-space: nowrap;
       }
-
-      /* --- ช่องกรอก + ปุ่มย้อนกลับเฉพาะช่อง --- */
-      .kpiset-input-wrap { position: relative; display: inline-block; }
-      .kpiset-undo-btn {
-        position: absolute; top: 50%; right: 3px; transform: translateY(-50%);
-        border: none; background: #fff; color: #b0b6c0; cursor: pointer;
-        font-size: 10px; padding: 2px 4px; border-radius: 4px; line-height: 1;
-        opacity: 0; pointer-events: none; transition: opacity 0.12s, color 0.12s;
-      }
-      .kpiset-input-wrap:hover .kpiset-undo-btn,
-      .kpiset-input-wrap:focus-within .kpiset-undo-btn {
-        opacity: 1; pointer-events: auto;
-      }
-      .kpiset-undo-btn:hover { color: #d95f1d; }
-
       .kpiset-table .kpiset-row-name {
         min-width: 150px;
         font-size: 12px;
         font-weight: 600;
         border: none;
         background: transparent;
-        padding: 6px 20px 6px 4px;
+        padding: 6px 4px;
         width: 100%;
         box-sizing: border-box;
       }
       .kpiset-input {
         width: 80px;
-        padding: 6px 20px 6px 6px;
+        padding: 6px 6px;
         font-size: 12px;
         border: 1px solid #e2e8f0;
         border-radius: 6px;
@@ -300,6 +313,20 @@ function kpiRenderAll(container) {
       <div>
         <h2>KPI Setting</h2>
         <p>กรอกเป้าหมาย KPI ด้วยมือ แล้วกดบันทึกเพื่อเก็บค่าไว้ใช้เปรียบเทียบในหน้า Dashboard</p>
+        <div class="kpiset-header-totals">
+          <div class="stat">
+            <span class="stat-label">Total Sales Target (Year)</span>
+            <span class="stat-value" id="kpiset-total-sales">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Total New Customer Target</span>
+            <span class="stat-value" id="kpiset-total-newcust">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Total Old Customer Target</span>
+            <span class="stat-value" id="kpiset-total-oldcust">0</span>
+          </div>
+        </div>
       </div>
       <div class="kpiset-header-actions">
         <button class="kpiset-btn kpiset-btn-reset" onclick="resetKpiSettings()"><i class="fas fa-undo"></i> ล้างค่าทั้งหมด</button>
@@ -331,7 +358,7 @@ function kpiRenderAll(container) {
 
       <div class="kpiset-setting-row">
         <span class="kpiset-setting-label">2.1 เพิ่มจำนวนลูกค้าเก่า</span>
-        ${kpiInputHTML('kpi-cust-setting-old-value', state.customerSetting.old.value, {})}
+        <input type="text" inputmode="decimal" class="kpiset-input" id="kpi-cust-setting-old-value" value="${kpiFormatNum(state.customerSetting.old.value)}" placeholder="0">
         <select class="kpiset-unit-select" id="kpi-cust-setting-old-unit">
           <option value="%" ${state.customerSetting.old.unit === '%' ? 'selected' : ''}>% ต่อเดือน</option>
           <option value="count" ${state.customerSetting.old.unit === 'count' ? 'selected' : ''}>จำนวนคน/เดือน</option>
@@ -339,7 +366,7 @@ function kpiRenderAll(container) {
       </div>
       <div class="kpiset-setting-row">
         <span class="kpiset-setting-label">2.1 เพิ่มจำนวนลูกค้าใหม่</span>
-        ${kpiInputHTML('kpi-cust-setting-new-value', state.customerSetting.new.value, {})}
+        <input type="text" inputmode="decimal" class="kpiset-input" id="kpi-cust-setting-new-value" value="${kpiFormatNum(state.customerSetting.new.value)}" placeholder="0">
         <select class="kpiset-unit-select" id="kpi-cust-setting-new-unit">
           <option value="%" ${state.customerSetting.new.unit === '%' ? 'selected' : ''}>% ต่อเดือน</option>
           <option value="count" ${state.customerSetting.new.unit === 'count' ? 'selected' : ''}>จำนวนคน/เดือน</option>
@@ -356,15 +383,15 @@ function kpiRenderAll(container) {
       <h3>3. KPI CRM Metric</h3>
       <div class="kpiset-metric-row">
         <span class="kpiset-metric-label">จำนวนลูกค้าทั้งหมด (คน)</span>
-        ${kpiInputHTML('kpi-crm-totalCustomers', state.crm.totalCustomers, { oninput: 'updateKpiFrequency()' })}
+        <input type="text" inputmode="decimal" class="kpiset-input" id="kpi-crm-totalCustomers" value="${kpiFormatNum(state.crm.totalCustomers)}" placeholder="0" oninput="updateKpiFrequency()">
       </div>
       <div class="kpiset-metric-row">
         <span class="kpiset-metric-label">AOV Average Order Value (ยอดเฉลี่ยต่อบิล)</span>
-        ${kpiInputHTML('kpi-crm-aov', state.crm.aov, { oninput: 'updateKpiFrequency()' })}
+        <input type="text" inputmode="decimal" class="kpiset-input" id="kpi-crm-aov" value="${kpiFormatNum(state.crm.aov)}" placeholder="0" oninput="updateKpiFrequency()">
       </div>
       <div class="kpiset-metric-row">
         <span class="kpiset-metric-label">SPH Spending per Head (เฉลี่ยซื้อต่อคน)</span>
-        ${kpiInputHTML('kpi-crm-sph', state.crm.sph, { oninput: 'updateKpiFrequency()' })}
+        <input type="text" inputmode="decimal" class="kpiset-input" id="kpi-crm-sph" value="${kpiFormatNum(state.crm.sph)}" placeholder="0" oninput="updateKpiFrequency()">
       </div>
       <div class="kpiset-metric-row">
         <span class="kpiset-metric-label">Frequency (SPH/AOV) (ความถี่ซื้อ) <span style="color:#94a3b8;">&lt;-- สูตร auto</span></span>
@@ -372,13 +399,42 @@ function kpiRenderAll(container) {
       </div>
       <div class="kpiset-metric-row">
         <span class="kpiset-metric-label">Retention rate (อัตราการซื้อซ้ำ) (%)</span>
-        ${kpiInputHTML('kpi-crm-retention', state.crm.retention, {})}
+        <input type="text" inputmode="decimal" class="kpiset-input" id="kpi-crm-retention" value="${kpiFormatNum(state.crm.retention)}" placeholder="0">
       </div>
     </div>
   `;
 
   updateKpiFrequency();
+  updateKpiHeaderTotals();
 }
+
+// Recomputes the header stat chips from whatever is currently in the DOM (not saved state),
+// so it stays live as the user types/pastes, matching the per-row/per-table totals below.
+window.updateKpiHeaderTotals = function() {
+  const salesEl = document.getElementById('kpiset-total-sales');
+  const newEl = document.getElementById('kpiset-total-newcust');
+  const oldEl = document.getElementById('kpiset-total-oldcust');
+  if (!salesEl || !window.__kpiState) return;
+
+  let salesTotal = 0;
+  (window.__kpiState.byChannel || []).forEach((row, r) => {
+    for (let m = 0; m < 12; m++) {
+      const el = document.getElementById(`kpi-chan-${r}-${m}`);
+      salesTotal += kpiParseNum(el ? el.value : 0);
+    }
+  });
+  salesEl.textContent = kpiFormatNum(salesTotal) || '0';
+
+  ['new', 'old'].forEach(type => {
+    let total = 0;
+    for (let m = 0; m < 12; m++) {
+      const el = document.getElementById(`kpi-cust-${type}-${m}`);
+      total += kpiParseNum(el ? el.value : 0);
+    }
+    const el = type === 'new' ? newEl : oldEl;
+    if (el) el.textContent = kpiFormatNum(total) || '0';
+  });
+};
 
 function kpiBuildRowTable(sectionKey, prefix, rows) {
   return `
@@ -401,9 +457,9 @@ function kpiBuildRowTable(sectionKey, prefix, rows) {
 function kpiBuildRowTr(sectionKey, prefix, r, row) {
   return `
     <tr>
-      <td>${kpiInputHTML(`kpi-${prefix}-name-${r}`, row.name, { className: 'kpiset-row-name', raw: true, onchange: `syncKpiRowName('${sectionKey}', ${r}, this.value)` })}</td>
+      <td><input type="text" class="kpiset-row-name" id="kpi-${prefix}-name-${r}" value="${row.name}" onchange="syncKpiRowName('${sectionKey}', ${r}, this.value)"></td>
       ${row.values.map((v, m) => `
-        <td>${kpiInputHTML(`kpi-${prefix}-${r}-${m}`, v, { oninput: `updateKpiRowTotal('${prefix}', ${r})` })}</td>
+        <td><input type="text" inputmode="decimal" class="kpiset-input" id="kpi-${prefix}-${r}-${m}" value="${kpiFormatNum(v)}" placeholder="0" oninput="updateKpiRowTotal('${prefix}', ${r})" onpaste="handleKpiRowPaste(event, '${sectionKey}', '${prefix}', ${r}, ${m})"></td>
       `).join('')}
       <td class="kpiset-total-cell" id="kpi-${prefix}-total-${r}">${kpiFormatNum(kpiRowTotal(row.values)) || 0}</td>
       <td><button class="kpiset-remove-btn" onclick="removeKpiRow('${sectionKey}', '${prefix}', ${r})" title="ลบแถว"><i class="fas fa-times"></i></button></td>
@@ -427,7 +483,7 @@ function kpiBuildCustomerMonthlyTable(customerMonthly) {
           <tr>
             <td style="font-weight:600;">${labels[type]}</td>
             ${customerMonthly[type].map((v, m) => `
-              <td>${kpiInputHTML(`kpi-cust-${type}-${m}`, v, { oninput: `updateKpiCustomerMonthlyTotal('${type}')` })}</td>
+              <td><input type="text" inputmode="decimal" class="kpiset-input" id="kpi-cust-${type}-${m}" value="${kpiFormatNum(v)}" placeholder="0" oninput="updateKpiCustomerMonthlyTotal('${type}')" onpaste="handleKpiCustomerPaste(event, '${type}', ${m})"></td>
             `).join('')}
             <td class="kpiset-total-cell" id="kpi-cust-total-${type}">${kpiFormatNum(kpiRowTotal(customerMonthly[type])) || 0}</td>
           </tr>
@@ -447,6 +503,7 @@ window.updateKpiRowTotal = function(prefix, r) {
   }
   const totalCell = document.getElementById(`kpi-${prefix}-total-${r}`);
   if (totalCell) totalCell.textContent = kpiFormatNum(total) || '0';
+  updateKpiHeaderTotals();
 };
 
 window.updateKpiCustomerMonthlyTotal = function(type) {
@@ -457,6 +514,7 @@ window.updateKpiCustomerMonthlyTotal = function(type) {
   }
   const totalCell = document.getElementById(`kpi-cust-total-${type}`);
   if (totalCell) totalCell.textContent = kpiFormatNum(total) || '0';
+  updateKpiHeaderTotals();
 };
 
 window.updateKpiFrequency = function() {
@@ -497,6 +555,7 @@ window.addKpiRow = function(sectionKey) {
   });
   const wrapper = document.getElementById(`kpi-${sectionKey === 'byProduct' ? 'product' : 'channel'}-table-wrapper`);
   if (wrapper) wrapper.innerHTML = kpiBuildRowTable(sectionKey, prefix, window.__kpiState[sectionKey]);
+  updateKpiHeaderTotals();
 };
 
 window.removeKpiRow = function(sectionKey, prefix, r) {
@@ -504,6 +563,7 @@ window.removeKpiRow = function(sectionKey, prefix, r) {
   window.__kpiState[sectionKey].splice(r, 1);
   const wrapper = document.getElementById(`kpi-${sectionKey === 'byProduct' ? 'product' : 'channel'}-table-wrapper`);
   if (wrapper) wrapper.innerHTML = kpiBuildRowTable(sectionKey, prefix, window.__kpiState[sectionKey]);
+  updateKpiHeaderTotals();
 };
 
 // --- Save / Reset ---
