@@ -157,14 +157,36 @@ function renderExecutive1(filteredData, rawData) {
       .exec-table tbody tr:nth-child(odd) td:not(.col-total) {
         background-color: #fbfcfe;
       }
-      .exec-table .bg-light-green {
-        background-color: #f0fdf4 !important;
-        color: #166534;
+      /* Row groups: each ties a set of related metrics to one color so the grouping carries meaning
+         (Sales performance / Customer base / New-vs-Retained mix / Growth-migration) rather than
+         alternating colors with no relationship to the data. */
+      .exec-table .group-sales {
+        background-color: #fff7ed !important;
+        color: #9a3412;
       }
-      .exec-table .bg-light-blue {
+      .exec-table .group-customer {
         background-color: #f0f9ff !important;
         color: #0369a1;
       }
+      .exec-table .group-mix {
+        background-color: #f0fdf4 !important;
+        color: #166534;
+      }
+      .exec-table .group-growth {
+        background-color: #faf5ff !important;
+        color: #7e22ce;
+      }
+      .exec-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin: -4px 0 14px 2px;
+        font-family: 'Inter', sans-serif;
+        font-size: 11.5px;
+        color: #64748b;
+      }
+      .exec-legend-item { display: flex; align-items: center; gap: 6px; }
+      .exec-legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
       .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
       .dot-blue { background-color: #38bdf8; }
       .dot-green { background-color: #22c55e; }
@@ -390,6 +412,12 @@ function renderExecutive1(filteredData, rawData) {
     <div class="exec-section-title">YTD Overview<span>ภาพรวมยอดขายสะสม</span></div>
     ${kpiHtml}
     <div class="exec-section-title">Monthly Breakdown<span>รายละเอียดรายเดือน</span></div>
+    <div class="exec-legend">
+      <span class="exec-legend-item"><span class="exec-legend-dot" style="background:#ea580c;"></span>Sales performance (Revenue, Orders, AOV)</span>
+      <span class="exec-legend-item"><span class="exec-legend-dot" style="background:#0369a1;"></span>Customer base (Unique Buyers, Frequency, SPH)</span>
+      <span class="exec-legend-item"><span class="exec-legend-dot" style="background:#166534;"></span>New vs. Retained mix (Retained, New, % New Share)</span>
+      <span class="exec-legend-item"><span class="exec-legend-dot" style="background:#7e22ce;"></span>Growth / migration (New to Sub, % Migration Rate)</span>
+    </div>
     <div class="exec-table-wrapper">
       <table class="exec-table">
       <thead>
@@ -414,19 +442,19 @@ function renderExecutive1(filteredData, rawData) {
     rowHtml += `<td class="col-total">${displayStrT}</td></tr>`;
     return rowHtml;
   };
-  html += renderRow('Revenue<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดขาย </span>', revArr, true, false, false, 'bg-light-green');
-  html += renderRow('Orders<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ออเดอร์</span>', ordArr, true, false, false, 'bg-light-blue');
-  html += renderRow('AOV (Average Order Value)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดต่อบิลเฉลี่ย </span>', aovArr, true, false, false, 'bg-light-blue');
-  html += renderRow('Unique Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนซื้อจริง</span>', ubArr, true, false, false, 'bg-light-green');
-  html += renderRow('Frequency<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ความถี่ซื้อ </span>', freqArr, false, true, false, 'bg-light-blue');
-  html += renderRow('Spending per Head<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">เฉลี่ยต่อคน </span>', sphArr, true, false, false, 'bg-light-blue');
-  html += renderRow('Retained Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนเก่าซื้อซ้ำ </span>', retArr, true, false, false, 'bg-light-blue');
-  html += renderRow('New Customers (Global)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่ (Global)</span>', newGArr, true, false, false, 'bg-light-green');
-  html += renderRow('% New Customer Share<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สัดส่วนลูกค้าใหม่</span>', newGShrArr, false, false, true, 'bg-light-blue');
-  html += renderRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', migArr, true, false, false, 'bg-light-green');
-  html += renderRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', migRtArr, false, false, true, 'bg-light-blue');
+  html += renderRow('Revenue<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดขาย </span>', revArr, true, false, false, 'group-sales');
+  html += renderRow('Orders<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ออเดอร์</span>', ordArr, true, false, false, 'group-sales');
+  html += renderRow('AOV (Average Order Value)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดต่อบิลเฉลี่ย </span>', aovArr, true, false, false, 'group-sales');
+  html += renderRow('Unique Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนซื้อจริง</span>', ubArr, true, false, false, 'group-customer');
+  html += renderRow('Frequency<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ความถี่ซื้อ </span>', freqArr, false, true, false, 'group-customer');
+  html += renderRow('Spending per Head<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">เฉลี่ยต่อคน </span>', sphArr, true, false, false, 'group-customer');
+  html += renderRow('Retained Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนเก่าซื้อซ้ำ </span>', retArr, true, false, false, 'group-mix');
+  html += renderRow('New Customers (Global)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่ (Global)</span>', newGArr, true, false, false, 'group-mix');
+  html += renderRow('% New Customer Share<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สัดส่วนลูกค้าใหม่</span>', newGShrArr, false, false, true, 'group-mix');
+  html += renderRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', migArr, true, false, false, 'group-growth');
+  html += renderRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', migRtArr, false, false, true, 'group-growth');
   // Channel Status Row Placeholder
-  html += `<tr><td class="metric-label bg-light-blue">Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span></td>`;
+  html += `<tr><td class="metric-label">Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span></td>`;
   for (let m = 1; m <= 12; m++) {
     // Placeholder logic based on image: showing some dots
     let u = agg[m].uniqueBuyers.size;
