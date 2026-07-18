@@ -36,9 +36,14 @@ function renderExecutive2(filteredData, rawData) {
       .exec2-card-title { font-weight: 700; font-size: 14px; color: #333; }
       .exec2-card-sub { font-size: 11px; color: #888; margin-top: 4px; }
 
-      .exec2-table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+      .exec2-table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
       .exec2-table-header h3 { margin: 0; font-size: 16px; color: #222; }
       .month-label { font-size: 14px; font-weight: 700; color: #d95f1d; }
+      .exec2-definitions {
+        font-size: 11.5px; color: #6b7280; line-height: 1.6; margin-bottom: 15px;
+        background: #fafafa; border: 1px solid #f0f0f0; border-radius: 8px; padding: 8px 14px;
+      }
+      .exec2-definitions b { color: #444; }
 
       .exec2-table-wrapper {
         background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow-x: auto;
@@ -109,10 +114,31 @@ function renderExecutive2(filteredData, rawData) {
   }
   const scFirstPurchase = window.scFirstPurchase;
 
-  // Aggregate data by SubChannel for the CURRENTLY FILTERED data
+  // ---- Scope data to the month actually in effect ----
+  // filteredData (from dashboard.html) is NOT month-filtered - the top Month filter is only ever
+  // applied by the Overview tab. Executive2 needs to scope itself so that (a) picking a Month in the
+  // filter bar actually changes this table, and (b) with Month = "All" it shows the latest available
+  // month as a meaningful snapshot instead of a whole-year sum (percentages skew badly over a full year).
+  const rowMonthStr = (row) => {
+    const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
+    const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+    const d = parseD(dateStr);
+    return d ? `${d.y}-${String(d.m).padStart(2, '0')}` : '';
+  };
+
+  let resolvedMonth = (window.filters && window.filters.Month !== 'All') ? window.filters.Month : '';
+  if (!resolvedMonth) {
+    filteredData.forEach(row => {
+      const ms = rowMonthStr(row);
+      if (ms && ms > resolvedMonth) resolvedMonth = ms;
+    });
+  }
+  const scopedData = resolvedMonth ? filteredData.filter(row => rowMonthStr(row) === resolvedMonth) : filteredData;
+
+  // Aggregate data by SubChannel for the resolved month
   const agg = {};
-  
-  filteredData.forEach(row => {
+
+  scopedData.forEach(row => {
     let sc = getExec2Group(row);
 
     if (!agg[sc]) {
@@ -183,7 +209,7 @@ function renderExecutive2(filteredData, rawData) {
     const totalNewAndMig = pctNew + pctMig;
     
     if (pctNew > 70) {
-      category = 'Vanguard (ทัพหน้า)';
+      category = 'Vanguard';
       categoryClass = 'badge-vanguard';
       dotClass = 'dot-vanguard';
     } else if (pctMig > 70) {
@@ -191,7 +217,7 @@ function renderExecutive2(filteredData, rawData) {
       categoryClass = 'badge-migration';
       dotClass = 'dot-migration';
     } else if (totalNewAndMig < 30) {
-      category = 'Cash Cow (เสือนอนกิน)';
+      category = 'Cash Cow';
       categoryClass = 'badge-cashcow';
       dotClass = 'dot-cashcow';
     } else {
@@ -217,52 +243,59 @@ function renderExecutive2(filteredData, rawData) {
   // Drop sub-channels with no real purchases (e.g. placeholder rows with 0 revenue/buyers)
   const realResults = results.filter(r => r.revenue > 0 && r.buyers > 0);
 
-  // Sort by revenue descending
-  realResults.sort((a, b) => b.revenue - a.revenue);
+  // Sort alphabetically by sub-channel name so the same row lands in the same place when you
+  // flip between months, instead of jumping around with a revenue-descending sort.
+  realResults.sort((a, b) => a.subChannel.localeCompare(b.subChannel));
 
   // Formatting helpers
   const fmtNum = (num) => (Number(num) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
   const fmtPct = (num) => (Number(num) || 0).toFixed(0) + '%';
-  
-  const currentMonthLabel = (window.filters && window.filters.Month !== 'All') 
-    ? window.filters.Month 
-    : 'All Months';
+
+  const currentMonthLabel = resolvedMonth || 'No data';
 
   let html = `
     <div class="exec2-cards">
       <div class="exec2-card vanguard">
         <div class="exec2-card-dot dot-vanguard"></div>
         <div class="exec2-card-text">
-          <span class="exec2-card-title">Vanguard (ทัพหน้า)</span>
-          <span class="exec2-card-sub">หาคนใหม่เก่งมาก (>70%)</span>
+          <span class="exec2-card-title">Vanguard</span>
+          <span class="exec2-card-sub">Strong at acquiring new customers (&gt;70% new)</span>
         </div>
       </div>
       <div class="exec2-card migration">
         <div class="exec2-card-dot dot-migration"></div>
         <div class="exec2-card-text">
           <span class="exec2-card-title">Migration Hub</span>
-          <span class="exec2-card-sub">จุดรับแขกเก่า (>70%)</span>
+          <span class="exec2-card-sub">Mostly receives customers migrating from other channels (&gt;70%)</span>
         </div>
       </div>
       <div class="exec2-card retention">
         <div class="exec2-card-dot dot-retention"></div>
         <div class="exec2-card-text">
           <span class="exec2-card-title">Retention Hub</span>
-          <span class="exec2-card-sub">ถังเก็บลูกค้า (>30%)</span>
+          <span class="exec2-card-sub">Keeps customers coming back (new + migration &gt;= 30%)</span>
         </div>
       </div>
       <div class="exec2-card cashcow">
         <div class="exec2-card-dot dot-cashcow"></div>
         <div class="exec2-card-text">
           <span class="exec2-card-title">Cash Cow</span>
-          <span class="exec2-card-sub">เสือนอนกิน (<30%)</span>
+          <span class="exec2-card-sub">Stable repeat revenue, little new acquisition (&lt;30%)</span>
         </div>
       </div>
     </div>
 
     <div class="exec2-table-header">
-      <h3>ความหมายเชิงกลยุทธ์ (Strategic Meaning)</h3>
+      <h3>Strategic Meaning by Sub-Channel</h3>
       <span class="month-label">${currentMonthLabel}</span>
+    </div>
+    <div class="exec2-definitions">
+      <b>Definitions:</b>
+      Buyers = unique paying customers this month &middot;
+      New Customers = customers making their very first purchase ever &middot;
+      New-to-Sub = first purchase on this sub-channel by an existing customer (migrated in) &middot;
+      % Migration = New-to-Sub / Buyers &middot;
+      % New Share = New Customers / Buyers
     </div>
 
     <div class="exec2-table-wrapper">
