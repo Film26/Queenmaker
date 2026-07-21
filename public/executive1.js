@@ -45,7 +45,7 @@ function renderExecutive1(filteredData, rawData) {
       }
       .kpi-card {
         background: #fff;
-        border: 1px solid #e2e8f0;
+        border: 1.5px solid var(--kpi-color, #e2e8f0);
         border-top: 4px solid var(--kpi-color, #d95f1d);
         border-radius: 14px;
         padding: 16px 16px 12px;
@@ -61,7 +61,7 @@ function renderExecutive1(filteredData, rawData) {
         font-weight: 700;
         letter-spacing: 0.4px;
         text-transform: uppercase;
-        color: var(--kpi-color, #d95f1d);
+        color: var(--kpi-label-color, var(--kpi-color, #d95f1d));
       }
       .kpi-card-sublabel {
         display: block;
@@ -101,33 +101,35 @@ function renderExecutive1(filteredData, rawData) {
 
       /* ---- Monthly breakdown table ---- */
       .exec-table-wrapper {
-        background: #fff;
+        background: #eaf2fd;
+        border: 1.5px solid #1e3a8a;
         border-radius: 12px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-        overflow-x: auto;
+        overflow-x: visible;
         max-width: 100%;
-        scrollbar-width: thin;
         margin-bottom: 25px;
       }
       .exec-table {
         width: 100%;
+        table-layout: fixed;
         border-collapse: separate;
         border-spacing: 0;
         font-family: 'Inter', sans-serif;
-        font-size: 13px;
-        background-color: #fff;
-        border: 1px solid #e2e8f0;
+        font-size: 12px;
+        background-color: #eaf2fd;
         border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
         margin-bottom: 0;
       }
       .exec-table th, .exec-table td {
-        border-bottom: 1px solid #e2e8f0;
-        border-right: 1px solid #eef2f7;
-        padding: 12px 10px;
+        border-bottom: 1px solid #1e3a8a;
+        border-right: 1px solid #6b8fd4;
+        padding: 10px 5px;
         text-align: right;
-        white-space: nowrap;
+        white-space: normal;
+        word-break: break-word;
+        color: #0f172a;
+        font-weight: 600;
       }
       .exec-table th:last-child, .exec-table td:last-child {
         border-right: none;
@@ -136,26 +138,26 @@ function renderExecutive1(filteredData, rawData) {
         border-bottom: none;
       }
       .exec-table th {
-        background-color: #1e293b;
+        background-color: #0f2c66;
         color: #fff;
         font-weight: 700;
         text-align: center;
-        border-bottom: none;
-        border-right: 1px solid rgba(255,255,255,0.08);
+        border-bottom: 2px solid #1e3a8a;
+        border-right: 1px solid rgba(255,255,255,0.15);
       }
       .exec-table th:first-child, .exec-table td.metric-label {
         text-align: left;
-        font-weight: 600;
-        width: 16%;
-        color: #334155;
+        font-weight: 700;
+        width: 15%;
+        color: #0f2c66;
       }
       .exec-table td.col-total, .exec-table th.col-total {
-        font-weight: bold;
-        background-color: #f8fafc;
-        color: #0f172a;
+        font-weight: 800;
+        background-color: #cfe0f9;
+        color: #0f2c66;
       }
-      .exec-table tbody tr:nth-child(odd) td:not(.col-total) {
-        background-color: #fbfcfe;
+      .exec-table tbody tr:nth-child(even) td:not(.col-total):not(.metric-label) {
+        background-color: #f4f9ff;
       }
       /* Row groups: each ties a set of related metrics to one color so the grouping carries meaning
          (Sales performance / Customer base / New-vs-Retained mix / Growth-migration) rather than
@@ -385,20 +387,20 @@ function renderExecutive1(filteredData, rawData) {
   };
 
   const kpiCards = [
-    { label: 'YTD Revenue', sub: 'ยอดขาย YTD (บาท)', value: fmtMoney(total.revenue), arr: revArr, color: '#d95f1d' },
-    { label: 'YTD Buyer', sub: 'ลูกค้าจริง YTD (คน)', value: fmtNum(total.uniqueBuyers.size), arr: ubArr, color: '#198754' },
-    { label: 'New Customers', sub: 'ลูกค้าใหม่ YTD (คน)', value: fmtNum(total.newGlobalBuyers.size), arr: newGArr, color: '#198754' },
-    { label: 'Old Customers', sub: 'ลูกค้าเก่า YTD (คน)', value: fmtNum(total.retainedBuyers.size), arr: retArr, color: '#6c757d' },
-    { label: 'YTD AOV', sub: 'ยอดต่อบิลเฉลี่ย (บาท)', value: fmtMoney(getSafely(total.revenue, total.orders)), arr: aovArr, color: '#d95f1d' },
-    { label: 'YTD SPH', sub: 'ยอดเฉลี่ยต่อคน (บาท)', value: fmtMoney(getSafely(total.revenue, total.uniqueBuyers.size)), arr: sphArr, color: '#2d1e1a' },
-    { label: 'Repeat Purchase', sub: 'การซื้อซ้ำ (ครั้ง)', value: fmtDec(getSafely(total.orders, total.uniqueBuyers.size)), arr: freqArr, color: '#198754' }
+    { label: 'YTD Revenue', sub: 'ยอดขาย YTD (บาท)', value: fmtMoney(total.revenue), arr: revArr, color: '#228B22' },
+    { label: 'YTD Buyer', sub: 'ลูกค้าจริง YTD (คน)', value: fmtNum(total.uniqueBuyers.size), arr: ubArr, color: '#000080' },
+    { label: 'New Customers', sub: 'ลูกค้าใหม่ YTD (คน)', value: fmtNum(total.newGlobalBuyers.size), arr: newGArr, color: '#00BCD4', labelColor: '#0e7490' },
+    { label: 'Old Customers', sub: 'ลูกค้าเก่า YTD (คน)', value: fmtNum(total.retainedBuyers.size), arr: retArr, color: '#0A1F44' },
+    { label: 'YTD AOV', sub: 'ยอดต่อบิลเฉลี่ย (บาท)', value: fmtMoney(getSafely(total.revenue, total.orders)), arr: aovArr, color: '#FFC107', labelColor: '#b45309' },
+    { label: 'YTD SPH', sub: 'ยอดเฉลี่ยต่อคน (บาท)', value: fmtMoney(getSafely(total.revenue, total.uniqueBuyers.size)), arr: sphArr, color: '#84CC16', labelColor: '#4d7c0f' },
+    { label: 'Repeat Purchase', sub: 'การซื้อซ้ำ (ครั้ง)', value: fmtDec(getSafely(total.orders, total.uniqueBuyers.size)), arr: freqArr, color: '#4F46E5' }
   ];
 
   let kpiHtml = '<div class="kpi-card-row">';
   kpiCards.forEach(card => {
     const series = card.arr.slice(0, latestM);
     kpiHtml += `
-      <div class="kpi-card" style="--kpi-color:${card.color}">
+      <div class="kpi-card" style="--kpi-color:${card.color}; --kpi-label-color:${card.labelColor || card.color}">
         <div class="kpi-card-label">${card.label}<span class="kpi-card-sublabel">${card.sub}</span></div>
         <div class="kpi-card-value">${card.value}</div>
         ${buildTrend(card.arr)}
