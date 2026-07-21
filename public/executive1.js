@@ -138,12 +138,12 @@ function renderExecutive1(filteredData, rawData) {
         border-bottom: none;
       }
       .exec-table th {
-        background-color: #0f2c66;
-        color: #fff;
+        background-color: #ddd6fe;
+        color: #4c1d95;
         font-weight: 700;
         text-align: center;
-        border-bottom: 2px solid #1e3a8a;
-        border-right: 1px solid rgba(255,255,255,0.15);
+        border-bottom: 2px solid #a78bfa;
+        border-right: 1px solid rgba(76,29,149,0.15);
       }
       .exec-table th:first-child, .exec-table td.metric-label {
         text-align: left;
@@ -155,6 +155,10 @@ function renderExecutive1(filteredData, rawData) {
         font-weight: 800;
         background-color: #cfe0f9;
         color: #0f2c66;
+      }
+      .exec-table thead th.col-total {
+        background-color: #ddd6fe;
+        color: #4c1d95;
       }
       .exec-table tbody tr:nth-child(even) td:not(.col-total):not(.metric-label) {
         background-color: #f4f9ff;
@@ -424,7 +428,7 @@ function renderExecutive1(filteredData, rawData) {
       <table class="exec-table">
       <thead>
         <tr>
-         <th>Metric / Month<br><span style="font-size: 11px; font-weight: normal; color: #cbd5e1;">ตัวชี้วัด / เดือน</span></th>
+         <th>Metric / Month<br><span style="font-size: 11px; font-weight: normal; color: #6d28d9;">ตัวชี้วัด / เดือน</span></th>
           ${months.map(m => `<th>${m}</th>`).join('')}
           <th class="col-total">Total Year<br><span style="font-size: 11px; font-weight: normal; color: #64748b;">ยอดรวมทั้งปี</span></th>
         </tr>
