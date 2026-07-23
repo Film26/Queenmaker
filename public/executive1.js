@@ -163,24 +163,20 @@ function renderExecutive1(filteredData, rawData) {
       .exec-table tbody tr:nth-child(even) td:not(.col-total):not(.metric-label) {
         background-color: #f4f9ff;
       }
-      /* Row groups: each ties a set of related metrics to one color so the grouping carries meaning
-         (Sales performance / Customer base / New-vs-Retained mix / Growth-migration) rather than
-         alternating colors with no relationship to the data. */
-      .exec-table .group-sales {
-        background-color: #fff7ed !important;
-        color: #9a3412;
+      /* Revenue through Channel Status: single light-blue background across the whole row. */
+      .exec-table .group-sales,
+      .exec-table .group-customer,
+      .exec-table .group-mix,
+      .exec-table .group-growth,
+      .exec-table .row-channel-status {
+        background-color: #dbeafe !important;
       }
-      .exec-table .group-customer {
-        background-color: #f0f9ff !important;
-        color: #0369a1;
-      }
-      .exec-table .group-mix {
-        background-color: #f0fdf4 !important;
-        color: #166534;
-      }
-      .exec-table .group-growth {
-        background-color: #faf5ff !important;
-        color: #7e22ce;
+      .exec-table .group-sales td,
+      .exec-table .group-customer td,
+      .exec-table .group-mix td,
+      .exec-table .group-growth td,
+      .exec-table .row-channel-status td {
+        background-color: #dbeafe !important;
       }
       .exec-legend {
         display: flex;
@@ -436,7 +432,7 @@ function renderExecutive1(filteredData, rawData) {
       <tbody>
   `;
   const renderRow = (label, values, isMoney = false, isDec = false, isPct = false, bgClass = '') => {
-    let rowHtml = `<tr><td class="metric-label ${bgClass}">${label}</td>`;
+    let rowHtml = `<tr class="${bgClass}"><td class="metric-label">${label}</td>`;
     for (let m = 1; m <= 12; m++) {
       let val = values[m - 1];
       let displayStr = isMoney ? fmtNum(val) : isDec ? fmtDec(val) : isPct ? fmtPct(val) : fmtNum(val);
@@ -460,7 +456,7 @@ function renderExecutive1(filteredData, rawData) {
   html += renderRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', migArr, true, false, false, 'group-growth');
   html += renderRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', migRtArr, false, false, true, 'group-growth');
   // Channel Status Row Placeholder
-  html += `<tr><td class="metric-label">Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span></td>`;
+  html += `<tr class="row-channel-status"><td class="metric-label">Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span></td>`;
   for (let m = 1; m <= 12; m++) {
     // Placeholder logic based on image: showing some dots
     let u = agg[m].uniqueBuyers.size;
