@@ -94,19 +94,20 @@
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-cog"></i>SETTINGS</a></li>
       </ul>
     </aside>
-    <main class="main-content" style="padding:0;">
-      <header class="top-bar" style="background: #fbf9f4; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.04);">
-        <div style="display: flex; align-items: center; gap: 16px;">
+    <main class="main-content" style="padding:0; padding-top: 74px;">
+      <header class="top-bar" style="background: #fbf9f4; padding: 16px 40px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.04);">
+        <div style="justify-self: start; display: flex; align-items: center;">
           <button id="menuToggle" class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('active'); document.getElementById('sidebarOverlay').classList.toggle('active');" style="background: none; border: none; font-size: 24px; cursor: pointer;">
             <i class="fas fa-bars"></i>
           </button>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <img src="./369223.png" alt="QueenMaker" style="width: 30px; height: 30px; object-fit: contain; border-radius: 6px;" onerror="this.style.display='none'">
-            <span style="font-family:'Outfit', sans-serif; font-size: 18px; font-weight: 700; color: #1e293b; letter-spacing: 0.3px;">QueenMaker</span>
-          </div>
         </div>
 
-        <div class="user-actions" style="display: flex; gap: 15px; align-items: center;">
+        <div style="justify-self: center; display: flex; align-items: center; gap: 12px;">
+          <img src="./369223.png" alt="QueenMaker" style="width: 42px; height: 42px; object-fit: contain; border-radius: 8px;" onerror="this.style.display='none'">
+          <span style="font-family:'Outfit', sans-serif; font-size: 26px; font-weight: 700; color: #1e293b; letter-spacing: 0.3px;">QueenMaker</span>
+        </div>
+
+        <div class="user-actions" style="justify-self: end; display: flex; gap: 15px; align-items: center;">
           <button id="importBtn" class="btn" style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
             <i class="fas fa-file-import"></i> Import Data
           </button>
