@@ -1,6 +1,4 @@
 // public/settings.js
-// หน้า Settings: จัดการ Dropdown Options (Channel/SubChannel/Product/SubProduct/Admin) และ User Management
-// ทำงานแบบ Demo Mode (localStorage) โดยดีฟอลต์ ถ้ามี window.CrmApi ต่อ backend จริงแล้วจะเรียกผ่าน CrmApi แทนอัตโนมัติ
 
 const SETTINGS_STORAGE_KEY = 'qm_settings_v1';
 
@@ -103,6 +101,31 @@ window.AppData.config = window.AppData.config || {};
 window.AppData.users = window.AppData.users || [];
 
 let __settingsUi = { mainTab: 'config', configTab: 'Channel' };
+
+// --- Real-time propagation: แจ้งหน้าอื่น (dashboard/insighthub ฯลฯ) ทุกครั้งที่ AppData เปลี่ยนแปลงสำเร็จ ---
+// type: 'config' (Channel/SubChannel/Product/SubProduct/Admin) หรือ 'users'
+// ฟังก์ชันนี้แค่ dispatch event เฉยๆ ไม่เรียก render ใดๆ กลับมาเอง จึงไม่มีทางเกิด infinite loop
+function stgNotifyChange(type, extra) {
+  try {
+    window.dispatchEvent(new CustomEvent('appDataChanged', Object.assign({}, { detail: Object.assign({ type: type }, extra || {}) })));
+  } catch (e) {
+    console.error('[Settings] แจ้งเตือนการเปลี่ยนแปลงข้อมูลไม่สำเร็จ', e);
+  }
+}
+
+// โหลดข้อมูล config/users เข้า window.AppData ทันทีที่ไฟล์นี้ถูกโหลด (ไม่ต้องรอให้ผู้ใช้เปิดหน้า Settings ก่อน)
+// เพื่อให้หน้าอื่น (เช่น Filter Dropdown บน Dashboard) มีข้อมูลล่าสุดพร้อมใช้ตั้งแต่ต้น
+// และยิง appDataChanged อีกครั้งเผื่อกรณีมีการโหลดข้อมูลจาก CrmApi จริงที่เป็น async (ช้ากว่าตอนสคริปต์อื่น attach listener)
+(function settingsPreload() {
+  Promise.all([settingsApiGetConfig(), settingsApiGetUsers()]).then(([config, users]) => {
+    window.AppData.config = config;
+    window.AppData.users = users;
+    stgNotifyChange('config', { source: 'preload' });
+    stgNotifyChange('users', { source: 'preload' });
+  }).catch(err => {
+    console.error('[Settings] โหลดข้อมูลเริ่มต้นไม่สำเร็จ', err);
+  });
+})();
 
 // --- Toast notifications ---
 function stgToast(message, type) {
@@ -314,6 +337,7 @@ function stgSaveConfigModal(category, itemId) {
     stgCloseModal();
     stgSwitchConfigTab(category);
     stgToast(itemId ? 'แก้ไขรายการสำเร็จ' : 'เพิ่มรายการสำเร็จ', 'success');
+    stgNotifyChange('config', { category: category });
   }).catch(err => {
     console.error('[Settings] บันทึกไม่สำเร็จ', err);
     stgToast('บันทึกข้อมูลไม่สำเร็จ', 'error');
@@ -330,6 +354,7 @@ window.stgToggleConfigActive = function(category, itemId) {
     window.AppData.config[category] = items;
     stgSwitchConfigTab(category);
     stgToast('อัปเดตสถานะสำเร็จ', 'success');
+    stgNotifyChange('config', { category: category });
   }).catch(err => {
     console.error('[Settings] อัปเดตสถานะไม่สำเร็จ', err);
     stgToast('อัปเดตสถานะไม่สำเร็จ', 'error');
@@ -347,6 +372,7 @@ window.stgDeleteConfigItem = function(category, itemId) {
     window.AppData.config[category] = next;
     stgSwitchConfigTab(category);
     stgToast('ลบรายการสำเร็จ', 'success');
+    stgNotifyChange('config', { category: category });
   }).catch(err => {
     console.error('[Settings] ลบไม่สำเร็จ', err);
     stgToast('ลบรายการไม่สำเร็จ', 'error');
@@ -478,6 +504,7 @@ function stgSaveUserModal(userId) {
     stgCloseModal();
     stgSwitchMainTab('users');
     stgToast(isEdit ? 'แก้ไขผู้ใช้งานสำเร็จ' : 'เพิ่มผู้ใช้งานสำเร็จ', 'success');
+    stgNotifyChange('users');
   }).catch(err => {
     console.error('[Settings] บันทึกผู้ใช้งานไม่สำเร็จ', err);
     stgToast('บันทึกข้อมูลไม่สำเร็จ', 'error');
@@ -494,6 +521,7 @@ window.stgToggleUserActive = function(userId) {
     window.AppData.users = users;
     stgSwitchMainTab('users');
     stgToast('อัปเดตสถานะสำเร็จ', 'success');
+    stgNotifyChange('users');
   }).catch(err => {
     console.error('[Settings] อัปเดตสถานะไม่สำเร็จ', err);
     stgToast('อัปเดตสถานะไม่สำเร็จ', 'error');
@@ -511,6 +539,7 @@ window.stgDeleteUser = function(userId) {
     window.AppData.users = next;
     stgSwitchMainTab('users');
     stgToast('ลบผู้ใช้งานสำเร็จ', 'success');
+    stgNotifyChange('users');
   }).catch(err => {
     console.error('[Settings] ลบผู้ใช้งานไม่สำเร็จ', err);
     stgToast('ลบผู้ใช้งานไม่สำเร็จ', 'error');
