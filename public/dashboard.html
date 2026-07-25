@@ -289,6 +289,7 @@
     
     // คอยเก็บสถานะ Filter โดยเพิ่ม 'KPI' เข้ามา (ตั้งค่าเริ่มต้นเป็น Off)
     let filters = { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All', KPI: 'Off' };
+    window.filters = filters;
     let monthlyData = {}; 
     let globalFirstPurchase = {}; 
     let availableMonths = [];
