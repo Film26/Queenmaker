@@ -258,29 +258,29 @@ function renderExecutive2(filteredData, rawData) {
       <div class="exec2-card vanguard">
         <div class="exec2-card-dot dot-vanguard"></div>
         <div class="exec2-card-text">
-          <span class="exec2-card-title">Vanguard</span>
-          <span class="exec2-card-sub">Strong at acquiring new customers (&gt;70% new)</span>
+          <span class="exec2-card-title">Vanguard (ทัพหน้า)</span>
+          <span class="exec2-card-sub">หาคนใหม่เก่งมาก &middot; ยิงแอดหาคนใหม่ (Pure New) แล้วได้ผลดีเยี่ยม</span>
         </div>
       </div>
       <div class="exec2-card migration">
         <div class="exec2-card-dot dot-migration"></div>
         <div class="exec2-card-text">
-          <span class="exec2-card-title">Migration Hub</span>
-          <span class="exec2-card-sub">Mostly receives customers migrating from other channels (&gt;70%)</span>
+          <span class="exec2-card-title">Migration Hub (จุดรับแขกเก่า)</span>
+          <span class="exec2-card-sub">ลูกค้าเก่าจากเพจอื่น "ไหล" มาลองซื้อที่เพจนี้เยอะ</span>
         </div>
       </div>
       <div class="exec2-card retention">
         <div class="exec2-card-dot dot-retention"></div>
         <div class="exec2-card-text">
-          <span class="exec2-card-title">Retention Hub</span>
-          <span class="exec2-card-sub">Keeps customers coming back (new + migration &gt;= 30%)</span>
+          <span class="exec2-card-title">Retention Hub (ถังเก็บลูกค้า)</span>
+          <span class="exec2-card-sub">ลูกค้าเดิมของเพจนั้นกลับมาซื้อซ้ำต่อเนื่อง (เน้นกำไร)</span>
         </div>
       </div>
       <div class="exec2-card cashcow">
         <div class="exec2-card-dot dot-cashcow"></div>
         <div class="exec2-card-text">
-          <span class="exec2-card-title">Cash Cow</span>
-          <span class="exec2-card-sub">Stable repeat revenue, little new acquisition (&lt;30%)</span>
+          <span class="exec2-card-title">Cash Cow (เสือนอนกิน)</span>
+          <span class="exec2-card-sub">แทบไม่มีคนใหม่เลย แต่ลูกค้าเก่าแก่ยังซื้ออยู่ (ไม่ต้องลงแอด)</span>
         </div>
       </div>
     </div>
