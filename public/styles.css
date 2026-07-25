@@ -696,8 +696,7 @@ h1, h2, h3, .brand-name {
 }
 
 /* =========================================
-   LOGIN PAGE STYLES (MATCHING DESIGN)
-   ========================================= */
+   LOGIN PAGE STYLES (MATCHING DESIGN)  */
 
 .login-wrapper {
   display: flex;
@@ -897,8 +896,7 @@ h1, h2, h3, .brand-name {
 }
 
 /* =========================================
-   COHORT HEATMAP STYLES
-   ========================================= */
+   COHORT HEATMAP STYLES */
 .cohort-table {
   border-collapse: collapse;
   width: max-content;
@@ -953,8 +951,7 @@ h1, h2, h3, .brand-name {
 }
 
 /* =========================================
-   EXECUTIVE 1 STYLES
-   ========================================= */
+   EXECUTIVE 1 STYLES */
 .exec-table {
   width: 100%;
   border-collapse: collapse;
@@ -1091,8 +1088,7 @@ h1, h2, h3, .brand-name {
 }
 
 /* =========================================
-   COHORT HEATMAP STYLES
-   ========================================= */
+   COHORT HEATMAP STYLES */
 .cohort-table {
   border-collapse: collapse;
   width: max-content;
@@ -1146,9 +1142,8 @@ h1, h2, h3, .brand-name {
   background-color: #fafafa;
 }
 
-/* =========================================
-   EXECUTIVE 1 STYLES
-   ========================================= */
+/* ========================================= 
+   EXECUTIVE 1 STYLES */
 .exec-table {
   width: 100%;
   border-collapse: collapse;
