@@ -1,4 +1,12 @@
 // public/insighthub.js
+
+window.addEventListener('appDataChanged', function(e) {
+  if (!e || !e.detail || e.detail.type !== 'config') return;
+  if (window.__hubCache && window.__hubCache.uniq) {
+    window.__hubCache.uniq = {};
+  }
+});
+
 if (!window.insightHubState) {
   window.insightHubState = {
     currentPage: 1,
