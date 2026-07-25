@@ -91,7 +91,7 @@
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-kpisetting" onclick="event.preventDefault(); switchTab('kpisetting')"><i class="fas fa-chart-line"></i>KPI SETTING</a></li>
-        <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-cog"></i>SETTINGS</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" id="side-settings" onclick="event.preventDefault(); switchTab('settings')"><i class="fas fa-cog"></i>SETTINGS</a></li>
       </ul>
     </aside>
     <main class="main-content" style="padding:0;">
@@ -270,6 +270,7 @@
         <div id="view-retention" class="view-content" style="display:none; padding: 20px;"></div>
         <div id="view-insighthub" class="view-content" style="display:none; padding: 20px;"></div>
         <div id="view-kpisetting" class="view-content" style="display:none; padding: 20px;"></div>
+        <div id="view-settings" class="view-content" style="display:none; padding: 20px;"></div>
 
       </div>
     </main>
@@ -418,8 +419,20 @@
       document.getElementById('side-insight').classList.remove('active');
       const sideKpiSetting = document.getElementById('side-kpisetting');
       if (sideKpiSetting) sideKpiSetting.classList.remove('active');
+      const sideSettings = document.getElementById('side-settings');
+      if (sideSettings) sideSettings.classList.remove('active');
 
-      if (tabId === 'insighthub') {
+      if (tabId === 'settings') {
+        if (sideSettings) sideSettings.classList.add('active');
+        document.getElementById('view-settings').style.display = 'block';
+
+        const tabsContainer = document.querySelector('.tabs-container');
+        if (tabsContainer) tabsContainer.style.display = 'none';
+        const filtersBar = document.querySelector('.filters-bar');
+        if (filtersBar) filtersBar.style.display = 'none';
+
+        if (typeof renderSettings === 'function') { renderSettings(); }
+      } else if (tabId === 'insighthub') {
         document.getElementById('side-insight').classList.add('active');
         document.getElementById('view-insighthub').style.display = 'block';
 
@@ -1218,5 +1231,6 @@
   <script src="insighthub.js?v=15"></script>
   <script src="retention.js?v=1"></script>
   <script src="kpisetting.js?v=2"></script>
+  <script src="settings.js?v=1"></script>
 </body>
 </html>
