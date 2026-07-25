@@ -774,27 +774,71 @@
     }
 
     // --- Dropdowns & Filters Logic ---
+    // ตัวเลือกสำรอง ใช้เฉพาะตอนที่ยังไม่มีข้อมูลจากหน้า Settings (window.AppData.config) เท่านั้น
+    // เมื่อหน้า Settings โหลด/บันทึกข้อมูลแล้ว ตัวเลือกจริงจะมาจาก AppData.config เสมอ (ดู refreshOptionDropdownsFromConfig)
+    const FALLBACK_OPTION_LISTS = {
+      Channel: ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'],
+      SubChannel: ['Call', 'CRM', 'Email', 'FB', 'FBC', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'IG-FBH', 'IG-FBSS', 'IG-FBW', 'Lazada', 'Line', 'Other', 'PC', 'Shopee', 'Telesale', 'Tiktok', 'Website'],
+      Product: ['Plus', 'Gold', 'Wiss', 'Kides', 'Collagen'],
+      SubProduct: ['Plus', 'Gold', 'Wiss', 'Kides original', 'Kidesส้ม', 'Kides แตงโม', 'Callagen'],
+      Admin: ['May', 'บี', 'มิ้ว', 'แอน', 'แอล']
+    };
+    const OPTION_FILTER_TYPES = ['Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'];
+
+    function getConfigOptionList(type) {
+      const items = window.AppData && window.AppData.config && window.AppData.config[type];
+      if (Array.isArray(items) && items.length > 0) {
+        return items.filter(item => item.active).map(item => item.name);
+      }
+      return FALLBACK_OPTION_LISTS[type] || [];
+    }
+
+    // สร้างเมนู Dropdown ของ Channel/SubChannel/Product/SubProduct/Admin ใหม่จาก window.AppData.config
+    // (ไม่แตะ Year/Month) ถ้า filter ที่เลือกค้างไว้ถูกลบ/ปิดใช้งานไปแล้ว จะรีเซ็ตกลับเป็น 'All' ให้อัตโนมัติ
+    // หมายเหตุ: ฟังก์ชันนี้ไม่เรียก applyFilters() เอง เพื่อกันการเรียกซ้อนกันเป็น infinite loop
+    // (ฟังก์ชันนี้ถูกเรียกจากภายใน applyFilters() ผ่าน populateDropdowns() ด้วย) ผู้เรียกที่ต้องการรีเฟรชข้อมูล
+    // ต้องเรียก applyFilters() เองอีกทีหลังจากนี้ (ดู appDataChanged listener ด้านล่าง)
+    function refreshOptionDropdownsFromConfig() {
+      let needReapply = false;
+      OPTION_FILTER_TYPES.forEach(type => {
+        const menu = document.getElementById('menu-' + type);
+        if (!menu) return;
+        const options = getConfigOptionList(type);
+        menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
+        options.forEach(val => {
+          menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
+        });
+
+        if (filters[type] !== 'All' && options.indexOf(filters[type]) === -1) {
+          filters[type] = 'All';
+          const lbl = document.getElementById('lbl-' + type);
+          if (lbl) lbl.textContent = 'All';
+          const btn = document.getElementById('btn-' + type);
+          if (btn) btn.classList.remove('active');
+          needReapply = true;
+        }
+      });
+      return needReapply;
+    }
+
     function populateDropdowns() {
       populateYearMenu();
       populateMonthMenu(filters.Year);
-
-      const fixedLists = {
-        Channel: ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'],
-        SubChannel: ['Call', 'CRM', 'Email', 'FB', 'FBC', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'IG-FBH', 'IG-FBSS', 'IG-FBW', 'Lazada', 'Line', 'Other', 'PC', 'Shopee', 'Telesale', 'Tiktok', 'Website'],
-        Product: ['Plus', 'Gold', 'Wiss', 'Kides', 'Collagen'],
-        SubProduct: ['Plus', 'Gold', 'Wiss', 'Kides original', 'Kidesส้ม', 'Kides แตงโม', 'Callagen'],
-        Admin: ['May', 'บี', 'มิ้ว', 'แอน', 'แอล']
-     };
-
-      ['Channel', 'SubChannel', 'Product', 'SubProduct' , 'Admin' ].forEach(type => {
-        const menu = document.getElementById('menu-' + type);
-        if (!menu) return;
-        menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
-        fixedLists[type].forEach(val => {
-          menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
-        });
-      });
+      refreshOptionDropdownsFromConfig();
     }
+
+    // อัปเดตแบบเรียลไทม์: หน้า Settings ยิง 'appDataChanged' ทุกครั้งที่ เพิ่ม/แก้ไข/ลบ/เปลี่ยนสถานะ
+    // ข้อมูลตัวเลือก (Channel/SubChannel/Product/SubProduct/Admin) สำเร็จ -> รีเฟรชเมนู Filter บน Header
+    // แล้ว re-render ทุก view ที่กำลังเปิดอยู่ผ่าน applyFilters() (จุดเดียวที่ตัดสินใจ re-render จริง กันซ้ำซ้อน)
+    window.addEventListener('appDataChanged', function(e) {
+      if (!e || !e.detail) return;
+      if (e.detail.type === 'config') {
+        refreshOptionDropdownsFromConfig();
+        applyFilters();
+      }
+      // e.detail.type === 'users': ยังไม่มี UI ในหน้า Dashboard ที่ผูกกับ User Management โดยตรง
+      // (คนละส่วนกับ 'Admin' ซึ่งเป็น master data การขายที่จัดการแยกในหมวด Dropdown Options)
+    });
 
     // Year list never depends on the current filter selection - built once from all raw data.
     function populateYearMenu() {
