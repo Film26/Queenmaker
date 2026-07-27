@@ -428,35 +428,44 @@
         });
       }
 
+      function loadSampleData() {
+        showLoading(true);
+        fetch(sampleUrl)
+          .then(res => res.text())
+          .then(text => {
+            Papa.parse(text, {
+              header: true,
+              skipEmptyLines: true,
+              complete: (results) => {
+                try {
+                  for (let k in keyCache) delete keyCache[k];
+                  window.userCohorts = null;
+                  window.scFirstPurchase = null;
+                  rawData = results.data.filter(row => {
+                    if (!row) return false;
+                    return Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
+                  });
+                  precomputeGlobalFirstPurchases();
+                  applyFilters();
+                } finally {
+                  showLoading(false);
+                }
+              }
+            });
+          })
+          .catch(err => { showLoading(false); alert('Failed to load sample data'); });
+      }
+
       const loadSampleBtn = document.getElementById('loadSampleBtn');
       if (loadSampleBtn) {
-        loadSampleBtn.addEventListener('click', () => {
-          showLoading(true);
-          fetch(sampleUrl)
-            .then(res => res.text())
-            .then(text => {
-              Papa.parse(text, { 
-                header: true, 
-                skipEmptyLines: true,
-                complete: (results) => {
-                  try {
-                    for (let k in keyCache) delete keyCache[k];
-                    window.userCohorts = null;
-                    window.scFirstPurchase = null;
-                    rawData = results.data.filter(row => {
-                      if (!row) return false;
-                      return Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
-                    });
-                    precomputeGlobalFirstPurchases();
-                    applyFilters();
-                  } finally {
-                    showLoading(false);
-                  }
-                }
-              });
-            })
-            .catch(err => { showLoading(false); alert('Failed to load sample data'); });
-        });
+        loadSampleBtn.addEventListener('click', loadSampleData);
+      }
+
+      // Auto-load sample data when no dataset is available yet (no manual import and no
+      // Insight Hub handoff from another tab), so tabs like Insight Hub show data right
+      // away instead of asking the user to press "Load Sample" first.
+      if (!rawData || rawData.length === 0) {
+        loadSampleData();
       }
 
       initCharts();
