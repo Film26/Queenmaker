@@ -1414,7 +1414,16 @@ window.exportInsightHubExcel = function() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'InsightHub');
   const dateTag = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `InsightHub_Export_${dateTag}.xlsx`);
+  const fileName = `InsightHub_Export_${dateTag}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+
+  // Task 7: audit trail for exports of confidential customer data.
+  fetch('/api/audit/log', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'insighthub_export', detail: { fileName, rowCount: exportRows.length } })
+  }).catch(err => console.error('[InsightHub] Failed to record export audit log:', err));
 };
 
 window.setHubSort = function(colName) {
