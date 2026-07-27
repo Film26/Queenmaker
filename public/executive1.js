@@ -157,7 +157,7 @@ function renderExecutive1(filteredData, rawData) {
         color: #0f2c66;
       }
       .exec-table thead th.col-total {
-        background-color: #d95f1d;
+        background-color: #1e3a8a;
         color: #ffffff;
       }
       .exec-table tbody tr:nth-child(even) td:not(.col-total):not(.metric-label) {
@@ -391,7 +391,7 @@ function renderExecutive1(filteredData, rawData) {
 
   const kpiCards = [
     { label: 'YTD Revenue', sub: 'ยอดขาย YTD (บาท)', value: fmtMoney(total.revenue), arr: revArr, color: '#228B22' },
-    { label: 'YTD Buyer', sub: 'ลูกค้าจริง YTD (คน)', value: fmtNum(total.uniqueBuyers.size), arr: ubArr, color: '#64748B', labelColor: '#334155' },
+    { label: 'YTD Buyer', sub: 'ลูกค้าจริง YTD (คน)', value: fmtNum(total.uniqueBuyers.size), arr: ubArr, color: '#334155', labelColor: '#0f172a' },
     { label: 'New Customers', sub: 'ลูกค้าใหม่ YTD (คน)', value: fmtNum(total.newGlobalBuyers.size), arr: newGArr, color: '#00BCD4', labelColor: '#0e7490' },
     { label: 'Old Customers', sub: 'ลูกค้าเก่า YTD (คน)', value: fmtNum(total.retainedBuyers.size), arr: retArr, color: '#334155', labelColor: '#0f172a' },
     { label: 'YTD AOV', sub: 'ยอดต่อบิลเฉลี่ย (บาท)', value: fmtMoney(getSafely(total.revenue, total.orders)), arr: aovArr, color: '#65A30D', labelColor: '#3f6212' },
