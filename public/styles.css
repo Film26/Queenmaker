@@ -684,11 +684,6 @@ h1, h2, h3, .brand-name {
     justify-content: space-between;
   }
   
-  .strategy-table th:nth-child(4),
-  .strategy-table td:nth-child(4),
-  .strategy-table th:nth-child(5),
-  .strategy-table td:nth-child(5) {
-  }
 }
 
 /* =========================================
@@ -962,8 +957,8 @@ h1, h2, h3, .brand-name {
   text-align: right;
 }
 .exec-table th {
-  background-color: #e6d1d9;
-  color: #333;
+  background-color: #1e3a8a;
+  color: #fff;
   font-weight: 600;
   text-align: center;
 }
@@ -975,7 +970,6 @@ h1, h2, h3, .brand-name {
 .exec-table td.col-total, .exec-table th.col-total {
   font-weight: bold;
 }
-.exec-table .bg-light-green {
 .login-form .input-group {
   position: relative;
   margin-bottom: 20px;
@@ -1154,8 +1148,8 @@ h1, h2, h3, .brand-name {
   text-align: right;
 }
 .exec-table th {
-  background-color: #e6d1d9;
-  color: #333;
+  background-color: #1e3a8a;
+  color: #fff;
   font-weight: 600;
   text-align: center;
 }
