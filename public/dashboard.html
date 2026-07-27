@@ -592,6 +592,28 @@
       el.innerHTML = icon + pct;
     }
 
+    // เหมือน updateKpiTargetUI ด้านบน (เทียบกับเป้าหมายจากหน้า KPI Setting + ใส่ป้าย "KPI") แต่ไม่ใส่
+    // class kpi-target-badge เพราะการ์ด YTD Sales/Total Customer/YTD New ทั้ง 3 นี้มี element เดียว
+    // แสดงอยู่ในตำแหน่งปกติของการ์ดอยู่แล้ว ไม่ได้ปักเป็น badge ซ้อนมุมล่างขวาแบบการ์ดอื่น
+    function updateKpiCompareUI(elId, current, target) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      const kpiLabel = '<span style="font-size:9px; font-weight:800; letter-spacing:0.5px;">KPI</span> ';
+      if (!target || target === 0) {
+        el.innerHTML = kpiLabel + '-';
+        el.className = 'kpi-change-new neutral';
+        return;
+      }
+      const change = (current - target) / target;
+      const pct = formatPercent(change);
+
+      let icon = kpiLabel;
+      if (change > 0) { el.className = 'kpi-change-new up'; icon += '<i class="fas fa-arrow-up"></i> '; }
+      else if (change < 0) { el.className = 'kpi-change-new down'; icon += '<i class="fas fa-arrow-down"></i> '; }
+      else { el.className = 'kpi-change-new neutral'; }
+      el.innerHTML = icon + pct;
+    }
+
     // --- Data Mapping & Parsing ---
     function getRowValue(row, possibleKeys) {
       if (!row) return '';
@@ -1218,9 +1240,9 @@
       if (filters.KPI === 'On') {
         changeYTDSalesEl.style.display = 'inline-flex';
         changeYTDNewEl.style.display = 'inline-flex';
-        updateChangeUI('change-ytd-sales', ytdSales, window.kpiSettingsData.salesYTD);
-        updateChangeUI('change-total-cust', totalCust, window.kpiSettingsData.totalCust);
-        updateChangeUI('change-ytd-new', ytdNew, window.kpiSettingsData.newCustYTD);
+        updateKpiCompareUI('change-ytd-sales', ytdSales, window.kpiSettingsData.salesYTD);
+        updateKpiCompareUI('change-total-cust', totalCust, window.kpiSettingsData.totalCust);
+        updateKpiCompareUI('change-ytd-new', ytdNew, window.kpiSettingsData.newCustYTD);
       } else {
         changeYTDSalesEl.style.display = 'none';
         changeYTDNewEl.style.display = 'none';
