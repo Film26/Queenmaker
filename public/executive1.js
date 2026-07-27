@@ -138,12 +138,12 @@ function renderExecutive1(filteredData, rawData) {
         border-bottom: none;
       }
       .exec-table th {
-        background-color: #ddd6fe;
-        color: #4c1d95;
+        background-color: #1e3a8a;
+        color: #ffffff;
         font-weight: 700;
         text-align: center;
-        border-bottom: 2px solid #a78bfa;
-        border-right: 1px solid rgba(76,29,149,0.15);
+        border-bottom: 2px solid #16305f;
+        border-right: 1px solid rgba(255,255,255,0.15);
       }
       .exec-table th:first-child, .exec-table td.metric-label {
         text-align: left;
@@ -157,8 +157,8 @@ function renderExecutive1(filteredData, rawData) {
         color: #0f2c66;
       }
       .exec-table thead th.col-total {
-        background-color: #ddd6fe;
-        color: #4c1d95;
+        background-color: #d95f1d;
+        color: #ffffff;
       }
       .exec-table tbody tr:nth-child(even) td:not(.col-total):not(.metric-label) {
         background-color: #f4f9ff;
@@ -189,10 +189,6 @@ function renderExecutive1(filteredData, rawData) {
       }
       .exec-legend-item { display: flex; align-items: center; gap: 6px; }
       .exec-legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-      .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
-      .dot-blue { background-color: #38bdf8; }
-      .dot-green { background-color: #22c55e; }
-      .dot-orange { background-color: #ea580c; }
     `;
     document.head.appendChild(style);
   }
@@ -226,6 +222,13 @@ function renderExecutive1(filteredData, rawData) {
     if (y < 2000) y += 2000;
     return { y, m, d, val: y * 10000 + m * 100 + d };
   };
+  // Month filter (top filter bar) is applied here as a point-in-time cutoff, mirroring the
+  // YTD-cutoff convention already used by the Overview tab in dashboard.html (renderDashboard():
+  // ytdSales/ytdBuyers only sum months <= the selected month). Without this, these "YTD ..." cards
+  // always summed all 12 months regardless of the Month filter - the bug reported in Task 3.
+  const monthCutoff = (window.filters && window.filters.Month !== 'All') ? window.filters.Month : null;
+  const withinCutoff = (d) => !monthCutoff || `${d.y}-${String(d.m).padStart(2, '0')}` <= monthCutoff;
+
   // Determine global first purchase dates if not already available globally
   // We use the global `globalFirstPurchase` from dashboard.html which is already calculated correctly!
   // First pass: Calculate first purchase date within the CURRENT filtered context (for Migration)
@@ -236,7 +239,7 @@ function renderExecutive1(filteredData, rawData) {
     const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
-    if (!d) return;
+    if (!d || !withinCutoff(d)) return;
     if (!filterContextFirstPurchase[id] || d.val < filterContextFirstPurchase[id]) {
       filterContextFirstPurchase[id] = d.val;
     }
@@ -250,7 +253,7 @@ function renderExecutive1(filteredData, rawData) {
 
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
-    if (!d) return;
+    if (!d || !withinCutoff(d)) return;
 
     const m = d.m;
     if (m >= 1 && m <= 12) {
@@ -388,10 +391,10 @@ function renderExecutive1(filteredData, rawData) {
 
   const kpiCards = [
     { label: 'YTD Revenue', sub: 'ยอดขาย YTD (บาท)', value: fmtMoney(total.revenue), arr: revArr, color: '#228B22' },
-    { label: 'YTD Buyer', sub: 'ลูกค้าจริง YTD (คน)', value: fmtNum(total.uniqueBuyers.size), arr: ubArr, color: '#000080' },
+    { label: 'YTD Buyer', sub: 'ลูกค้าจริง YTD (คน)', value: fmtNum(total.uniqueBuyers.size), arr: ubArr, color: '#64748B', labelColor: '#334155' },
     { label: 'New Customers', sub: 'ลูกค้าใหม่ YTD (คน)', value: fmtNum(total.newGlobalBuyers.size), arr: newGArr, color: '#00BCD4', labelColor: '#0e7490' },
-    { label: 'Old Customers', sub: 'ลูกค้าเก่า YTD (คน)', value: fmtNum(total.retainedBuyers.size), arr: retArr, color: '#0A1F44' },
-    { label: 'YTD AOV', sub: 'ยอดต่อบิลเฉลี่ย (บาท)', value: fmtMoney(getSafely(total.revenue, total.orders)), arr: aovArr, color: '#FFC107', labelColor: '#b45309' },
+    { label: 'Old Customers', sub: 'ลูกค้าเก่า YTD (คน)', value: fmtNum(total.retainedBuyers.size), arr: retArr, color: '#334155', labelColor: '#0f172a' },
+    { label: 'YTD AOV', sub: 'ยอดต่อบิลเฉลี่ย (บาท)', value: fmtMoney(getSafely(total.revenue, total.orders)), arr: aovArr, color: '#65A30D', labelColor: '#3f6212' },
     { label: 'YTD SPH', sub: 'ยอดเฉลี่ยต่อคน (บาท)', value: fmtMoney(getSafely(total.revenue, total.uniqueBuyers.size)), arr: sphArr, color: '#84CC16', labelColor: '#4d7c0f' },
     { label: 'Repeat Purchase', sub: 'การซื้อซ้ำ (ครั้ง)', value: fmtDec(getSafely(total.orders, total.uniqueBuyers.size)), arr: freqArr, color: '#4F46E5' }
   ];
@@ -455,21 +458,6 @@ function renderExecutive1(filteredData, rawData) {
   html += renderRow('% New Customer Share<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สัดส่วนลูกค้าใหม่</span>', newGShrArr, false, false, true, 'group-mix');
   html += renderRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', migArr, true, false, false, 'group-growth');
   html += renderRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', migRtArr, false, false, true, 'group-growth');
-  // Channel Status Row Placeholder
-  html += `<tr class="row-channel-status"><td class="metric-label">Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span></td>`;
-  for (let m = 1; m <= 12; m++) {
-    // Placeholder logic based on image: showing some dots
-    let u = agg[m].uniqueBuyers.size;
-    let label = '-';
-    let dot = '';
-    if (u > 0) {
-      if (m % 3 === 0) { label = 'Vanguard'; dot = '<span class="status-dot dot-blue"></span>'; }
-      else if (m % 3 === 1) { label = 'Migration'; dot = '<span class="status-dot dot-green"></span>'; }
-      else { label = 'Retention'; dot = '<span class="status-dot dot-orange"></span>'; }
-    }
-    html += `<td>${dot}${label}</td>`;
-  }
-  html += `<td class="col-total">-</td></tr>`;
   html += `</tbody></table></div>`;
   container.innerHTML = html;
 }
