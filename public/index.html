@@ -56,8 +56,6 @@
   </div>
 
   <script>
-    const demoUsername = 'admin';
-    const demoPassword = 'password'; // Updated to match usual pattern or previous session
     const loginBtn = document.getElementById('loginBtn');
     const feedback = document.getElementById('feedback');
     const togglePassword = document.getElementById('togglePassword');
@@ -71,31 +69,48 @@
       togglePassword.classList.toggle('fa-eye-slash');
     });
 
-    // Login Logic
+    // Login Logic - validated server-side against the real user store (see /api/auth/login
+    // in server.js), not a hardcoded client-side check.
     document.querySelector('.login-form').addEventListener('submit', function(e){
       e.preventDefault();
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value.trim();
 
-      if(username === demoUsername && password === demoPassword){
-        loginBtn.textContent = 'SIGNING IN...';
-        loginBtn.style.opacity = '0.8';
-        feedback.textContent = 'Login สำเร็จ! กำลังเข้าสู่ระบบ...';
-        feedback.style.color = '#198754';
-        
-        setTimeout(() => {
-          window.location.href = 'dashboard.html';
-        }, 800);
-      } else {
-        feedback.textContent = 'Username หรือ Password ไม่ถูกต้อง';
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'SIGNING IN...';
+      loginBtn.style.opacity = '0.8';
+      feedback.textContent = '';
+
+      fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      }).then(res => res.json().then(body => ({ ok: res.ok, body }))).then(({ ok, body }) => {
+        if (ok) {
+          feedback.textContent = 'Login สำเร็จ! กำลังเข้าสู่ระบบ...';
+          feedback.style.color = '#198754';
+          setTimeout(() => { window.location.href = 'dashboard.html'; }, 400);
+        } else {
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'LOGIN';
+          loginBtn.style.opacity = '1';
+          feedback.textContent = body.error || 'Username หรือ Password ไม่ถูกต้อง';
+          feedback.style.color = '#dc3545';
+
+          // Shake animation effect
+          const card = document.querySelector('.login-card');
+          card.style.animation = 'none';
+          void card.offsetWidth;
+          card.style.animation = 'shake 0.4s ease-in-out';
+        }
+      }).catch(() => {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'LOGIN';
+        loginBtn.style.opacity = '1';
+        feedback.textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
         feedback.style.color = '#dc3545';
-        
-        // Shake animation effect
-        const card = document.querySelector('.login-card');
-        card.style.animation = 'none';
-        void card.offsetWidth;
-        card.style.animation = 'shake 0.4s ease-in-out';
-      }
+      });
     });
 
     // Add shake animation to CSS dynamically or via styles.css
