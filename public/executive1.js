@@ -178,6 +178,23 @@ function renderExecutive1(filteredData, rawData) {
       .exec-table .row-channel-status td {
         background-color: #dbeafe !important;
       }
+      .channel-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 600;
+      }
+      .channel-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        flex-shrink: 0;
+      }
+      .cs-dot-vanguard { background: #2684ff; }
+      .cs-dot-migration { background: #13ce66; }
+      .cs-dot-retention { background: #ff9900; }
+      .cs-dot-cashcow { background: #ff4949; }
       .exec-legend {
         display: flex;
         flex-wrap: wrap;
@@ -458,6 +475,27 @@ function renderExecutive1(filteredData, rawData) {
   html += renderRow('% New Customer Share<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สัดส่วนลูกค้าใหม่</span>', newGShrArr, false, false, true, 'group-mix');
   html += renderRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', migArr, true, false, false, 'group-growth');
   html += renderRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', migRtArr, false, false, true, 'group-growth');
+
+  // Channel Status: classify each month (and Total Year) using the same Vanguard / Migration /
+  // Retention / Cash Cow thresholds as executive2.js's Strategic Meaning table, applied to the
+  // whole dataset for that month instead of per sub-channel.
+  const classifyChannelStatus = (pctNew, pctMig) => {
+    if (pctNew > 70) return { label: 'Vanguard', dot: 'cs-dot-vanguard' };
+    if (pctMig > 70) return { label: 'Migration', dot: 'cs-dot-migration' };
+    if (pctNew + pctMig < 30) return { label: 'Cash Cow', dot: 'cs-dot-cashcow' };
+    return { label: 'Retention', dot: 'cs-dot-retention' };
+  };
+  const channelStatusCell = (idx) => {
+    if (!ubArr[idx]) return '<td>-</td>';
+    const { label, dot } = classifyChannelStatus(newGShrArr[idx] * 100, migRtArr[idx] * 100);
+    return `<td><span class="channel-status-badge"><span class="channel-status-dot ${dot}"></span>${label}</span></td>`;
+  };
+  let channelStatusRow = `<tr class="row-channel-status"><td class="metric-label">Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span></td>`;
+  for (let m = 1; m <= 12; m++) channelStatusRow += channelStatusCell(m - 1);
+  channelStatusRow += channelStatusCell(12).replace('<td>', '<td class="col-total">');
+  channelStatusRow += '</tr>';
+  html += channelStatusRow;
+
   html += `</tbody></table></div>`;
   container.innerHTML = html;
 }
