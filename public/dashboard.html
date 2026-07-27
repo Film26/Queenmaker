@@ -86,7 +86,7 @@
       
       <ul class="nav-menu">
         <li class="nav-item"><a href="#" class="nav-link active" id="side-crm" onclick="event.preventDefault(); switchTab('overview')"><i class="fas fa-th-large"></i>CRM DASHBOARD</a></li>
-        <li class="nav-item"><a href="#" class="nav-link" id="side-insight" onclick="event.preventDefault(); switchTab('insighthub')"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
+        <li class="nav-item"><a href="dashboard.html?tab=insighthub" class="nav-link" id="side-insight" target="_blank" rel="noopener noreferrer" onclick="prepareInsightHubHandoff()"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-pie"></i>MUSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
@@ -113,7 +113,7 @@
           </button>
           <input type="file" id="fileInput" accept=".csv" style="display: none;">
           <button id="loadSampleBtn" class="btn" style="background: #e86c31; color: white; border: none; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer;">Load Sample</button>
-          <a href="#" class="btn" style="background: #eee; color: #333; text-decoration: none; border-radius: 20px; padding: 8px 20px; font-weight: 600;">Logout</a>
+          <a href="#" class="btn" id="logoutBtn" onclick="event.preventDefault(); doLogout();" style="background: #eee; color: #333; text-decoration: none; border-radius: 20px; padding: 8px 20px; font-weight: 600;">Logout</a>
         </div>
       </header>
       <div class="dashboard-content">
@@ -291,6 +291,47 @@
     // คอยเก็บสถานะ Filter โดยเพิ่ม 'KPI' เข้ามา (ตั้งค่าเริ่มต้นเป็น Off)
     let filters = { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All', KPI: 'Off' };
     window.filters = filters;
+
+    // --- Auth/session (Task 4/7) ---
+    // The server already redirects an unauthenticated GET /dashboard.html to the login page
+    // (see requirePageAuth in server.js) - this client-side check additionally catches a
+    // session that expires *while this tab is already open* (idle timeout) and hides
+    // admin-only navigation based on role (Manager vs Super Admin).
+    function checkSessionOrRedirect() {
+      fetch('/api/auth/me', { credentials: 'same-origin' }).then(res => {
+        if (!res.ok) { window.location.href = '/'; return null; }
+        return res.json();
+      }).then(data => {
+        if (!data) return;
+        window.currentUser = data.user;
+        const sideSettingsItem = document.getElementById('side-settings');
+        if (sideSettingsItem && data.user.role !== 'Super Admin') {
+          sideSettingsItem.closest('.nav-item').style.display = 'none';
+        }
+      }).catch(() => { /* transient network error - don't force logout */ });
+    }
+
+    function doLogout() {
+      fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).finally(() => {
+        window.location.href = '/';
+      });
+    }
+
+    // --- Inside Hub in a new tab (Task 6) ---
+    // Inside Hub has no separate URL/page of its own - it's the #view-insighthub tab inside
+    // this same file. A brand-new browser tab has no access to this tab's in-memory `rawData`
+    // (and rel="noopener noreferrer" intentionally blocks the new tab from reaching back into
+    // this window to read it), so the currently-loaded dataset is hand off through localStorage
+    // just before the new tab opens, then consumed once and immediately removed - see
+    // restoreInsightHubHandoffIfAny() in the DOMContentLoaded handler below.
+    function prepareInsightHubHandoff() {
+      try {
+        localStorage.setItem('qm_insighthub_handoff', JSON.stringify({ rawData: rawData, savedAt: Date.now() }));
+      } catch (e) {
+        console.error('[InsightHub] Failed to hand off dataset to the new tab:', e);
+        alert('ไม่สามารถส่งข้อมูลไปยังแท็บใหม่ได้ (ข้อมูลอาจมีขนาดใหญ่เกินไปสำหรับ localStorage) กรุณากด Import Data หรือ Load Sample อีกครั้งในแท็บใหม่');
+      }
+    }
     let monthlyData = {}; 
     let globalFirstPurchase = {}; 
     let availableMonths = [];
@@ -324,6 +365,28 @@
 
     // --- DOMContentLoaded Section ---
     window.addEventListener('DOMContentLoaded', () => {
+      checkSessionOrRedirect();
+      setInterval(checkSessionOrRedirect, 5 * 60 * 1000);
+
+      // Restore a dataset handed off from the Dashboard tab that opened this one via
+      // "Inside Hub" (see prepareInsightHubHandoff() above), then jump straight to that tab.
+      (function restoreInsightHubHandoffIfAny() {
+        if (new URLSearchParams(window.location.search).get('tab') !== 'insighthub') return;
+        try {
+          const raw = localStorage.getItem('qm_insighthub_handoff');
+          if (!raw) return;
+          localStorage.removeItem('qm_insighthub_handoff');
+          const payload = JSON.parse(raw);
+          if (!payload || !Array.isArray(payload.rawData) || Date.now() - (payload.savedAt || 0) > 5 * 60 * 1000) return;
+          rawData = payload.rawData;
+          precomputeGlobalFirstPurchases();
+          applyFilters();
+          switchTab('insighthub');
+        } catch (e) {
+          console.error('[InsightHub] Failed to restore handed-off dataset:', e);
+        }
+      })();
+
       const importBtn = document.getElementById('importBtn');
       const fileInput = document.getElementById('fileInput');
       
@@ -785,6 +848,15 @@
     };
     const OPTION_FILTER_TYPES = ['Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'];
 
+    // ใช้เช็คสถานะ Active/Disabled ของสินค้า (ตั้งค่าที่หน้า Settings > Product) ก่อนนับเข้า
+    // ทุก KPI/กราฟ/ตาราง - ไม่ใช่แค่ซ่อนออกจาก dropdown ตัวเลือก (ดู applyFilters ด้านล่าง)
+    function isProductActive(productName) {
+      const items = window.AppData && window.AppData.config && window.AppData.config.Product;
+      if (!Array.isArray(items) || items.length === 0) return true;
+      const match = items.find(item => item.name === productName);
+      return match ? !!match.active : true;
+    }
+
     function getConfigOptionList(type) {
       const items = window.AppData && window.AppData.config && window.AppData.config[type];
       if (Array.isArray(items) && items.length > 0) {
@@ -962,6 +1034,7 @@
         const subProduct = getNormalizedSubProduct(rawProductName);
         const admin = getNormalizedAdmin(row);
         
+        if (!isProductActive(product)) return false;
         if (filters.Year !== 'All' && d.y.toString() !== filters.Year) return false;
         if (filters.Channel !== 'All' && channel !== filters.Channel) return false;
         if (filters.SubChannel !== 'All' && subChannel !== filters.SubChannel) return false;
@@ -1275,6 +1348,7 @@
   <script src="insighthub.js?v=15"></script>
   <script src="retention.js?v=1"></script>
   <script src="kpisetting.js?v=2"></script>
+  <script src="api-client.js?v=1"></script>
   <script src="settings.js?v=1"></script>
 </body>
 </html>
