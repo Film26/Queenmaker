@@ -101,7 +101,7 @@ function renderExecutive1(filteredData, rawData) {
 
       /* ---- Monthly breakdown table ---- */
       .exec-table-wrapper {
-        background: #eaf2fd;
+        background: #f3f8fe;
         border: 1.5px solid #1e3a8a;
         border-radius: 12px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.03);
@@ -116,7 +116,7 @@ function renderExecutive1(filteredData, rawData) {
         border-spacing: 0;
         font-family: 'Inter', sans-serif;
         font-size: 12px;
-        background-color: #eaf2fd;
+        background-color: #f3f8fe;
         border-radius: 12px;
         overflow: hidden;
         margin-bottom: 0;
@@ -149,11 +149,16 @@ function renderExecutive1(filteredData, rawData) {
         text-align: left;
         font-weight: 700;
         width: 15%;
+      }
+      .exec-table th:first-child {
+        color: #ffffff;
+      }
+      .exec-table td.metric-label {
         color: #0f2c66;
       }
       .exec-table td.col-total, .exec-table th.col-total {
         font-weight: 800;
-        background-color: #cfe0f9;
+        background-color: #e3edfb;
         color: #0f2c66;
       }
       .exec-table thead th.col-total {
@@ -161,7 +166,7 @@ function renderExecutive1(filteredData, rawData) {
         color: #ffffff;
       }
       .exec-table tbody tr:nth-child(even) td:not(.col-total):not(.metric-label) {
-        background-color: #f4f9ff;
+        background-color: #fbfdff;
       }
       /* Revenue through Channel Status: single light-blue background across the whole row. */
       .exec-table .group-sales,
@@ -169,14 +174,14 @@ function renderExecutive1(filteredData, rawData) {
       .exec-table .group-mix,
       .exec-table .group-growth,
       .exec-table .row-channel-status {
-        background-color: #dbeafe !important;
+        background-color: #f5fafe !important;
       }
       .exec-table .group-sales td,
       .exec-table .group-customer td,
       .exec-table .group-mix td,
       .exec-table .group-growth td,
       .exec-table .row-channel-status td {
-        background-color: #dbeafe !important;
+        background-color: #f5fafe !important;
       }
       .channel-status-badge {
         display: inline-flex;
@@ -444,9 +449,9 @@ function renderExecutive1(filteredData, rawData) {
       <table class="exec-table">
       <thead>
         <tr>
-         <th>Metric / Month<br><span style="font-size: 11px; font-weight: normal; color: #6d28d9;">ตัวชี้วัด / เดือน</span></th>
+         <th>Metric / Month<br><span style="font-size: 11px; font-weight: normal; color: #ffffff;">ตัวชี้วัด / เดือน</span></th>
           ${months.map(m => `<th>${m}</th>`).join('')}
-          <th class="col-total">Total Year<br><span style="font-size: 11px; font-weight: normal; color: #64748b;">ยอดรวมทั้งปี</span></th>
+          <th class="col-total">Total Year<br><span style="font-size: 11px; font-weight: normal; color: #ffffff;">ยอดรวมทั้งปี</span></th>
         </tr>
       </thead>
       <tbody>
