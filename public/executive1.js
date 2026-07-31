@@ -29,6 +29,36 @@ function renderExecutive1(filteredData, rawData) {
         color: #94a3b8;
         margin-left: 6px;
       }
+      .exec-section-title-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin: 26px 0 14px 2px;
+      }
+      .exec-section-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: #dbeafe;
+        color: #1e3a8a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+      .exec-section-title-lg {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 800;
+        color: #0f172a;
+      }
+      .exec-section-title-lg span {
+        font-size: 14px;
+        font-weight: 500;
+        color: #64748b;
+        margin-left: 8px;
+      }
 
       /* ---- KPI stat cards ---- */
       .kpi-card-row {
@@ -131,6 +161,10 @@ function renderExecutive1(filteredData, rawData) {
         color: #0f172a;
         font-weight: 600;
       }
+      .exec-table td {
+        border-bottom: 1px solid #e1ecfa;
+        border-right: 1px solid #e1ecfa;
+      }
       .exec-table th:last-child, .exec-table td:last-child {
         border-right: none;
       }
@@ -211,6 +245,18 @@ function renderExecutive1(filteredData, rawData) {
       }
       .exec-legend-item { display: flex; align-items: center; gap: 6px; }
       .exec-legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+      .exec-table-footnote {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #eff6ff;
+        color: #475569;
+        font-size: 12px;
+        padding: 10px 16px;
+        border-radius: 10px;
+        margin-top: 10px;
+      }
+      .exec-table-footnote i { color: #2563eb; }
     `;
     document.head.appendChild(style);
   }
@@ -438,7 +484,10 @@ function renderExecutive1(filteredData, rawData) {
   let html = `
     <div class="exec-section-title">YTD Overview<span>ภาพรวมยอดขายสะสม</span></div>
     ${kpiHtml}
-    <div class="exec-section-title">Monthly Breakdown<span>รายละเอียดรายเดือน</span></div>
+    <div class="exec-section-title-row">
+      <span class="exec-section-icon"><i class="fas fa-chart-column"></i></span>
+      <div class="exec-section-title exec-section-title-lg">Monthly Breakdown<span>รายละเอียดรายเดือน</span></div>
+    </div>
     <div class="exec-legend">
       <span class="exec-legend-item"><span class="exec-legend-dot" style="background:#ea580c;"></span>Sales performance (Revenue, Orders, AOV)</span>
       <span class="exec-legend-item"><span class="exec-legend-dot" style="background:#0369a1;"></span>Customer base (Unique Buyers, Frequency, SPH)</span>
@@ -502,5 +551,6 @@ function renderExecutive1(filteredData, rawData) {
   html += channelStatusRow;
 
   html += `</tbody></table></div>`;
+  html += `<div class="exec-table-footnote"><i class="fas fa-circle-info"></i> หมายเหตุ: ตัวเลขทั้งหมดเป็นผลรวมในแต่ละเดือน ยอดรวมทั้งปีอาจมีความคลาดเคลื่อนจากการปัดเศษ</div>`;
   container.innerHTML = html;
 }
