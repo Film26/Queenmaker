@@ -164,19 +164,22 @@
             <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title" id="title-ytd-sales">ยอดขาย YTD (บาท)</div></div>
               <div class="kpi-val" id="val-ytd-sales">฿0</div>
-              <div><span class="kpi-change-new neutral" id="change-ytd-sales" style="display:none;">-</span></div>
+              <div><span class="kpi-change-new neutral" id="change-ytd-sales">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ytd-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
             </div>
-            
+
             <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title">Total Customer (คน)</div></div>
               <div class="kpi-val" id="val-total-cust">0</div>
               <div><span class="kpi-change-new neutral" id="change-total-cust">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-total-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
             </div>
-            
+
             <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title">YTD New Customers (คน)</div></div>
               <div class="kpi-val" id="val-ytd-new">0</div>
-              <div><span class="kpi-change-new neutral" id="change-ytd-new" style="display:none;">-</span></div>
+              <div><span class="kpi-change-new neutral" id="change-ytd-new">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ytd-new" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
             </div>
 
             <div class="kpi-card grid-span-1">
@@ -589,28 +592,6 @@
       if (change > 0) { el.className = 'kpi-change-new up kpi-target-badge'; icon += '<i class="fas fa-arrow-up"></i> '; }
       else if (change < 0) { el.className = 'kpi-change-new down kpi-target-badge'; icon += '<i class="fas fa-arrow-down"></i> '; }
       else { el.className = 'kpi-change-new neutral kpi-target-badge'; }
-      el.innerHTML = icon + pct;
-    }
-
-    // เหมือน updateKpiTargetUI ด้านบน (เทียบกับเป้าหมายจากหน้า KPI Setting + ใส่ป้าย "KPI") แต่ไม่ใส่
-    // class kpi-target-badge เพราะการ์ด YTD Sales/Total Customer/YTD New ทั้ง 3 นี้มี element เดียว
-    // แสดงอยู่ในตำแหน่งปกติของการ์ดอยู่แล้ว ไม่ได้ปักเป็น badge ซ้อนมุมล่างขวาแบบการ์ดอื่น
-    function updateKpiCompareUI(elId, current, target) {
-      const el = document.getElementById(elId);
-      if (!el) return;
-      const kpiLabel = '<span style="font-size:9px; font-weight:800; letter-spacing:0.5px;">KPI</span> ';
-      if (!target || target === 0) {
-        el.innerHTML = kpiLabel + '-';
-        el.className = 'kpi-change-new neutral';
-        return;
-      }
-      const change = (current - target) / target;
-      const pct = formatPercent(change);
-
-      let icon = kpiLabel;
-      if (change > 0) { el.className = 'kpi-change-new up'; icon += '<i class="fas fa-arrow-up"></i> '; }
-      else if (change < 0) { el.className = 'kpi-change-new down'; icon += '<i class="fas fa-arrow-down"></i> '; }
-      else { el.className = 'kpi-change-new neutral'; }
       el.innerHTML = icon + pct;
     }
 
@@ -1231,27 +1212,18 @@
       updateChangeUI('change-repeat', repeat, prevRepeat);
 
       // ==========================================
-      // 💡 โลจิกควบคุมบรรทัดเปรียบเทียบเปอร์เซ็นต์ (KPI Compare Switch) - ของเดิม ไม่แตะต้อง
+      // 💡 บรรทัดเปรียบเทียบ % กับเดือนก่อนหน้า (MoM) - เหมือนการ์ดอื่นๆ ด้านล่าง แสดงตลอดเวลา
+      // ไม่ผูกกับปุ่ม KPI Compare อีกต่อไป (ของเดิมสลับความหมาย MoM/KPI บน element เดียวกัน ทำให้
+      // กด KPI แล้วข้อมูล MoM หาย - ตอนนี้แยก badge กด KPI ต่างหาก ดูส่วน kpiTargetList ด้านล่าง)
       // ==========================================
-      const changeYTDSalesEl = document.getElementById('change-ytd-sales');
-      const changeTotalCustEl = document.getElementById('change-total-cust');
-      const changeYTDNewEl = document.getElementById('change-ytd-new');
-
-      if (filters.KPI === 'On') {
-        changeYTDSalesEl.style.display = 'inline-flex';
-        changeYTDNewEl.style.display = 'inline-flex';
-        updateKpiCompareUI('change-ytd-sales', ytdSales, window.kpiSettingsData.salesYTD);
-        updateKpiCompareUI('change-total-cust', totalCust, window.kpiSettingsData.totalCust);
-        updateKpiCompareUI('change-ytd-new', ytdNew, window.kpiSettingsData.newCustYTD);
-      } else {
-        changeYTDSalesEl.style.display = 'none';
-        changeYTDNewEl.style.display = 'none';
-        updateChangeUI('change-total-cust', totalCust, prev ? totalEverPrev.size : 0);
-      }
+      const prevYtdSales = prev ? (ytdSales - curr.sales) : 0;
+      const prevYtdNew = prev ? (ytdNew - newCount) : 0;
+      updateChangeUI('change-ytd-sales', ytdSales, prevYtdSales);
+      updateChangeUI('change-total-cust', totalCust, prev ? totalEverPrev.size : 0);
+      updateChangeUI('change-ytd-new', ytdNew, prevYtdNew);
 
       // ==========================================
-      // 🎯 การ์ดที่ยังไม่มี % เทียบ KPI (AOV, ยอดขายรายเดือน, Active/New/Retained Customer, SPH, Repeat Purchase)
-      // เพิ่ม badge ใหม่แยกต่างหาก (kpi-target-*) ไว้ข้างของเดิม ควบคุมด้วยปุ่ม KPI Compare เดียวกัน
+      // 🎯 badge เทียบเป้าหมาย KPI Setting (มุมล่างขวาของกรอบการ์ด) ควบคุมด้วยปุ่ม KPI Compare
       // ไม่ยุ่งกับ change-* ตัวเดิมที่โชว์ % เทียบเดือนก่อนหน้าอยู่แล้วด้านบน
       // ==========================================
       const monthIdx = parseInt(monthPart, 10) - 1; // 0 = Jan ... 11 = Dec ตรงกับ index ในอาร์เรย์ 12 เดือนของ KPI Setting
@@ -1263,6 +1235,9 @@
 
       // elId ของ badge ใหม่, ค่าจริง, เป้าหมายจาก KPI Setting
       const kpiTargetList = [
+        ['kpi-target-ytd-sales', ytdSales, kpiData.salesYTD || 0],
+        ['kpi-target-total-cust', totalCust, kpiData.totalCust || 0],
+        ['kpi-target-ytd-new', ytdNew, kpiData.newCustYTD || 0],
         ['kpi-target-aov', aov, kpiData.aov || 0],
         ['kpi-target-sales', curr.sales, kpiAt(kMonthlySales, monthIdx)],
         ['kpi-target-active-cust', activeCustThisMonth, kpiAt(kMonthlyNew, monthIdx) + kpiAt(kMonthlyOld, monthIdx)],
