@@ -160,6 +160,10 @@
           <button id="clearFiltersBtn" class="clear-filters-btn" onclick="clearFilters()">Clear Filters</button>
         </div>
         <div id="view-overview">
+          <div id="overview-empty-state" style="display:none; text-align:center; padding:60px 20px; color:#999; font-size:15px; background:#fff; border-radius:16px; margin-bottom:25px;">
+            <i class="fas fa-inbox" style="font-size:32px; display:block; margin-bottom:12px; color:#ccc;"></i>
+            ไม่พบข้อมูลตามเงื่อนไข Filter ที่เลือก กรุณาปรับ Filter หรือตรวจสอบข้อมูลที่ Import เข้ามา
+          </div>
           <div class="cards-grid">
             <div class="kpi-card grid-span-1">
               <div class="kpi-header"><div class="kpi-title" id="title-ytd-sales">ยอดขาย YTD (บาท)</div></div>
@@ -1060,10 +1064,21 @@
       }
     }
 
+    // เปิด/ปิดข้อความ "ไม่พบข้อมูล" ในหน้า Overview และซ่อน/แสดงการ์ด+กราฟตามสถานะข้อมูลที่ผ่าน Filter
+    function setOverviewEmptyState(isEmpty) {
+      const banner = document.getElementById('overview-empty-state');
+      const cardsGrid = document.querySelector('#view-overview .cards-grid');
+      const chartsGrid = document.querySelector('#view-overview .charts-grid');
+      if (banner) banner.style.display = isEmpty ? 'block' : 'none';
+      if (cardsGrid) cardsGrid.style.display = isEmpty ? 'none' : '';
+      if (chartsGrid) chartsGrid.style.display = isEmpty ? 'none' : '';
+    }
+
     function processData(data) {
       monthlyData = {};
       if (!data || data.length === 0) { renderEmpty(); return; }
-      
+      setOverviewEmptyState(false);
+
       data.forEach(row => {
         if (!isSaleOrder(row)) return;
         const id = getCustomerUniqueId(row);
@@ -1102,6 +1117,7 @@
     };
 
     function renderEmpty() {
+      setOverviewEmptyState(true);
       const titleSalesEl = document.getElementById('title-sales');
       if (titleSalesEl) titleSalesEl.textContent = 'ยอดขายประจำเดือน';
       const ids = ['sales','total-cust','active-cust','ytd-sales','ytd-new','new-cust','ret-cust','aov','sph','repeat'];
@@ -1122,10 +1138,10 @@
     // ==========================================
     function renderDashboard() {
       if (availableMonths.length === 0) { renderEmpty(); return; }
-      let focalMonths = availableMonths;
-      if (filters.Month !== 'All') focalMonths = availableMonths.filter(m => m <= filters.Month);
-      if (focalMonths.length === 0) { renderEmpty(); return; }
-      const selectedMonthStr = focalMonths[focalMonths.length - 1];
+      // เลือก Month แล้วต้องมีข้อมูลจริงของเดือนนั้นเท่านั้น (ตาม Channel/SubChannel/Product/SubProduct/Admin
+      // ที่กรองอยู่ด้วย) ห้ามย้อนไปโชว์ยอดของเดือนก่อนหน้าแทน ไม่งั้นจะดูเหมือนมีข้อมูลทั้งที่เดือนที่เลือกจริงๆ ไม่มี
+      if (filters.Month !== 'All' && !monthlyData[filters.Month]) { renderEmpty(); return; }
+      const selectedMonthStr = filters.Month !== 'All' ? filters.Month : availableMonths[availableMonths.length - 1];
       const idx = availableMonths.indexOf(selectedMonthStr);
       const curr = monthlyData[selectedMonthStr];
       const prev = idx > 0 ? monthlyData[availableMonths[idx - 1]] : null;
@@ -1259,7 +1275,7 @@
       });
 
       // --- ชุดโค้ดการจัดการโครงสร้างและข้อมูลของกราฟทำงานปกติ 100% ---
-      const trendMonths = focalMonths.slice(-12);
+      const trendMonths = availableMonths.slice(0, idx + 1).slice(-12);
       const salesData = trendMonths.map(m => monthlyData[m].sales);
       const newCustArr = [], retCustArr = [];
       
