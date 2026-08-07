@@ -1,4 +1,4 @@
-// public/executive1.js
+// public/executive.js
 function renderExecutive1(filteredData, rawData) {
   const container = document.getElementById('view-executive1');
 
@@ -216,6 +216,16 @@ function renderExecutive1(filteredData, rawData) {
       .exec-table .group-growth td,
       .exec-table .row-channel-status td {
         background-color: #f5fafe !important;
+      }
+      /* แถวลำดับ 1-5 (Revenue...Frequency) พื้นเทาอ่อน / แถวลำดับ 6-12 (Spending per Head...Channel Status)
+         พื้นเข้มขึ้น ตามที่พี่มาร์ทคอมเมนต์ไว้ - ต้องอยู่หลัง .group-* ด้านบนเพื่อให้ชนะ (source order, !important เท่ากัน) */
+      .exec-table .exec-tier-light,
+      .exec-table .exec-tier-light td {
+        background-color: #f1f5f9 !important;
+      }
+      .exec-table .exec-tier-dark,
+      .exec-table .exec-tier-dark td {
+        background-color: #e2e8f0 !important;
       }
       .channel-status-badge {
         display: inline-flex;
@@ -488,12 +498,6 @@ function renderExecutive1(filteredData, rawData) {
       <span class="exec-section-icon"><i class="fas fa-chart-column"></i></span>
       <div class="exec-section-title exec-section-title-lg">Monthly Breakdown<span>รายละเอียดรายเดือน</span></div>
     </div>
-    <div class="exec-legend">
-      <span class="exec-legend-item"><span class="exec-legend-dot" style="background:#ea580c;"></span>Sales performance (Revenue, Orders, AOV)</span>
-      <span class="exec-legend-item"><span class="exec-legend-dot" style="background:#0369a1;"></span>Customer base (Unique Buyers, Frequency, SPH)</span>
-      <span class="exec-legend-item"><span class="exec-legend-dot" style="background:#166534;"></span>New vs. Retained mix (Retained, New, % New Share)</span>
-      <span class="exec-legend-item"><span class="exec-legend-dot" style="background:#7e22ce;"></span>Growth / migration (New to Sub, % Migration Rate)</span>
-    </div>
     <div class="exec-table-wrapper">
       <table class="exec-table">
       <thead>
@@ -518,17 +522,27 @@ function renderExecutive1(filteredData, rawData) {
     rowHtml += `<td class="col-total">${displayStrT}</td></tr>`;
     return rowHtml;
   };
-  html += renderRow('Revenue<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดขาย </span>', revArr, true, false, false, 'group-sales');
-  html += renderRow('Orders<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ออเดอร์</span>', ordArr, true, false, false, 'group-sales');
-  html += renderRow('AOV (Average Order Value)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดต่อบิลเฉลี่ย </span>', aovArr, true, false, false, 'group-sales');
-  html += renderRow('Unique Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนซื้อจริง</span>', ubArr, true, false, false, 'group-customer');
-  html += renderRow('Frequency<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ความถี่ซื้อ </span>', freqArr, false, true, false, 'group-customer');
-  html += renderRow('Spending per Head<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">เฉลี่ยต่อคน </span>', sphArr, true, false, false, 'group-customer');
-  html += renderRow('Retained Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนเก่าซื้อซ้ำ </span>', retArr, true, false, false, 'group-mix');
-  html += renderRow('New Customers (Global)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่ (Global)</span>', newGArr, true, false, false, 'group-mix');
-  html += renderRow('% New Customer Share<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สัดส่วนลูกค้าใหม่</span>', newGShrArr, false, false, true, 'group-mix');
-  html += renderRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', migArr, true, false, false, 'group-growth');
-  html += renderRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', migRtArr, false, false, true, 'group-growth');
+  // แถวลำดับ 1-5 (Revenue...Frequency) = โทนพื้นเทาอ่อน, ลำดับ 6-12 (Spending per Head...Channel Status)
+  // = โทนพื้นเข้มขึ้น ตามที่พี่มาร์ทคอมเมนต์ไว้ในสลิปประชุม (ดู .exec-tier-light / .exec-tier-dark ด้านบน)
+  html += renderRow('Revenue<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดขาย </span>', revArr, true, false, false, 'group-sales exec-tier-light');
+  html += renderRow('Orders<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ออเดอร์</span>', ordArr, true, false, false, 'group-sales exec-tier-light');
+  html += renderRow('AOV (Average Order Value)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดต่อบิลเฉลี่ย </span>', aovArr, true, false, false, 'group-sales exec-tier-light');
+  html += renderRow('Unique Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนซื้อจริง</span>', ubArr, true, false, false, 'group-customer exec-tier-light');
+  html += renderRow('Frequency<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ความถี่ซื้อ </span>', freqArr, false, true, false, 'group-customer exec-tier-light');
+  html += renderRow('Spending per Head<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">เฉลี่ยต่อคน </span>', sphArr, true, false, false, 'group-customer exec-tier-dark');
+  html += renderRow('Retained Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนเก่าซื้อซ้ำ </span>', retArr, true, false, false, 'group-mix exec-tier-dark');
+  html += renderRow('New Customers (Global)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่ (Global)</span>', newGArr, true, false, false, 'group-mix exec-tier-dark');
+  html += renderRow('% New Customer Share<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สัดส่วนลูกค้าใหม่</span>', newGShrArr, false, false, true, 'group-mix exec-tier-dark');
+
+  // แถว New to Sub (Migration) / % Migration Rate / Channel Status พูดถึงการ "ย้าย" ระหว่าง Sub Channel
+  // โดยตรง - ที่ระดับ "รวมทุก Sub Channel" (SubChannel filter = All) ตัวเลขนี้ไม่มีความหมายที่ใช้งานได้จริง
+  // (เหมือน executive2.js ที่วิเคราะห์ Migration แยกทีละ Sub Channel เท่านั้น) จึงโชว์แถวนี้เฉพาะตอนที่ผู้ใช้
+  // เลือก Filter Sub Channel เจาะจงแล้วเท่านั้น ตามที่พี่มาร์ทคอมเมนต์ไว้ในสลิปประชุม
+  const isSubChannelScoped = window.filters && window.filters.SubChannel !== 'All';
+  if (isSubChannelScoped) {
+    html += renderRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', migArr, true, false, false, 'group-growth exec-tier-dark');
+    html += renderRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', migRtArr, false, false, true, 'group-growth exec-tier-dark');
+  }
 
   // Channel Status: classify each month (and Total Year) using the same Vanguard / Migration /
   // Retention / Cash Cow thresholds as executive2.js's Strategic Meaning table, applied to the
@@ -544,11 +558,13 @@ function renderExecutive1(filteredData, rawData) {
     const { label, dot } = classifyChannelStatus(newGShrArr[idx] * 100, migRtArr[idx] * 100);
     return `<td><span class="channel-status-badge"><span class="channel-status-dot ${dot}"></span>${label}</span></td>`;
   };
-  let channelStatusRow = `<tr class="row-channel-status"><td class="metric-label">Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span></td>`;
-  for (let m = 1; m <= 12; m++) channelStatusRow += channelStatusCell(m - 1);
-  channelStatusRow += channelStatusCell(12).replace('<td>', '<td class="col-total">');
-  channelStatusRow += '</tr>';
-  html += channelStatusRow;
+  if (isSubChannelScoped) {
+    let channelStatusRow = `<tr class="row-channel-status exec-tier-dark"><td class="metric-label">Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span></td>`;
+    for (let m = 1; m <= 12; m++) channelStatusRow += channelStatusCell(m - 1);
+    channelStatusRow += channelStatusCell(12).replace('<td>', '<td class="col-total">');
+    channelStatusRow += '</tr>';
+    html += channelStatusRow;
+  }
 
   html += `</tbody></table></div>`;
   html += `<div class="exec-table-footnote"><i class="fas fa-circle-info"></i> หมายเหตุ: ตัวเลขทั้งหมดเป็นผลรวมในแต่ละเดือน ยอดรวมทั้งปีอาจมีความคลาดเคลื่อนจากการปัดเศษ</div>`;
