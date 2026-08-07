@@ -678,8 +678,13 @@
       if (!row) return false;
       // [CLEANSED] ไฟล์ที่ผ่าน Data cleansing มีคอลัมน์ Order type (ผลจากชีต Config_OrderType_Map) มาแล้ว
       // -> ยึดค่าจากชีตเป็นหลัก: นับเฉพาะ SALE (Other/ของขวัญวันเกิด/ของขวัญปีใหม่/เคลม ไม่นับเป็นยอดขาย)
-      if (row['Order type'] !== undefined || row['OrderType'] !== undefined) {
-        const ot = ((row['Order type'] !== undefined ? row['Order type'] : row['OrderType']) || '').toString().trim();
+      // หมายเหตุ: บางไฟล์ (เช่นไฟล์ export รุ่นเก่าที่ยังไม่ผ่าน cleansing) มีคอลัมน์ "Order type" อยู่ในหัวตาราง
+      // แต่ค่าว่างเปล่าทุกแถว - ถ้ายึดแค่ว่า "มีคอลัมน์นี้ไหม" แล้วเจอค่าว่าง จะถูกตีเป็น "ไม่ใช่ยอดขาย" หมดทั้งไฟล์
+      // (import แล้วเห็นข้อมูลเป็น 0 ทั้งที่ไฟล์มีข้อมูลจริง) -> ต้องเช็คว่าค่าใน "แถวนั้น" ไม่ว่างด้วย ถึงจะเชื่อคอลัมน์นี้
+      // ถ้าว่าง ให้ตกไปใช้กติกาแบบเดิม (เดา non-sale จาก Remark + revenue > 0) แทน
+      const otRaw = row['Order type'] !== undefined ? row['Order type'] : row['OrderType'];
+      const ot = (otRaw || '').toString().trim();
+      if (ot) {
         return ot.toUpperCase() === 'SALE';
       }
       const remark = getRowValue(row, ['หมายเหตุ', 'Remark']);
