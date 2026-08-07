@@ -1,4 +1,4 @@
-// public/executive2.js
+// public/Migration.js
 
 function renderExecutive2(filteredData, rawData) {
   const container = document.getElementById('view-executive2');
@@ -38,7 +38,7 @@ function renderExecutive2(filteredData, rawData) {
 
       .exec2-table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
       .exec2-table-header h3 { margin: 0; font-size: 16px; color: #222; }
-      .month-label { font-size: 14px; font-weight: 700; color: #d95f1d; }
+      .month-label { font-size: 14px; font-weight: 700; color: #1e293b; }
       .exec2-definitions {
         font-size: 11.5px; color: #6b7280; line-height: 1.6; margin-bottom: 15px;
         background: #fafafa; border: 1px solid #f0f0f0; border-radius: 8px; padding: 8px 14px;
