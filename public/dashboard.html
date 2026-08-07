@@ -92,8 +92,8 @@
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-kpisetting" onclick="event.preventDefault(); switchTab('kpisetting')"><i class="fas fa-chart-line"></i>KPI SETTING</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-settings" onclick="event.preventDefault(); switchTab('settings')"><i class="fas fa-cog"></i>SETTINGS</a></li>
-        <li class="nav-item" style="margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);">
-          <div style="display:flex; align-items:center; justify-content:center; gap:6px; padding: 4px 20px 0; font-size:11px; font-weight:600; letter-spacing:0.4px; color: #94a3b8;">
+        <li class="nav-item" style="margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+          <div style="display:flex; align-items:center; justify-content:center; gap:6px; padding: 4px 20px 0; font-size:11px; font-weight:600; letter-spacing:0.4px; color: var(--text-muted);">
             <i class="fas fa-crown" style="font-size:10px;"></i> Powered by Queenmaker
           </div>
         </li>
@@ -125,7 +125,7 @@
         
         <div class="tabs-container">
           <button id="tab-overview" class="tab-btn active" onclick="switchTab('overview')">Overview</button>
-          <button id="tab-executive1" class="tab-btn" onclick="switchTab('executive1')">Executive</button>
+          <button id="tab-executive1" class="tab-btn" onclick="switchTab('executive1')">Executive1</button>
           <button id="tab-executive2" class="tab-btn" onclick="switchTab('executive2')">Migration</button>
           <button id="tab-retention" class="tab-btn" onclick="switchTab('retention')">Retention</button>
           <button id="tab-cohort" class="tab-btn" onclick="switchTab('cohort')">Cohort Heatmap</button>
@@ -485,9 +485,6 @@
 
     // --- Navigation & UI Control ---
     function switchTab(tabId) {
-      // ต้องตั้งก่อนสิ่งอื่นใด - isExecutiveFilterScope() (ใช้ตัดสินใจว่าจะโชว์ตัวเลือก "All" ใน Filter
-      // dropdown หรือไม่) อ่านค่านี้ตอนสร้างเมนู ถ้าตั้งช้าไปเมนูจะยังอิงแท็บเก่าอยู่
-      window.currentTabId = tabId;
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.view-content').forEach(view => view.style.display = 'none');
       document.getElementById('view-overview').style.display = 'none';
@@ -536,11 +533,7 @@
         if (tabsContainer) tabsContainer.style.display = 'flex';
         const filtersBar = document.querySelector('.filters-bar');
         if (filtersBar) filtersBar.style.display = 'flex';
-
-        // สร้างเมนู Filter ใหม่ทุกครั้งที่สลับแท็บ เพราะตัวเลือก "All" จะโชว์หรือไม่ขึ้นกับแท็บที่เลือกอยู่
-        // (ดู isExecutiveFilterScope) - ทำก่อนเช็ค tabId ด้านล่าง เพื่อให้ทุกแท็บได้เมนูที่ตรงกับตัวเองเสมอ
-        if (rawData.length > 0) populateDropdowns();
-
+        
         if (tabId === 'overview') {
           document.getElementById('tab-overview').classList.add('active');
           document.getElementById('view-overview').style.display = 'block';
@@ -551,8 +544,6 @@
         } else if (tabId === 'executive1') {
           document.getElementById('tab-executive1').classList.add('active');
           document.getElementById('view-executive1').style.display = 'block';
-          // หน้า Executive ห้ามเหลือตัวกรองไหนเป็น All - ถ้ามีให้เลือกค่าจริงตัวแรกที่มีให้อัตโนมัติ
-          if (rawData.length > 0 && enforceExecutiveFilters()) { applyFilters(); }
           if (typeof renderExecutive1 === 'function') { renderExecutive1(filteredData, rawData); }
         } else if (tabId === 'executive2') {
           document.getElementById('tab-executive2').classList.add('active');
@@ -891,55 +882,6 @@
       return FALLBACK_OPTION_LISTS[type] || [];
     }
 
-    // หน้า Executive ต้องเลือกตัวกรองที่เจาะจงเสมอ (ห้ามเป็น All) ตามที่พี่มาร์ทคอมเมนต์ไว้ - ใช้เช็คสถานะนี้
-    // ตอนสร้างเมนู dropdown ของทั้ง Year/Month/Channel/SubChannel/Product/SubProduct/Admin เพื่อไม่ให้มีตัวเลือก
-    // "All" ให้กดตอนอยู่หน้านี้ (แท็บอื่นยังมี All ตามปกติ) ดู enforceExecutiveFilters() ด้านล่างที่บังคับเลือกค่าจริงให้ด้วย
-    function isExecutiveFilterScope() { return window.currentTabId === 'executive1'; }
-
-    // ถ้ามีตัวกรองตัวไหนยังเป็น All อยู่ตอนเข้าหน้า Executive ให้เลือกค่าจริงตัวแรกที่มีให้อัตโนมัติ
-    // (คืนค่า true ถ้ามีการเปลี่ยนค่า - ผู้เรียกต้องเรียก applyFilters() เองต่อเพื่อ re-render)
-    function enforceExecutiveFilters() {
-      let changed = false;
-
-      const yearsSet = new Set();
-      rawData.forEach(row => {
-        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
-        if (!dateStr) return;
-        const d = parseDate(dateStr);
-        if (d) yearsSet.add(d.y.toString());
-      });
-      const sortedYears = Array.from(yearsSet).sort();
-      if (filters.Year === 'All' && sortedYears.length > 0) { filters.Year = sortedYears[0]; changed = true; }
-
-      const monthsSet = new Set();
-      rawData.forEach(row => {
-        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
-        if (!dateStr) return;
-        const d = parseDate(dateStr);
-        if (d && d.y.toString() === filters.Year) monthsSet.add(d.str);
-      });
-      const sortedMonths = Array.from(monthsSet).sort().reverse();
-      if (filters.Month === 'All' && sortedMonths.length > 0) { filters.Month = sortedMonths[0]; changed = true; }
-
-      OPTION_FILTER_TYPES.forEach(type => {
-        if (filters[type] === 'All') {
-          const options = getConfigOptionList(type);
-          if (options.length > 0) { filters[type] = options[0]; changed = true; }
-        }
-      });
-
-      if (changed) {
-        ['Year', 'Month', ...OPTION_FILTER_TYPES].forEach(type => {
-          const lbl = document.getElementById('lbl-' + type);
-          if (lbl) lbl.textContent = filters[type];
-          const btn = document.getElementById('btn-' + type);
-          if (btn) btn.classList.toggle('active', filters[type] !== 'All');
-        });
-      }
-
-      return changed;
-    }
-
     // สร้างเมนู Dropdown ของ Channel/SubChannel/Product/SubProduct/Admin ใหม่จาก window.AppData.config
     // (ไม่แตะ Year/Month) ถ้า filter ที่เลือกค้างไว้ถูกลบ/ปิดใช้งานไปแล้ว จะรีเซ็ตกลับเป็น 'All' ให้อัตโนมัติ
     // หมายเหตุ: ฟังก์ชันนี้ไม่เรียก applyFilters() เอง เพื่อกันการเรียกซ้อนกันเป็น infinite loop
@@ -947,12 +889,11 @@
     // ต้องเรียก applyFilters() เองอีกทีหลังจากนี้ (ดู appDataChanged listener ด้านล่าง)
     function refreshOptionDropdownsFromConfig() {
       let needReapply = false;
-      const allowAll = !isExecutiveFilterScope();
       OPTION_FILTER_TYPES.forEach(type => {
         const menu = document.getElementById('menu-' + type);
         if (!menu) return;
         const options = getConfigOptionList(type);
-        menu.innerHTML = allowAll ? `<div onclick="setFilter('${type}', 'All')">All</div>` : '';
+        menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
         options.forEach(val => {
           menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
         });
@@ -982,7 +923,6 @@
       if (!e || !e.detail) return;
       if (e.detail.type === 'config') {
         refreshOptionDropdownsFromConfig();
-        if (isExecutiveFilterScope()) enforceExecutiveFilters();
         applyFilters();
       }
       // e.detail.type === 'users': ยังไม่มี UI ในหน้า Dashboard ที่ผูกกับ User Management โดยตรง
@@ -1001,7 +941,7 @@
       });
       const yearMenu = document.getElementById('menu-Year');
       if (yearMenu) {
-        yearMenu.innerHTML = isExecutiveFilterScope() ? '' : `<div onclick="setFilter('Year', 'All')">All</div>`;
+        yearMenu.innerHTML = `<div onclick="setFilter('Year', 'All')">All</div>`;
         Array.from(yearsSet).sort().forEach(val => {
           yearMenu.innerHTML += `<div onclick="setFilter('Year', '${val}')">${val}</div>`;
         });
@@ -1022,19 +962,17 @@
       });
       const monthMenu = document.getElementById('menu-Month');
       if (monthMenu) {
-        monthMenu.innerHTML = isExecutiveFilterScope() ? '' : `<div onclick="setFilter('Month', 'All')">All</div>`;
+        monthMenu.innerHTML = `<div onclick="setFilter('Month', 'All')">All</div>`;
         Array.from(monthsSet).sort().reverse().forEach(val => {
           monthMenu.innerHTML += `<div onclick="setFilter('Month', '${val}')">${val}</div>`;
         });
       }
       if (filters.Month !== 'All' && !monthsSet.has(filters.Month)) {
-        // หน้า Executive ห้ามเหลือ All ค้างไว้ - ถ้าเดือนที่เลือกไว้ใช้กับปีใหม่ไม่ได้ ให้เลือกเดือนแรกที่มีแทน
-        const sortedMonths = Array.from(monthsSet).sort().reverse();
-        filters.Month = (isExecutiveFilterScope() && sortedMonths.length > 0) ? sortedMonths[0] : 'All';
+        filters.Month = 'All';
         const lbl = document.getElementById('lbl-Month');
-        if (lbl) lbl.textContent = filters.Month;
+        if (lbl) lbl.textContent = 'All';
         const btn = document.getElementById('btn-Month');
-        if (btn) btn.classList.toggle('active', filters.Month !== 'All');
+        if (btn) btn.classList.remove('active');
       }
     }
 
@@ -1086,12 +1024,6 @@
         document.getElementById('clearFilterBtn').style.display = 'none';
       }
       populateMonthMenu('All');
-      // หน้า Executive ห้ามเหลือ All ค้างไว้แม้กดปุ่ม Clear Filters - เลือกค่าจริงตัวแรกให้อัตโนมัติเหมือนตอนสลับแท็บเข้ามา
-      // แล้วสร้างเมนู Month ใหม่อีกทีให้ตรงกับปีที่เพิ่งถูกเลือกอัตโนมัติ (เมื่อกี้สร้างแบบไม่กรองปีไปก่อน)
-      if (isExecutiveFilterScope()) {
-        enforceExecutiveFilters();
-        populateMonthMenu(filters.Year);
-      }
       applyFilters();
     }
 
