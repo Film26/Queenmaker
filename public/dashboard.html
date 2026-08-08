@@ -165,12 +165,16 @@
           <button id="clearFiltersBtn" class="clear-filters-btn" onclick="clearFilters()">Clear Filters</button>
         </div>
         <!-- Filter ของหน้า Executive แยกต่างหากจาก .filters-bar ด้านบนโดยสิ้นเชิง (คนละ state คนละ element)
-             ไม่มีตัวเลือก "All" - ต้องเลือกค่าจริงทั้ง 4 ตัวเสมอ (Year/Channel/SubChannel/Admin)
-             ไม่มี Month/Product/Sub Product แล้ว (เอาออกจากหน้านี้ตามที่ตกลงกันไว้) ดู execFilters/setExecFilter ในสคริปต์ด้านล่าง -->
+             ไม่มีตัวเลือก "All" - ต้องเลือกค่าจริงทั้ง 7 ตัวเสมอ (Year/Month/Channel/SubChannel/Product/SubProduct/Admin)
+             ดู execFilters/setExecFilter ในสคริปต์ด้านล่าง -->
         <div class="filters-bar" id="execFiltersBar" style="display:none;">
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Exec-Year" onclick="toggleFilter('menu-Exec-Year')">Year: <span id="lbl-Exec-Year">-</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Exec-Year" class="filter-content"></div>
+          </div>
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-Exec-Month" onclick="toggleFilter('menu-Exec-Month')">Month: <span id="lbl-Exec-Month">-</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-Exec-Month" class="filter-content"></div>
           </div>
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Exec-Channel" onclick="toggleFilter('menu-Exec-Channel')">Channel: <span id="lbl-Exec-Channel">-</span> <i class="fas fa-caret-down"></i></button>
@@ -179,6 +183,14 @@
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Exec-SubChannel" onclick="toggleFilter('menu-Exec-SubChannel')">SubChannel: <span id="lbl-Exec-SubChannel">-</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Exec-SubChannel" class="filter-content"></div>
+          </div>
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-Exec-Product" onclick="toggleFilter('menu-Exec-Product')">Product: <span id="lbl-Exec-Product">-</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-Exec-Product" class="filter-content"></div>
+          </div>
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-Exec-SubProduct" onclick="toggleFilter('menu-Exec-SubProduct')">Sub Product: <span id="lbl-Exec-SubProduct">-</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-Exec-SubProduct" class="filter-content"></div>
           </div>
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Exec-Admin" onclick="toggleFilter('menu-Exec-Admin')">Admin: <span id="lbl-Exec-Admin">-</span> <i class="fas fa-caret-down"></i></button>
@@ -947,18 +959,21 @@
     // ==========================================================================
     // หน้า Executive: Filter ชุดแยกต่างหาก (execFilters) - คนละ state คนละ dropdown กับ filters ด้านบน
     // ที่ใช้ร่วมกันในหน้า Overview/Cohort/Migration/Retention โดยสิ้นเชิง ไม่มีตัวเลือก "All" เลย
-    // ต้องเลือกค่าจริงครบทั้ง 4 ตัว (Year/Channel/SubChannel/Admin) เสมอ - ไม่มี Month/Product/Sub Product
-    // แล้ว (เอาออกจากหน้านี้) Product/SubProduct เลย fix เป็น 'All' ตายตัวเพราะ computeFilteredData ยังใช้เช็คอยู่
+    // ต้องเลือกค่าจริงครบทั้ง 7 ตัว (Year/Month/Channel/SubChannel/Product/SubProduct/Admin) เสมอ
     // ถ้ายังไม่เคยเลือก จะตั้งค่าเริ่มต้นเป็นตัวเลือกล่าสุด/ตัวแรกที่มีให้อัตโนมัติ
     //
     // execFiltersTouched: แยกจาก execFilters เอง - ใช้ตามว่าผู้ใช้ "กดเลือกเอง" (ผ่าน setExecFilter) แล้วหรือยัง
     // ต่างจากค่าที่ auto-select ให้ตอนเปิดหน้าครั้งแรก ใช้คุมว่าแถว 13-15 (Migration group) ในตาราง CRM Report
-    // จะโชว์ข้อมูลจริงเมื่อไหร่ (ต่อเมื่อกดเลือกเองครบทั้ง 4 ตัวแล้วเท่านั้น) ดู renderExecutive1 ใน executive.js
+    // จะโชว์ข้อมูลจริงเมื่อไหร่ (ต่อเมื่อกดเลือก Year/Channel/SubChannel/Admin เองครบแล้วเท่านั้น) ดู renderExecutive1 ใน executive.js
     // ==========================================================================
-    let execFilters = { Year: '', Channel: '', SubChannel: '', Admin: '', Product: 'All', SubProduct: 'All' };
+    let execFilters = { Year: '', Month: '', Channel: '', SubChannel: '', Product: '', SubProduct: '', Admin: '' };
     window.execFilters = execFilters;
-    const EXEC_OPTION_FILTER_TYPES = ['Channel', 'SubChannel', 'Admin'];
-    let execFiltersTouched = { Year: false, Channel: false, SubChannel: false, Admin: false };
+    const EXEC_OPTION_FILTER_TYPES = ['Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'];
+    // หมายเหตุ: มีทุกคีย์ของ execFilters ยกเว้น Month (Month reset ตาม Year เสมออยู่แล้วโดยไม่ต้องพึ่ง touched
+    // ดู populateExecMonthMenu) แถว 13-15 ใน executive.js เช็คแค่ Year/Channel/SubChannel/Admin เท่านั้น
+    // ส่วน Product/SubProduct เก็บ touched ไว้เพื่อกันไม่ให้ค่าที่ผู้ใช้เลือกเองโดนรีเซ็ตทิ้งตอนเปลี่ยน Year
+    // (ดู setExecFilter: EXEC_OPTION_FILTER_TYPES.forEach reset เฉพาะตัวที่ยัง !touched)
+    let execFiltersTouched = { Year: false, Channel: false, SubChannel: false, Product: false, SubProduct: false, Admin: false };
     window.execFiltersTouched = execFiltersTouched;
 
     function populateExecYearMenu() {
@@ -979,13 +994,33 @@
       if (lbl) lbl.textContent = execFilters.Year || '-';
     }
 
-    // เช็คว่า Channel/SubChannel/Admin ตัวไหนใน options (จาก Settings config) "มีข้อมูลจริง" อยู่ในปีที่กำลัง
-    // เลือก (execFilters.Year) บ้าง - ใช้เลือกค่า default ให้ตอน auto-select แทนการหยิบ options[0] เฉยๆ
-    // เพราะถ้า config เรียง option แรกเป็นค่าที่ไม่มีข้อมูลขายจริงเลย ตาราง CRM Report จะว่างเปล่าทั้งที่ปีนั้น
+    function populateExecMonthMenu() {
+      const monthsSet = new Set();
+      rawData.forEach(row => {
+        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
+        if (!dateStr) return;
+        const d = parseDate(dateStr);
+        if (d && d.y.toString() === execFilters.Year) monthsSet.add(d.str);
+      });
+      const sortedMonths = Array.from(monthsSet).sort().reverse();
+      if (!execFilters.Month || sortedMonths.indexOf(execFilters.Month) === -1) {
+        execFilters.Month = sortedMonths.length > 0 ? sortedMonths[0] : '';
+      }
+      const menu = document.getElementById('menu-Exec-Month');
+      if (menu) menu.innerHTML = sortedMonths.map(val => `<div onclick="setExecFilter('Month', '${val}')">${val}</div>`).join('');
+      const lbl = document.getElementById('lbl-Exec-Month');
+      if (lbl) lbl.textContent = execFilters.Month || '-';
+    }
+
+    // เช็คว่า Channel/SubChannel/Product/SubProduct/Admin ตัวไหนใน options (จาก Settings config) "มีข้อมูลจริง"
+    // อยู่ในปีที่กำลังเลือก (execFilters.Year) บ้าง - ใช้เลือกค่า default ให้ตอน auto-select แทนการหยิบ options[0]
+    // เฉยๆ เพราะถ้า config เรียง option แรกเป็นค่าที่ไม่มีข้อมูลขายจริงเลย ตาราง CRM Report จะว่างเปล่าทั้งที่ปีนั้น
     // มีข้อมูลอยู่จริง (ดู renderExecutive1: filteredData.length === 0 -> "No data available")
     const EXEC_TYPE_GETTERS = {
       Channel: (row) => getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row),
       SubChannel: (row) => getNormalizedSubChannel(row),
+      Product: (row) => getNormalizedProduct(getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set'])),
+      SubProduct: (row) => getNormalizedSubProduct(getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set'])),
       Admin: (row) => getNormalizedAdmin(row)
     };
     function pickDefaultExecOption(type, options) {
@@ -1018,8 +1053,9 @@
 
     function populateExecDropdowns() {
       populateExecYearMenu();
+      populateExecMonthMenu();
       refreshExecOptionDropdowns();
-      ['Year'].concat(EXEC_OPTION_FILTER_TYPES).forEach(type => {
+      ['Year', 'Month'].concat(EXEC_OPTION_FILTER_TYPES).forEach(type => {
         const btn = document.getElementById('btn-Exec-' + type);
         if (btn) btn.classList.toggle('active', !!execFilters[type]);
       });
@@ -1035,6 +1071,7 @@
           if (!execFiltersTouched[t]) execFilters[t] = '';
         });
         refreshExecOptionDropdowns();
+        populateExecMonthMenu();
       }
       const lbl = document.getElementById('lbl-Exec-' + type);
       if (lbl) lbl.textContent = val;
