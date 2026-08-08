@@ -130,7 +130,7 @@
           <button id="tab-retention" class="tab-btn" onclick="switchTab('retention')">Retention</button>
           <button id="tab-cohort" class="tab-btn" onclick="switchTab('cohort')">Cohort Heatmap</button>
         </div>
-        <div class="filters-bar">
+        <div class="filters-bar" id="mainFiltersBar">
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Year" onclick="toggleFilter('menu-Year')">Year: <span id="lbl-Year">All</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Year" class="filter-content"></div>
@@ -163,6 +163,38 @@
             <button class="filter-btn-new" id="btn-KPI" onclick="toggleKpiCompare()"><i class="fas fa-toggle-off" id="icon-KPI"></i> KPI Compare: <span id="lbl-KPI">Off</span></button>
           </div>
           <button id="clearFiltersBtn" class="clear-filters-btn" onclick="clearFilters()">Clear Filters</button>
+        </div>
+        <!-- Filter ของหน้า Executive แยกต่างหากจาก .filters-bar ด้านบนโดยสิ้นเชิง (คนละ state คนละ element)
+             ไม่มีตัวเลือก "All" - ต้องเลือกค่าจริงทั้ง 7 ตัวเสมอ ดู execFilters/setExecFilter ในสคริปต์ด้านล่าง -->
+        <div class="filters-bar" id="execFiltersBar" style="display:none;">
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-Exec-Year" onclick="toggleFilter('menu-Exec-Year')">Year: <span id="lbl-Exec-Year">-</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-Exec-Year" class="filter-content"></div>
+          </div>
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-Exec-Month" onclick="toggleFilter('menu-Exec-Month')">Month: <span id="lbl-Exec-Month">-</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-Exec-Month" class="filter-content"></div>
+          </div>
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-Exec-Channel" onclick="toggleFilter('menu-Exec-Channel')">Channel: <span id="lbl-Exec-Channel">-</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-Exec-Channel" class="filter-content"></div>
+          </div>
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-Exec-SubChannel" onclick="toggleFilter('menu-Exec-SubChannel')">SubChannel: <span id="lbl-Exec-SubChannel">-</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-Exec-SubChannel" class="filter-content"></div>
+          </div>
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-Exec-Product" onclick="toggleFilter('menu-Exec-Product')">Product: <span id="lbl-Exec-Product">-</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-Exec-Product" class="filter-content"></div>
+          </div>
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-Exec-SubProduct" onclick="toggleFilter('menu-Exec-SubProduct')">Sub Product: <span id="lbl-Exec-SubProduct">-</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-Exec-SubProduct" class="filter-content"></div>
+          </div>
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-Exec-Admin" onclick="toggleFilter('menu-Exec-Admin')">Admin: <span id="lbl-Exec-Admin">-</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-Exec-Admin" class="filter-content"></div>
+          </div>
         </div>
         <div id="view-overview">
           <div id="overview-empty-state" style="display:none; text-align:center; padding:60px 20px; color:#999; font-size:15px; background:#fff; border-radius:16px; margin-bottom:25px;">
@@ -497,14 +529,17 @@
       const sideSettings = document.getElementById('side-settings');
       if (sideSettings) sideSettings.classList.remove('active');
 
+      const mainFiltersBar = document.getElementById('mainFiltersBar');
+      const execFiltersBar = document.getElementById('execFiltersBar');
+
       if (tabId === 'settings') {
         if (sideSettings) sideSettings.classList.add('active');
         document.getElementById('view-settings').style.display = 'block';
 
         const tabsContainer = document.querySelector('.tabs-container');
         if (tabsContainer) tabsContainer.style.display = 'none';
-        const filtersBar = document.querySelector('.filters-bar');
-        if (filtersBar) filtersBar.style.display = 'none';
+        if (mainFiltersBar) mainFiltersBar.style.display = 'none';
+        if (execFiltersBar) execFiltersBar.style.display = 'none';
 
         if (typeof renderSettings === 'function') { renderSettings(); }
       } else if (tabId === 'insighthub') {
@@ -513,8 +548,8 @@
 
         const tabsContainer = document.querySelector('.tabs-container');
         if (tabsContainer) tabsContainer.style.display = 'none';
-        const filtersBar = document.querySelector('.filters-bar');
-        if (filtersBar) filtersBar.style.display = 'none';
+        if (mainFiltersBar) mainFiltersBar.style.display = 'none';
+        if (execFiltersBar) execFiltersBar.style.display = 'none';
 
         if (typeof renderInsightHub === 'function') { renderInsightHub(filteredData, rawData); }
       } else if (tabId === 'kpisetting') {
@@ -523,17 +558,20 @@
 
         const tabsContainer = document.querySelector('.tabs-container');
         if (tabsContainer) tabsContainer.style.display = 'none';
-        const filtersBar = document.querySelector('.filters-bar');
-        if (filtersBar) filtersBar.style.display = 'none';
+        if (mainFiltersBar) mainFiltersBar.style.display = 'none';
+        if (execFiltersBar) execFiltersBar.style.display = 'none';
 
         if (typeof renderKpiSetting === 'function') { renderKpiSetting(); }
       } else {
         document.getElementById('side-crm').classList.add('active');
         const tabsContainer = document.querySelector('.tabs-container');
         if (tabsContainer) tabsContainer.style.display = 'flex';
-        const filtersBar = document.querySelector('.filters-bar');
-        if (filtersBar) filtersBar.style.display = 'flex';
-        
+
+        // หน้า Executive ใช้ Filter แยกต่างหาก (execFiltersBar) ไม่ใช้ Filter บนสุด (mainFiltersBar) เลย
+        const isExecutiveTab = tabId === 'executive1';
+        if (mainFiltersBar) mainFiltersBar.style.display = isExecutiveTab ? 'none' : 'flex';
+        if (execFiltersBar) execFiltersBar.style.display = isExecutiveTab ? 'flex' : 'none';
+
         if (tabId === 'overview') {
           document.getElementById('tab-overview').classList.add('active');
           document.getElementById('view-overview').style.display = 'block';
@@ -544,7 +582,8 @@
         } else if (tabId === 'executive1') {
           document.getElementById('tab-executive1').classList.add('active');
           document.getElementById('view-executive1').style.display = 'block';
-          if (typeof renderExecutive1 === 'function') { renderExecutive1(filteredData, rawData); }
+          if (rawData.length > 0) populateExecDropdowns();
+          applyExecFilters();
         } else if (tabId === 'executive2') {
           document.getElementById('tab-executive2').classList.add('active');
           document.getElementById('view-executive2').style.display = 'block';
@@ -916,6 +955,94 @@
       refreshOptionDropdownsFromConfig();
     }
 
+    // ==========================================================================
+    // หน้า Executive: Filter ชุดแยกต่างหาก (execFilters) - คนละ state คนละ dropdown กับ filters ด้านบน
+    // ที่ใช้ร่วมกันในหน้า Overview/Cohort/Migration/Retention โดยสิ้นเชิง ไม่มีตัวเลือก "All" เลย
+    // ต้องเลือกค่าจริงครบทั้ง 7 ตัว (Year/Month/Channel/SubChannel/Product/SubProduct/Admin) เสมอ
+    // ตามที่พี่มาร์ทคอมเมนต์ไว้ - ถ้ายังไม่เคยเลือก จะตั้งค่าเริ่มต้นเป็นตัวเลือกล่าสุด/ตัวแรกที่มีให้อัตโนมัติ
+    // ==========================================================================
+    let execFilters = { Year: '', Month: '', Channel: '', SubChannel: '', Product: '', SubProduct: '', Admin: '' };
+    window.execFilters = execFilters;
+
+    function populateExecYearMenu() {
+      const yearsSet = new Set();
+      rawData.forEach(row => {
+        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
+        if (!dateStr) return;
+        const d = parseDate(dateStr);
+        if (d) yearsSet.add(d.y.toString());
+      });
+      const sortedYears = Array.from(yearsSet).sort();
+      if (!execFilters.Year || sortedYears.indexOf(execFilters.Year) === -1) {
+        execFilters.Year = sortedYears.length > 0 ? sortedYears[sortedYears.length - 1] : '';
+      }
+      const menu = document.getElementById('menu-Exec-Year');
+      if (menu) menu.innerHTML = sortedYears.map(val => `<div onclick="setExecFilter('Year', '${val}')">${val}</div>`).join('');
+      const lbl = document.getElementById('lbl-Exec-Year');
+      if (lbl) lbl.textContent = execFilters.Year || '-';
+    }
+
+    function populateExecMonthMenu() {
+      const monthsSet = new Set();
+      rawData.forEach(row => {
+        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
+        if (!dateStr) return;
+        const d = parseDate(dateStr);
+        if (d && d.y.toString() === execFilters.Year) monthsSet.add(d.str);
+      });
+      const sortedMonths = Array.from(monthsSet).sort().reverse();
+      if (!execFilters.Month || sortedMonths.indexOf(execFilters.Month) === -1) {
+        execFilters.Month = sortedMonths.length > 0 ? sortedMonths[0] : '';
+      }
+      const menu = document.getElementById('menu-Exec-Month');
+      if (menu) menu.innerHTML = sortedMonths.map(val => `<div onclick="setExecFilter('Month', '${val}')">${val}</div>`).join('');
+      const lbl = document.getElementById('lbl-Exec-Month');
+      if (lbl) lbl.textContent = execFilters.Month || '-';
+    }
+
+    function refreshExecOptionDropdowns() {
+      OPTION_FILTER_TYPES.forEach(type => {
+        const options = getConfigOptionList(type);
+        if (!execFilters[type] || options.indexOf(execFilters[type]) === -1) {
+          execFilters[type] = options.length > 0 ? options[0] : '';
+        }
+        const menu = document.getElementById('menu-Exec-' + type);
+        if (menu) menu.innerHTML = options.map(val => `<div onclick="setExecFilter('${type}', '${val}')">${val}</div>`).join('');
+        const lbl = document.getElementById('lbl-Exec-' + type);
+        if (lbl) lbl.textContent = execFilters[type] || '-';
+      });
+    }
+
+    function populateExecDropdowns() {
+      populateExecYearMenu();
+      populateExecMonthMenu();
+      refreshExecOptionDropdowns();
+      ['Year', 'Month'].concat(OPTION_FILTER_TYPES).forEach(type => {
+        const btn = document.getElementById('btn-Exec-' + type);
+        if (btn) btn.classList.toggle('active', !!execFilters[type]);
+      });
+    }
+
+    function setExecFilter(type, val) {
+      execFilters[type] = val;
+      const lbl = document.getElementById('lbl-Exec-' + type);
+      if (lbl) lbl.textContent = val;
+      const menu = document.getElementById('menu-Exec-' + type);
+      if (menu) menu.classList.remove('show');
+      const btn = document.getElementById('btn-Exec-' + type);
+      if (btn) btn.classList.add('active');
+
+      if (type === 'Year') populateExecMonthMenu();
+
+      applyExecFilters();
+    }
+    window.setExecFilter = setExecFilter;
+
+    function applyExecFilters() {
+      const execFilteredData = computeFilteredData(execFilters);
+      if (typeof renderExecutive1 === 'function') { renderExecutive1(execFilteredData, rawData); }
+    }
+
     // อัปเดตแบบเรียลไทม์: หน้า Settings ยิง 'appDataChanged' ทุกครั้งที่ เพิ่ม/แก้ไข/ลบ/เปลี่ยนสถานะ
     // ข้อมูลตัวเลือก (Channel/SubChannel/Product/SubProduct/Admin) สำเร็จ -> รีเฟรชเมนู Filter บน Header
     // แล้ว re-render ทุก view ที่กำลังเปิดอยู่ผ่าน applyFilters() (จุดเดียวที่ตัดสินใจ re-render จริง กันซ้ำซ้อน)
@@ -924,6 +1051,10 @@
       if (e.detail.type === 'config') {
         refreshOptionDropdownsFromConfig();
         applyFilters();
+        if (document.getElementById('view-executive1').style.display === 'block') {
+          refreshExecOptionDropdowns();
+          applyExecFilters();
+        }
       }
       // e.detail.type === 'users': ยังไม่มี UI ในหน้า Dashboard ที่ผูกกับ User Management โดยตรง
       // (คนละส่วนกับ 'Admin' ซึ่งเป็น master data การขายที่จัดการแยกในหมวด Dropdown Options)
@@ -1027,6 +1158,37 @@
       applyFilters();
     }
 
+    // กรอง rawData ด้วยชุด filter ที่ส่งเข้ามา (Year/Channel/SubChannel/Product/SubProduct/Admin - ไม่รวม Month
+    // ซึ่งแต่ละหน้าจัดการเป็น cutoff ของตัวเองต่างหาก) แยกออกมาเป็นฟังก์ชันกลาง เพื่อให้ทั้ง Filter บนสุด (ใช้ตัวแปร
+    // filters ของหน้า Overview/Cohort/Migration/Retention) และ Filter แยกของหน้า Executive (ใช้ execFilters
+    // คนละชุดกัน ไม่ยุ่งกัน) เรียกใช้ตรรกะเดียวกันได้โดยไม่ต้องเขียนซ้ำ
+    function computeFilteredData(sourceFilters) {
+      return rawData.filter(row => {
+        if (!isSaleOrder(row)) return false;
+        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+        if (!dateStr) return false;
+        const d = parseDate(dateStr);
+        if (!d) return false;
+
+        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
+        const subChannel = getNormalizedSubChannel(row);
+
+        const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
+        const product = getNormalizedProduct(rawProductName);
+        const subProduct = getNormalizedSubProduct(rawProductName);
+        const admin = getNormalizedAdmin(row);
+
+        if (!isProductActive(product)) return false;
+        if (sourceFilters.Year !== 'All' && d.y.toString() !== sourceFilters.Year) return false;
+        if (sourceFilters.Channel !== 'All' && channel !== sourceFilters.Channel) return false;
+        if (sourceFilters.SubChannel !== 'All' && subChannel !== sourceFilters.SubChannel) return false;
+        if (sourceFilters.Product !== 'All' && product !== sourceFilters.Product) return false;
+        if (sourceFilters.SubProduct !== 'All' && subProduct !== sourceFilters.SubProduct) return false;
+        if (sourceFilters.Admin !== 'All' && admin !== sourceFilters.Admin) return false;
+        return true;
+      });
+    }
+
     function applyFilters() {
       // แก้ปัญหาหน้าเด้งกลับขึ้นบนสุดทุกครั้งที่กด Filter (ทั้ง global filter บนสุด และ filter ภายในแต่ละ view
       // ล้วนเรียกฟังก์ชันนี้ซึ่ง re-render ทุก view ที่เปิดอยู่ ทำให้ความสูงหน้าเปลี่ยนแล้วเลื่อนขึ้นบนสุด)
@@ -1036,35 +1198,11 @@
       try {
 
       if (rawData.length > 0 && document.getElementById('menu-Year').children.length === 0) populateDropdowns();
-      filteredData = rawData.filter(row => {
-        if (!isSaleOrder(row)) return false;
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-        if (!dateStr) return false;
-        const d = parseDate(dateStr);
-        if (!d) return false;
-        
-        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
-        const subChannel = getNormalizedSubChannel(row);
-        
-        const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
-        const product = getNormalizedProduct(rawProductName);
-        const subProduct = getNormalizedSubProduct(rawProductName);
-        const admin = getNormalizedAdmin(row);
-        
-        if (!isProductActive(product)) return false;
-        if (filters.Year !== 'All' && d.y.toString() !== filters.Year) return false;
-        if (filters.Channel !== 'All' && channel !== filters.Channel) return false;
-        if (filters.SubChannel !== 'All' && subChannel !== filters.SubChannel) return false;
-        if (filters.Product !== 'All' && product !== filters.Product) return false;
-        if (filters.SubProduct !== 'All' && subProduct !== filters.SubProduct) return false;
-        if (filters.Admin !== 'All' && admin !== filters.Admin) return false;
-        return true;
-      });
-      
+      filteredData = computeFilteredData(filters);
+
       processData(filteredData);
-      
+
       try { if (document.getElementById('view-cohort').style.display === 'block' && typeof renderCohortHeatmap === 'function') { renderCohortHeatmap(filteredData, rawData); } } catch(e) { console.error(e); }
-      try { if (document.getElementById('view-executive1').style.display === 'block' && typeof renderExecutive1 === 'function') { renderExecutive1(filteredData, rawData); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-executive2').style.display === 'block' && typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, rawData); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-insighthub').style.display === 'block' && typeof renderInsightHub === 'function') { renderInsightHub(filteredData, rawData); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-retention').style.display === 'block' && typeof renderRetention === 'function') { renderRetention(filteredData, rawData); } } catch(e) { console.error(e); }
@@ -1366,8 +1504,8 @@
     window.switchTab = switchTab; window.applyFilters = applyFilters; window.setFilter = setFilter; window.clearFilters = clearFilters; window.toggleFilter = toggleFilter;
   </script>
   <script src="cohort.js?v=13"></script>
-  <script src="executive1.js?v=16"></script>
-  <script src="executive2.js?v=14"></script>
+  <script src="executive.js?v=17"></script>
+  <script src="Migration.js?v=15"></script>
   <script src="insighthub.js?v=15"></script>
   <script src="retention.js?v=1"></script>
   <script src="kpisetting.js?v=2"></script>
