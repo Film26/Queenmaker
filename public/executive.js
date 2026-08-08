@@ -300,6 +300,15 @@ function renderExecutive1(filteredData, rawData) {
     if (y < 2000) y += 2000;
     return { y, m, d, val: y * 10000 + m * 100 + d };
   };
+  // Month filter is applied here as a point-in-time cutoff, mirroring the YTD-cutoff convention
+  // already used by the Overview tab in dashboard.html (renderDashboard(): ytdSales/ytdBuyers only
+  // sum months <= the selected month). Without this, these "YTD ..." cards always summed all 12
+  // months regardless of the Month filter.
+  // ใช้ window.execFilters (Filter แยกต่างหากของหน้า Executive เอง) ไม่ใช่ window.filters ที่หน้า
+  // Overview/Cohort/Migration/Retention ใช้ร่วมกัน - สองหน้านี้ไม่ยุ่งกันแล้ว
+  const monthCutoff = (window.execFilters && window.execFilters.Month) ? window.execFilters.Month : null;
+  const withinCutoff = (d) => !monthCutoff || `${d.y}-${String(d.m).padStart(2, '0')}` <= monthCutoff;
+
   // Determine global first purchase dates if not already available globally
   // We use the global `globalFirstPurchase` from dashboard.html which is already calculated correctly!
   // First pass: Calculate first purchase date within the CURRENT filtered context (for Migration)
@@ -310,7 +319,7 @@ function renderExecutive1(filteredData, rawData) {
     const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
-    if (!d) return;
+    if (!d || !withinCutoff(d)) return;
     if (!filterContextFirstPurchase[id] || d.val < filterContextFirstPurchase[id]) {
       filterContextFirstPurchase[id] = d.val;
     }
@@ -324,7 +333,7 @@ function renderExecutive1(filteredData, rawData) {
 
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
-    if (!d) return;
+    if (!d || !withinCutoff(d)) return;
 
     const m = d.m;
     if (m >= 1 && m <= 12) {
