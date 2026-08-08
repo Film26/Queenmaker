@@ -217,7 +217,7 @@ function renderExecutive1(filteredData, rawData) {
       .exec-table .row-channel-status td {
         background-color: #f5fafe !important;
       }
-      /* แถวลำดับ 1-5 (Revenue...Frequency) พื้นเทาอ่อน / แถวลำดับ 6-12 (Spending per Head...Channel Status)
+      /* แถวลำดับ 1-5 (Revenue...Frequency) พื้นเทาอ่อน / แถวลำดับ 6-12 (All Customer...% Old Customer)
          พื้นเข้มขึ้น ตามที่พี่มาร์ทคอมเมนต์ไว้ - ต้องอยู่หลัง .group-* ด้านบนเพื่อให้ชนะ (source order, !important เท่ากัน) */
       .exec-table .exec-tier-light,
       .exec-table .exec-tier-light td {
@@ -300,11 +300,13 @@ function renderExecutive1(filteredData, rawData) {
     if (y < 2000) y += 2000;
     return { y, m, d, val: y * 10000 + m * 100 + d };
   };
-  // Month filter (top filter bar) is applied here as a point-in-time cutoff, mirroring the
-  // YTD-cutoff convention already used by the Overview tab in dashboard.html (renderDashboard():
-  // ytdSales/ytdBuyers only sum months <= the selected month). Without this, these "YTD ..." cards
-  // always summed all 12 months regardless of the Month filter - the bug reported in Task 3.
-  const monthCutoff = (window.filters && window.filters.Month !== 'All') ? window.filters.Month : null;
+  // Month filter is applied here as a point-in-time cutoff, mirroring the YTD-cutoff convention
+  // already used by the Overview tab in dashboard.html (renderDashboard(): ytdSales/ytdBuyers only
+  // sum months <= the selected month). Without this, these "YTD ..." cards always summed all 12
+  // months regardless of the Month filter - the bug reported in Task 3.
+  // ใช้ window.execFilters (Filter แยกต่างหากของหน้า Executive เอง) ไม่ใช่ window.filters ที่หน้า
+  // Overview/Cohort/Migration/Retention ใช้ร่วมกัน - สองหน้านี้ไม่ยุ่งกันแล้ว
+  const monthCutoff = (window.execFilters && window.execFilters.Month) ? window.execFilters.Month : null;
   const withinCutoff = (d) => !monthCutoff || `${d.y}-${String(d.m).padStart(2, '0')}` <= monthCutoff;
 
   // Determine global first purchase dates if not already available globally
@@ -393,6 +395,10 @@ function renderExecutive1(filteredData, rawData) {
 
   // Metrics Array Construction (per-month series, index 0 = Jan ... 11 = Dec, index 12 = Total Year)
   const revArr = [], ordArr = [], aovArr = [], ubArr = [], freqArr = [], sphArr = [], retArr = [], newGArr = [], newGShrArr = [], migArr = [], migRtArr = [];
+  // All Customer (ลูกค้าสะสม): ผลรวมสะสมของลูกค้าที่เคยซื้อนับจาก ม.ค. ถึงเดือนนั้นๆ "ภายในปีที่เลือก" เท่านั้น
+  // (รีเซ็ตทุกต้นปี ตามที่ตกลงกันไว้) ใช้ union ของ agg[m].uniqueBuyers ไล่สะสมทีละเดือน
+  const cumAllCustArr = [];
+  const cumulativeCustomerSet = new Set();
   for (let m = 1; m <= 12; m++) {
     const r = agg[m].revenue;
     const o = agg[m].orders;
@@ -412,6 +418,9 @@ function renderExecutive1(filteredData, rawData) {
     newGShrArr.push(getSafely(newG, u));
     migArr.push(mig);
     migRtArr.push(getSafely(mig, u));
+
+    agg[m].uniqueBuyers.forEach(id => cumulativeCustomerSet.add(id));
+    cumAllCustArr.push(cumulativeCustomerSet.size);
   }
   // Totals
   const rT = total.revenue, oT = total.orders, uT = total.uniqueBuyers.size;
@@ -426,6 +435,13 @@ function renderExecutive1(filteredData, rawData) {
   newGShrArr.push(getSafely(total.newGlobalBuyers.size, uT));
   migArr.push(total.newToSubBuyers.size);
   migRtArr.push(getSafely(total.newToSubBuyers.size, uT));
+  // ยอดรวมทั้งปีของ "ลูกค้าสะสม" คือยอดสะสม ณ สิ้นปี ซึ่งเท่ากับ uT อยู่แล้ว (union ของทุกเดือน)
+  cumAllCustArr.push(cumulativeCustomerSet.size);
+
+  // %Active customer = ลูกค้าที่ซื้อในเดือนนั้น (Active) หารด้วยลูกค้าสะสม ณ เดือนนั้น
+  const activePctArr = ubArr.map((u, i) => getSafely(u, cumAllCustArr[i]));
+  // % Old Customer = ลูกค้าเก่าที่ซื้อในเดือนนั้น หารด้วยลูกค้าทั้งหมดที่ซื้อในเดือนนั้น (= 100% - % New Customer Share)
+  const oldPctArr = ubArr.map((u, i) => getSafely(retArr[i], u));
 
   // ---- Build KPI stat cards (top row) ----
   // Find the latest month that actually has activity, so the sparkline/MoM
@@ -522,27 +538,39 @@ function renderExecutive1(filteredData, rawData) {
     rowHtml += `<td class="col-total">${displayStrT}</td></tr>`;
     return rowHtml;
   };
-  // แถวลำดับ 1-5 (Revenue...Frequency) = โทนพื้นเทาอ่อน, ลำดับ 6-12 (Spending per Head...Channel Status)
-  // = โทนพื้นเข้มขึ้น ตามที่พี่มาร์ทคอมเมนต์ไว้ในสลิปประชุม (ดู .exec-tier-light / .exec-tier-dark ด้านบน)
+  // ลำดับแถวและสีพื้นตามที่พี่มาร์ทคอมเมนต์ไว้: ลำดับ 1-5 (Revenue...Frequency) = พื้นเทาอ่อน,
+  // ลำดับ 6-12 (All Customer...% Old Customer) = พื้นเข้มขึ้น (สีเดิมของกลุ่มนี้), ลำดับ 13-15 (Migration group)
+  // = โชว์เสมอเหมือนเดิม ไม่ผูกกับเงื่อนไข Filter (ดู .exec-tier-light / .exec-tier-dark ด้านบน)
+  // 1
   html += renderRow('Revenue<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดขาย </span>', revArr, true, false, false, 'group-sales exec-tier-light');
+  // 2
   html += renderRow('Orders<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ออเดอร์</span>', ordArr, true, false, false, 'group-sales exec-tier-light');
+  // 3
   html += renderRow('AOV (Average Order Value)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดต่อบิลเฉลี่ย </span>', aovArr, true, false, false, 'group-sales exec-tier-light');
-  html += renderRow('Unique Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนซื้อจริง</span>', ubArr, true, false, false, 'group-customer exec-tier-light');
+  // 4
+  html += renderRow('SPH (Spending per Head)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดเฉลี่ยต่อหัว </span>', sphArr, true, false, false, 'group-sales exec-tier-light');
+  // 5
   html += renderRow('Frequency<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ความถี่ซื้อ </span>', freqArr, false, true, false, 'group-customer exec-tier-light');
-  html += renderRow('Spending per Head<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">เฉลี่ยต่อคน </span>', sphArr, true, false, false, 'group-customer exec-tier-dark');
-  html += renderRow('Retained Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">คนเก่าซื้อซ้ำ </span>', retArr, true, false, false, 'group-mix exec-tier-dark');
+  // 6
+  html += renderRow('All Customer<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าสะสม</span>', cumAllCustArr, true, false, false, 'group-customer exec-tier-dark');
+  // 7
+  html += renderRow('Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าที่ซื้อในเดือน</span>', ubArr, true, false, false, 'group-customer exec-tier-dark');
+  // 8
+  html += renderRow('%Active customer<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">% ลูกค้าที่ Active</span>', activePctArr, false, false, true, 'group-customer exec-tier-dark');
+  // 9
   html += renderRow('New Customers (Global)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่ (Global)</span>', newGArr, true, false, false, 'group-mix exec-tier-dark');
-  html += renderRow('% New Customer Share<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สัดส่วนลูกค้าใหม่</span>', newGShrArr, false, false, true, 'group-mix exec-tier-dark');
+  // 10
+  html += renderRow('Old Customers Retained Buyers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าเก่าซื้อซ้ำ </span>', retArr, true, false, false, 'group-mix exec-tier-dark');
+  // 11
+  html += renderRow('% New Customer Share<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">% ลูกค้าใหม่</span>', newGShrArr, false, false, true, 'group-mix exec-tier-dark');
+  // 12
+  html += renderRow('% Old Customer<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">% ลูกค้าเก่า</span>', oldPctArr, false, false, true, 'group-mix exec-tier-dark');
 
-  // แถว New to Sub (Migration) / % Migration Rate / Channel Status พูดถึงการ "ย้าย" ระหว่าง Sub Channel
-  // โดยตรง - ที่ระดับ "รวมทุก Sub Channel" (SubChannel filter = All) ตัวเลขนี้ไม่มีความหมายที่ใช้งานได้จริง
-  // (เหมือน executive2.js ที่วิเคราะห์ Migration แยกทีละ Sub Channel เท่านั้น) จึงโชว์แถวนี้เฉพาะตอนที่ผู้ใช้
-  // เลือก Filter Sub Channel เจาะจงแล้วเท่านั้น ตามที่พี่มาร์ทคอมเมนต์ไว้ในสลิปประชุม
-  const isSubChannelScoped = window.filters && window.filters.SubChannel !== 'All';
-  if (isSubChannelScoped) {
-    html += renderRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', migArr, true, false, false, 'group-growth exec-tier-dark');
-    html += renderRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', migRtArr, false, false, true, 'group-growth exec-tier-dark');
-  }
+  // 13-14: แถว New to Sub (Migration) / % Migration Rate พูดถึงการ "ย้าย" ระหว่าง Sub Channel โดยตรง -
+  // Filter ของหน้านี้ (execFilters) บังคับเลือก Sub Channel เจาะจงเสมออยู่แล้ว (ไม่มีตัวเลือก All)
+  // ตัวเลขกลุ่มนี้เลยมีความหมายใช้งานได้จริงเสมอ จึงโชว์ตลอดโดยไม่ต้องเช็คเงื่อนไขเพิ่ม
+  html += renderRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', migArr, true, false, false, 'group-growth exec-tier-dark');
+  html += renderRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', migRtArr, false, false, true, 'group-growth exec-tier-dark');
 
   // Channel Status: classify each month (and Total Year) using the same Vanguard / Migration /
   // Retention / Cash Cow thresholds as executive2.js's Strategic Meaning table, applied to the
@@ -558,13 +586,11 @@ function renderExecutive1(filteredData, rawData) {
     const { label, dot } = classifyChannelStatus(newGShrArr[idx] * 100, migRtArr[idx] * 100);
     return `<td><span class="channel-status-badge"><span class="channel-status-dot ${dot}"></span>${label}</span></td>`;
   };
-  if (isSubChannelScoped) {
-    let channelStatusRow = `<tr class="row-channel-status exec-tier-dark"><td class="metric-label">Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span></td>`;
-    for (let m = 1; m <= 12; m++) channelStatusRow += channelStatusCell(m - 1);
-    channelStatusRow += channelStatusCell(12).replace('<td>', '<td class="col-total">');
-    channelStatusRow += '</tr>';
-    html += channelStatusRow;
-  }
+  let channelStatusRow = `<tr class="row-channel-status exec-tier-dark"><td class="metric-label">Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span></td>`;
+  for (let m = 1; m <= 12; m++) channelStatusRow += channelStatusCell(m - 1);
+  channelStatusRow += channelStatusCell(12).replace('<td>', '<td class="col-total">');
+  channelStatusRow += '</tr>';
+  html += channelStatusRow;
 
   html += `</tbody></table></div>`;
   html += `<div class="exec-table-footnote"><i class="fas fa-circle-info"></i> หมายเหตุ: ตัวเลขทั้งหมดเป็นผลรวมในแต่ละเดือน ยอดรวมทั้งปีอาจมีความคลาดเคลื่อนจากการปัดเศษ</div>`;
