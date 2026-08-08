@@ -2,7 +2,7 @@
 
 :root {
   --bg-main: #f8f9fa;
-  --bg-sidebar: linear-gradient(180deg, #fdf1e6 0%, #fae1d0 100%);
+  --bg-sidebar: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
   --sidebar-width: 280px;
   --text-dark: #2d1e1a;
   --text-muted: #7a665e;
@@ -16,6 +16,7 @@
   --cashcow-color: #dc3545;
   --bg-color: #f8f9fa;
   --sidebar-bg: #ffffff;
+  --sidebar-active-bg: #1e3a8a;
   --card-bg: #ffffff;
   --text-main: #212529;
   --border-color: #eee0d5;
@@ -81,15 +82,24 @@ h1, h2, h3, .brand-name {
   display: flex;
   flex-direction: column;
   padding: 40px 0;
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 100;
-  
+
   /* Start collapsed */
   transform: translateX(-100%);
   opacity: 0;
   visibility: hidden;
 }
+
+/* แถบเมนู (sidebar) เป็นพื้น navy เข้ม - override สีตัวหนังสือ/ไอคอนที่สืบทอดมาจาก --text-dark/--text-muted
+   (ซึ่งเป็นสีน้ำตาลเข้มออกแบบมาสำหรับพื้นหลังสีอ่อน) ให้เป็นสีอ่อนแทน เพื่อให้อ่านออกบนพื้นเข้ม */
+.sidebar .close-sidebar { color: #cbd5e1; }
+.sidebar .close-sidebar:hover { color: #ffffff; }
+.sidebar .brand-name { color: #ffffff; }
+.sidebar .brand-tagline { color: #94a3b8; }
+.sidebar .nav-link { color: #cbd5e1; }
+.sidebar .nav-link:not(.active):hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
 
 .sidebar.active {
   transform: translateX(0);
@@ -154,7 +164,7 @@ h1, h2, h3, .brand-name {
 }
 
 .nav-menu::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 4px;
 }
 
@@ -178,8 +188,14 @@ h1, h2, h3, .brand-name {
 
 .nav-link.active {
   background: var(--sidebar-active-bg);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-  color: #333;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+  border-left: 3px solid #60a5fa;
+  padding-left: 17px;
+  color: #ffffff;
+}
+
+.nav-link.active i, .nav-link.active .icon {
+  color: #ffffff;
 }
 
 .nav-link:not(.active):hover {
@@ -701,7 +717,7 @@ h1, h2, h3, .brand-name {
 .login-left {
   flex: 1.2;
   position: relative;
-  background: linear-gradient(135deg, #fff5e6 0%, #fde4d0 100%);
+  background: linear-gradient(135deg, #e8eefc 0%, #c7d7f5 100%);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -804,8 +820,8 @@ h1, h2, h3, .brand-name {
 }
 
 .login-form .input-group input:focus {
-  border-color: #d95f1d;
-  box-shadow: 0 0 10px rgba(217, 95, 29, 0.1);
+  border-color: #1e3a8a;
+  box-shadow: 0 0 10px rgba(30, 58, 138, 0.12);
 }
 
 .login-form .input-group .toggle-pass {
@@ -827,26 +843,26 @@ h1, h2, h3, .brand-name {
   font-weight: 500;
 }
 
-.forgot-link:hover { color: #d95f1d; }
+.forgot-link:hover { color: #1e3a8a; }
 
 .btn-login {
   width: 100%;
   padding: 16px;
   border: none;
   border-radius: 50px;
-  background: linear-gradient(90deg, #b3003b 0%, #ff6a00 100%);
+  background: linear-gradient(90deg, #1e3a8a 0%, #1e40af 100%);
   color: #fff;
   font-size: 1.1rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s;
-  box-shadow: 0 10px 20px rgba(179, 0, 59, 0.2);
+  box-shadow: 0 10px 20px rgba(30, 58, 138, 0.25);
   letter-spacing: 1px;
 }
 
 .btn-login:hover {
   transform: translateY(-2px);
-  box-shadow: 0 15px 30px rgba(179, 0, 59, 0.3);
+  box-shadow: 0 15px 30px rgba(30, 58, 138, 0.35);
 }
 
 .login-card-footer {
@@ -882,7 +898,7 @@ h1, h2, h3, .brand-name {
 
 @media (max-width: 992px) {
   .login-left { display: none; }
-  .login-right { flex: 1; width: 100%; background: linear-gradient(135deg, #fff5e6 0%, #fde4d0 100%); }
+  .login-right { flex: 1; width: 100%; background: linear-gradient(135deg, #e8eefc 0%, #c7d7f5 100%); }
   .login-footer { right: 0; width: 100%; text-align: center; }
 }
 
@@ -995,8 +1011,8 @@ h1, h2, h3, .brand-name {
 }
 
 .login-form .input-group input:focus {
-  border-color: #d95f1d;
-  box-shadow: 0 0 10px rgba(217, 95, 29, 0.1);
+  border-color: #1e3a8a;
+  box-shadow: 0 0 10px rgba(30, 58, 138, 0.12);
 }
 
 .login-form .input-group .toggle-pass {
@@ -1018,26 +1034,26 @@ h1, h2, h3, .brand-name {
   font-weight: 500;
 }
 
-.forgot-link:hover { color: #d95f1d; }
+.forgot-link:hover { color: #1e3a8a; }
 
 .btn-login {
   width: 100%;
   padding: 16px;
   border: none;
   border-radius: 50px;
-  background: linear-gradient(90deg, #b3003b 0%, #ff6a00 100%);
+  background: linear-gradient(90deg, #1e3a8a 0%, #1e40af 100%);
   color: #fff;
   font-size: 1.1rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s;
-  box-shadow: 0 10px 20px rgba(179, 0, 59, 0.2);
+  box-shadow: 0 10px 20px rgba(30, 58, 138, 0.25);
   letter-spacing: 1px;
 }
 
 .btn-login:hover {
   transform: translateY(-2px);
-  box-shadow: 0 15px 30px rgba(179, 0, 59, 0.3);
+  box-shadow: 0 15px 30px rgba(30, 58, 138, 0.35);
 }
 
 .login-card-footer {
@@ -1073,7 +1089,7 @@ h1, h2, h3, .brand-name {
 
 @media (max-width: 992px) {
   .login-left { display: none; }
-  .login-right { flex: 1; width: 100%; background: linear-gradient(135deg, #fff5e6 0%, #fde4d0 100%); }
+  .login-right { flex: 1; width: 100%; background: linear-gradient(135deg, #e8eefc 0%, #c7d7f5 100%); }
   .login-footer { right: 0; width: 100%; text-align: center; }
 }
 
