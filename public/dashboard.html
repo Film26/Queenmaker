@@ -1215,6 +1215,15 @@
       try { if (document.getElementById('view-executive2').style.display === 'block' && typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, rawData); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-insighthub').style.display === 'block' && typeof renderInsightHub === 'function') { renderInsightHub(filteredData, rawData); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-retention').style.display === 'block' && typeof renderRetention === 'function') { renderRetention(filteredData, rawData); } } catch(e) { console.error(e); }
+      // หน้า Executive ใช้ execFilters แยกต่างหาก ไม่ได้อยู่ในลูป filteredData ด้านบน - ถ้าไม่เรียกตรงนี้ด้วย
+      // การ Import Data/Load Sample ใหม่ตอนที่ค้างอยู่หน้า Executive อยู่แล้ว จะไม่รีเฟรชข้อมูลเลย (ค้าง
+      // "No data available" ต่อไปจนกว่าจะสลับแท็บออกแล้วกลับเข้ามาใหม่)
+      try {
+        if (document.getElementById('view-executive1').style.display === 'block') {
+          if (rawData.length > 0) populateExecDropdowns();
+          applyExecFilters();
+        }
+      } catch(e) { console.error(e); }
 
       } finally {
         __scrollBox.scrollTop = __savedScrollTop;
