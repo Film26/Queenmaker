@@ -300,15 +300,6 @@ function renderExecutive1(filteredData, rawData) {
     if (y < 2000) y += 2000;
     return { y, m, d, val: y * 10000 + m * 100 + d };
   };
-  // Month filter is applied here as a point-in-time cutoff, mirroring the YTD-cutoff convention
-  // already used by the Overview tab in dashboard.html (renderDashboard(): ytdSales/ytdBuyers only
-  // sum months <= the selected month). Without this, these "YTD ..." cards always summed all 12
-  // months regardless of the Month filter - the bug reported in Task 3.
-  // ใช้ window.execFilters (Filter แยกต่างหากของหน้า Executive เอง) ไม่ใช่ window.filters ที่หน้า
-  // Overview/Cohort/Migration/Retention ใช้ร่วมกัน - สองหน้านี้ไม่ยุ่งกันแล้ว
-  const monthCutoff = (window.execFilters && window.execFilters.Month) ? window.execFilters.Month : null;
-  const withinCutoff = (d) => !monthCutoff || `${d.y}-${String(d.m).padStart(2, '0')}` <= monthCutoff;
-
   // Determine global first purchase dates if not already available globally
   // We use the global `globalFirstPurchase` from dashboard.html which is already calculated correctly!
   // First pass: Calculate first purchase date within the CURRENT filtered context (for Migration)
@@ -319,7 +310,7 @@ function renderExecutive1(filteredData, rawData) {
     const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
-    if (!d || !withinCutoff(d)) return;
+    if (!d) return;
     if (!filterContextFirstPurchase[id] || d.val < filterContextFirstPurchase[id]) {
       filterContextFirstPurchase[id] = d.val;
     }
@@ -333,7 +324,7 @@ function renderExecutive1(filteredData, rawData) {
 
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
-    if (!d || !withinCutoff(d)) return;
+    if (!d) return;
 
     const m = d.m;
     if (m >= 1 && m <= 12) {
@@ -506,13 +497,13 @@ function renderExecutive1(filteredData, rawData) {
   });
   kpiHtml += '</div>';
 
-  // ---- Build Monthly Breakdown Table ----
+  // ---- Build CRM Report Table ----
   let html = `
     <div class="exec-section-title">YTD Overview<span>ภาพรวมยอดขายสะสม</span></div>
     ${kpiHtml}
     <div class="exec-section-title-row">
       <span class="exec-section-icon"><i class="fas fa-chart-column"></i></span>
-      <div class="exec-section-title exec-section-title-lg">Monthly Breakdown<span>รายละเอียดรายเดือน</span></div>
+      <div class="exec-section-title exec-section-title-lg">CRM Report<span>รายงาน CRM</span></div>
     </div>
     <div class="exec-table-wrapper">
       <table class="exec-table">
@@ -538,9 +529,18 @@ function renderExecutive1(filteredData, rawData) {
     rowHtml += `<td class="col-total">${displayStrT}</td></tr>`;
     return rowHtml;
   };
+  // แถวที่ยังไม่มีเงื่อนไขให้แสดง (ดูเงื่อนไข showMigrationRows ด้านล่าง) - โชว์แค่โครงแถว/ป้ายชื่อ
+  // ค่าในทุกช่องเป็น "-" ล้วน ไม่มีการคำนวณใดๆ
+  const renderBlankRow = (label, bgClass = '') => {
+    let rowHtml = `<tr class="${bgClass}"><td class="metric-label">${label}</td>`;
+    for (let m = 1; m <= 12; m++) rowHtml += `<td>-</td>`;
+    rowHtml += `<td class="col-total">-</td></tr>`;
+    return rowHtml;
+  };
   // ลำดับแถวและสีพื้นตามที่พี่มาร์ทคอมเมนต์ไว้: ลำดับ 1-5 (Revenue...Frequency) = พื้นเทาอ่อน,
   // ลำดับ 6-12 (All Customer...% Old Customer) = พื้นเข้มขึ้น (สีเดิมของกลุ่มนี้), ลำดับ 13-15 (Migration group)
-  // = โชว์เสมอเหมือนเดิม ไม่ผูกกับเงื่อนไข Filter (ดู .exec-tier-light / .exec-tier-dark ด้านบน)
+  // = โชว์เฉพาะตอนที่ผู้ใช้กดเลือก Filter ของหน้า Executive เองครบทั้ง 4 ตัว (Year/Channel/SubChannel/Admin)
+  // แล้วเท่านั้น (ดู execFiltersTouched ที่ dashboard.html) ถ้ายังไม่กดเลือกครบ ปล่อยว่างไว้ (ดู showMigrationRows)
   // 1
   html += renderRow('Revenue<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดขาย </span>', revArr, true, false, false, 'group-sales exec-tier-light');
   // 2
@@ -566,31 +566,40 @@ function renderExecutive1(filteredData, rawData) {
   // 12
   html += renderRow('% Old Customer<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">% ลูกค้าเก่า</span>', oldPctArr, false, false, true, 'group-mix exec-tier-dark');
 
-  // 13-14: แถว New to Sub (Migration) / % Migration Rate พูดถึงการ "ย้าย" ระหว่าง Sub Channel โดยตรง -
-  // Filter ของหน้านี้ (execFilters) บังคับเลือก Sub Channel เจาะจงเสมออยู่แล้ว (ไม่มีตัวเลือก All)
-  // ตัวเลขกลุ่มนี้เลยมีความหมายใช้งานได้จริงเสมอ จึงโชว์ตลอดโดยไม่ต้องเช็คเงื่อนไขเพิ่ม
-  html += renderRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', migArr, true, false, false, 'group-growth exec-tier-dark');
-  html += renderRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', migRtArr, false, false, true, 'group-growth exec-tier-dark');
+  // 13-15 โชว์เฉพาะตอนที่ผู้ใช้กดเลือก Filter ของหน้า Executive เอง (ไม่ใช่ค่าที่ auto-select ให้ตอนเปิดหน้า)
+  // ครบทั้ง 4 ตัว (Year/Channel/SubChannel/Admin) แล้วเท่านั้น - ก่อนหน้านั้นปล่อยว่างไว้
+  const touched = window.execFiltersTouched;
+  const showMigrationRows = !!(touched && touched.Year && touched.Channel && touched.SubChannel && touched.Admin);
 
-  // Channel Status: classify each month (and Total Year) using the same Vanguard / Migration /
-  // Retention / Cash Cow thresholds as executive2.js's Strategic Meaning table, applied to the
-  // whole dataset for that month instead of per sub-channel.
-  const classifyChannelStatus = (pctNew, pctMig) => {
-    if (pctNew > 70) return { label: 'Vanguard', dot: 'cs-dot-vanguard' };
-    if (pctMig > 70) return { label: 'Migration', dot: 'cs-dot-migration' };
-    if (pctNew + pctMig < 30) return { label: 'Cash Cow', dot: 'cs-dot-cashcow' };
-    return { label: 'Retention', dot: 'cs-dot-retention' };
-  };
-  const channelStatusCell = (idx) => {
-    if (!ubArr[idx]) return '<td>-</td>';
-    const { label, dot } = classifyChannelStatus(newGShrArr[idx] * 100, migRtArr[idx] * 100);
-    return `<td><span class="channel-status-badge"><span class="channel-status-dot ${dot}"></span>${label}</span></td>`;
-  };
-  let channelStatusRow = `<tr class="row-channel-status exec-tier-dark"><td class="metric-label">Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span></td>`;
-  for (let m = 1; m <= 12; m++) channelStatusRow += channelStatusCell(m - 1);
-  channelStatusRow += channelStatusCell(12).replace('<td>', '<td class="col-total">');
-  channelStatusRow += '</tr>';
-  html += channelStatusRow;
+  if (showMigrationRows) {
+    // 13-14: แถว New to Sub (Migration) / % Migration Rate
+    html += renderRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', migArr, true, false, false, 'group-growth exec-tier-dark');
+    html += renderRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', migRtArr, false, false, true, 'group-growth exec-tier-dark');
+
+    // Channel Status: classify each month (and Total Year) using the same Vanguard / Migration /
+    // Retention / Cash Cow thresholds as executive2.js's Strategic Meaning table, applied to the
+    // whole dataset for that month instead of per sub-channel.
+    const classifyChannelStatus = (pctNew, pctMig) => {
+      if (pctNew > 70) return { label: 'Vanguard', dot: 'cs-dot-vanguard' };
+      if (pctMig > 70) return { label: 'Migration', dot: 'cs-dot-migration' };
+      if (pctNew + pctMig < 30) return { label: 'Cash Cow', dot: 'cs-dot-cashcow' };
+      return { label: 'Retention', dot: 'cs-dot-retention' };
+    };
+    const channelStatusCell = (idx) => {
+      if (!ubArr[idx]) return '<td>-</td>';
+      const { label, dot } = classifyChannelStatus(newGShrArr[idx] * 100, migRtArr[idx] * 100);
+      return `<td><span class="channel-status-badge"><span class="channel-status-dot ${dot}"></span>${label}</span></td>`;
+    };
+    let channelStatusRow = `<tr class="row-channel-status exec-tier-dark"><td class="metric-label">Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span></td>`;
+    for (let m = 1; m <= 12; m++) channelStatusRow += channelStatusCell(m - 1);
+    channelStatusRow += channelStatusCell(12).replace('<td>', '<td class="col-total">');
+    channelStatusRow += '</tr>';
+    html += channelStatusRow;
+  } else {
+    html += renderBlankRow('New to Sub (Migration)<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่เฉพาะกลุ่ม (Migration)</span>', 'group-growth exec-tier-dark');
+    html += renderBlankRow('% Migration Rate<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">อัตราการย้ายกลุ่ม</span>', 'group-growth exec-tier-dark');
+    html += renderBlankRow('Channel Status<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">สถานะช่องทาง</span>', 'row-channel-status exec-tier-dark');
+  }
 
   html += `</tbody></table></div>`;
   html += `<div class="exec-table-footnote"><i class="fas fa-circle-info"></i> หมายเหตุ: ตัวเลขทั้งหมดเป็นผลรวมในแต่ละเดือน ยอดรวมทั้งปีอาจมีความคลาดเคลื่อนจากการปัดเศษ</div>`;
