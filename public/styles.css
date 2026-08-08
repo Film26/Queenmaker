@@ -16,7 +16,7 @@
   --cashcow-color: #dc3545;
   --bg-color: #f8f9fa;
   --sidebar-bg: #ffffff;
-  --sidebar-active-bg: #1e3a8a;
+  --sidebar-active-bg: #1e293b;
   --card-bg: #ffffff;
   --text-main: #212529;
   --border-color: #eee0d5;
@@ -820,8 +820,8 @@ h1, h2, h3, .brand-name {
 }
 
 .login-form .input-group input:focus {
-  border-color: #1e3a8a;
-  box-shadow: 0 0 10px rgba(30, 58, 138, 0.12);
+  border-color: #1e293b;
+  box-shadow: 0 0 10px rgba(30, 41, 59, 0.12);
 }
 
 .login-form .input-group .toggle-pass {
@@ -843,26 +843,26 @@ h1, h2, h3, .brand-name {
   font-weight: 500;
 }
 
-.forgot-link:hover { color: #1e3a8a; }
+.forgot-link:hover { color: #1e293b; }
 
 .btn-login {
   width: 100%;
   padding: 16px;
   border: none;
   border-radius: 50px;
-  background: linear-gradient(90deg, #1e3a8a 0%, #1e40af 100%);
+  background: linear-gradient(90deg, #1e293b 0%, #334155 100%);
   color: #fff;
   font-size: 1.1rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s;
-  box-shadow: 0 10px 20px rgba(30, 58, 138, 0.25);
+  box-shadow: 0 10px 20px rgba(30, 41, 59, 0.25);
   letter-spacing: 1px;
 }
 
 .btn-login:hover {
   transform: translateY(-2px);
-  box-shadow: 0 15px 30px rgba(30, 58, 138, 0.35);
+  box-shadow: 0 15px 30px rgba(30, 41, 59, 0.35);
 }
 
 .login-card-footer {
@@ -1011,8 +1011,8 @@ h1, h2, h3, .brand-name {
 }
 
 .login-form .input-group input:focus {
-  border-color: #1e3a8a;
-  box-shadow: 0 0 10px rgba(30, 58, 138, 0.12);
+  border-color: #1e293b;
+  box-shadow: 0 0 10px rgba(30, 41, 59, 0.12);
 }
 
 .login-form .input-group .toggle-pass {
@@ -1034,26 +1034,26 @@ h1, h2, h3, .brand-name {
   font-weight: 500;
 }
 
-.forgot-link:hover { color: #1e3a8a; }
+.forgot-link:hover { color: #1e293b; }
 
 .btn-login {
   width: 100%;
   padding: 16px;
   border: none;
   border-radius: 50px;
-  background: linear-gradient(90deg, #1e3a8a 0%, #1e40af 100%);
+  background: linear-gradient(90deg, #1e293b 0%, #334155 100%);
   color: #fff;
   font-size: 1.1rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s;
-  box-shadow: 0 10px 20px rgba(30, 58, 138, 0.25);
+  box-shadow: 0 10px 20px rgba(30, 41, 59, 0.25);
   letter-spacing: 1px;
 }
 
 .btn-login:hover {
   transform: translateY(-2px);
-  box-shadow: 0 15px 30px rgba(30, 58, 138, 0.35);
+  box-shadow: 0 15px 30px rgba(30, 41, 59, 0.35);
 }
 
 .login-card-footer {
