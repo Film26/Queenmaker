@@ -165,15 +165,12 @@
           <button id="clearFiltersBtn" class="clear-filters-btn" onclick="clearFilters()">Clear Filters</button>
         </div>
         <!-- Filter ของหน้า Executive แยกต่างหากจาก .filters-bar ด้านบนโดยสิ้นเชิง (คนละ state คนละ element)
-             ไม่มีตัวเลือก "All" - ต้องเลือกค่าจริงทั้ง 7 ตัวเสมอ ดู execFilters/setExecFilter ในสคริปต์ด้านล่าง -->
+             ไม่มีตัวเลือก "All" - ต้องเลือกค่าจริงทั้ง 4 ตัวเสมอ (Year/Channel/SubChannel/Admin)
+             ไม่มี Month/Product/Sub Product แล้ว (เอาออกจากหน้านี้ตามที่ตกลงกันไว้) ดู execFilters/setExecFilter ในสคริปต์ด้านล่าง -->
         <div class="filters-bar" id="execFiltersBar" style="display:none;">
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Exec-Year" onclick="toggleFilter('menu-Exec-Year')">Year: <span id="lbl-Exec-Year">-</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Exec-Year" class="filter-content"></div>
-          </div>
-          <div class="filter-dropdown">
-            <button class="filter-btn-new" id="btn-Exec-Month" onclick="toggleFilter('menu-Exec-Month')">Month: <span id="lbl-Exec-Month">-</span> <i class="fas fa-caret-down"></i></button>
-            <div id="menu-Exec-Month" class="filter-content"></div>
           </div>
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Exec-Channel" onclick="toggleFilter('menu-Exec-Channel')">Channel: <span id="lbl-Exec-Channel">-</span> <i class="fas fa-caret-down"></i></button>
@@ -182,14 +179,6 @@
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Exec-SubChannel" onclick="toggleFilter('menu-Exec-SubChannel')">SubChannel: <span id="lbl-Exec-SubChannel">-</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Exec-SubChannel" class="filter-content"></div>
-          </div>
-          <div class="filter-dropdown">
-            <button class="filter-btn-new" id="btn-Exec-Product" onclick="toggleFilter('menu-Exec-Product')">Product: <span id="lbl-Exec-Product">-</span> <i class="fas fa-caret-down"></i></button>
-            <div id="menu-Exec-Product" class="filter-content"></div>
-          </div>
-          <div class="filter-dropdown">
-            <button class="filter-btn-new" id="btn-Exec-SubProduct" onclick="toggleFilter('menu-Exec-SubProduct')">Sub Product: <span id="lbl-Exec-SubProduct">-</span> <i class="fas fa-caret-down"></i></button>
-            <div id="menu-Exec-SubProduct" class="filter-content"></div>
           </div>
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Exec-Admin" onclick="toggleFilter('menu-Exec-Admin')">Admin: <span id="lbl-Exec-Admin">-</span> <i class="fas fa-caret-down"></i></button>
@@ -958,11 +947,19 @@
     // ==========================================================================
     // หน้า Executive: Filter ชุดแยกต่างหาก (execFilters) - คนละ state คนละ dropdown กับ filters ด้านบน
     // ที่ใช้ร่วมกันในหน้า Overview/Cohort/Migration/Retention โดยสิ้นเชิง ไม่มีตัวเลือก "All" เลย
-    // ต้องเลือกค่าจริงครบทั้ง 7 ตัว (Year/Month/Channel/SubChannel/Product/SubProduct/Admin) เสมอ
-    // ตามที่พี่มาร์ทคอมเมนต์ไว้ - ถ้ายังไม่เคยเลือก จะตั้งค่าเริ่มต้นเป็นตัวเลือกล่าสุด/ตัวแรกที่มีให้อัตโนมัติ
+    // ต้องเลือกค่าจริงครบทั้ง 4 ตัว (Year/Channel/SubChannel/Admin) เสมอ - ไม่มี Month/Product/Sub Product
+    // แล้ว (เอาออกจากหน้านี้) Product/SubProduct เลย fix เป็น 'All' ตายตัวเพราะ computeFilteredData ยังใช้เช็คอยู่
+    // ถ้ายังไม่เคยเลือก จะตั้งค่าเริ่มต้นเป็นตัวเลือกล่าสุด/ตัวแรกที่มีให้อัตโนมัติ
+    //
+    // execFiltersTouched: แยกจาก execFilters เอง - ใช้ตามว่าผู้ใช้ "กดเลือกเอง" (ผ่าน setExecFilter) แล้วหรือยัง
+    // ต่างจากค่าที่ auto-select ให้ตอนเปิดหน้าครั้งแรก ใช้คุมว่าแถว 13-15 (Migration group) ในตาราง CRM Report
+    // จะโชว์ข้อมูลจริงเมื่อไหร่ (ต่อเมื่อกดเลือกเองครบทั้ง 4 ตัวแล้วเท่านั้น) ดู renderExecutive1 ใน executive.js
     // ==========================================================================
-    let execFilters = { Year: '', Month: '', Channel: '', SubChannel: '', Product: '', SubProduct: '', Admin: '' };
+    let execFilters = { Year: '', Channel: '', SubChannel: '', Admin: '', Product: 'All', SubProduct: 'All' };
     window.execFilters = execFilters;
+    const EXEC_OPTION_FILTER_TYPES = ['Channel', 'SubChannel', 'Admin'];
+    let execFiltersTouched = { Year: false, Channel: false, SubChannel: false, Admin: false };
+    window.execFiltersTouched = execFiltersTouched;
 
     function populateExecYearMenu() {
       const yearsSet = new Set();
@@ -982,29 +979,35 @@
       if (lbl) lbl.textContent = execFilters.Year || '-';
     }
 
-    function populateExecMonthMenu() {
-      const monthsSet = new Set();
-      rawData.forEach(row => {
-        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
-        if (!dateStr) return;
-        const d = parseDate(dateStr);
-        if (d && d.y.toString() === execFilters.Year) monthsSet.add(d.str);
-      });
-      const sortedMonths = Array.from(monthsSet).sort().reverse();
-      if (!execFilters.Month || sortedMonths.indexOf(execFilters.Month) === -1) {
-        execFilters.Month = sortedMonths.length > 0 ? sortedMonths[0] : '';
+    // เช็คว่า Channel/SubChannel/Admin ตัวไหนใน options (จาก Settings config) "มีข้อมูลจริง" อยู่ในปีที่กำลัง
+    // เลือก (execFilters.Year) บ้าง - ใช้เลือกค่า default ให้ตอน auto-select แทนการหยิบ options[0] เฉยๆ
+    // เพราะถ้า config เรียง option แรกเป็นค่าที่ไม่มีข้อมูลขายจริงเลย ตาราง CRM Report จะว่างเปล่าทั้งที่ปีนั้น
+    // มีข้อมูลอยู่จริง (ดู renderExecutive1: filteredData.length === 0 -> "No data available")
+    const EXEC_TYPE_GETTERS = {
+      Channel: (row) => getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row),
+      SubChannel: (row) => getNormalizedSubChannel(row),
+      Admin: (row) => getNormalizedAdmin(row)
+    };
+    function pickDefaultExecOption(type, options) {
+      if (options.length === 0) return '';
+      const getter = EXEC_TYPE_GETTERS[type];
+      if (!getter) return options[0];
+      const present = new Set();
+      for (const row of rawData) {
+        if (!isSaleOrder(row)) continue;
+        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+        const d = dateStr ? parseDate(dateStr) : null;
+        if (execFilters.Year && (!d || d.y.toString() !== execFilters.Year)) continue;
+        present.add(getter(row));
       }
-      const menu = document.getElementById('menu-Exec-Month');
-      if (menu) menu.innerHTML = sortedMonths.map(val => `<div onclick="setExecFilter('Month', '${val}')">${val}</div>`).join('');
-      const lbl = document.getElementById('lbl-Exec-Month');
-      if (lbl) lbl.textContent = execFilters.Month || '-';
+      return options.find(opt => present.has(opt)) || options[0];
     }
 
     function refreshExecOptionDropdowns() {
-      OPTION_FILTER_TYPES.forEach(type => {
+      EXEC_OPTION_FILTER_TYPES.forEach(type => {
         const options = getConfigOptionList(type);
         if (!execFilters[type] || options.indexOf(execFilters[type]) === -1) {
-          execFilters[type] = options.length > 0 ? options[0] : '';
+          execFilters[type] = pickDefaultExecOption(type, options);
         }
         const menu = document.getElementById('menu-Exec-' + type);
         if (menu) menu.innerHTML = options.map(val => `<div onclick="setExecFilter('${type}', '${val}')">${val}</div>`).join('');
@@ -1015,9 +1018,8 @@
 
     function populateExecDropdowns() {
       populateExecYearMenu();
-      populateExecMonthMenu();
       refreshExecOptionDropdowns();
-      ['Year', 'Month'].concat(OPTION_FILTER_TYPES).forEach(type => {
+      ['Year'].concat(EXEC_OPTION_FILTER_TYPES).forEach(type => {
         const btn = document.getElementById('btn-Exec-' + type);
         if (btn) btn.classList.toggle('active', !!execFilters[type]);
       });
@@ -1025,14 +1027,21 @@
 
     function setExecFilter(type, val) {
       execFilters[type] = val;
+      execFiltersTouched[type] = true;
+      // เปลี่ยน Year แล้ว - ตัวที่ผู้ใช้ยังไม่เคยกดเลือกเอง (ไม่ touched) ให้คำนวณ default ใหม่ตามปีล่าสุด
+      // แทนที่จะค้างค่าเดิมซึ่งอาจไม่มีข้อมูลในปีใหม่ (กันปัญหา "No data available" ตอนสลับปี)
+      if (type === 'Year') {
+        EXEC_OPTION_FILTER_TYPES.forEach(t => {
+          if (!execFiltersTouched[t]) execFilters[t] = '';
+        });
+        refreshExecOptionDropdowns();
+      }
       const lbl = document.getElementById('lbl-Exec-' + type);
       if (lbl) lbl.textContent = val;
       const menu = document.getElementById('menu-Exec-' + type);
       if (menu) menu.classList.remove('show');
       const btn = document.getElementById('btn-Exec-' + type);
       if (btn) btn.classList.add('active');
-
-      if (type === 'Year') populateExecMonthMenu();
 
       applyExecFilters();
     }
