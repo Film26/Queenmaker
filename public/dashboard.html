@@ -1023,19 +1023,42 @@
       SubProduct: (row) => getNormalizedSubProduct(getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set'])),
       Admin: (row) => getNormalizedAdmin(row)
     };
+    // เช็คว่าแถวนี้ตรงกับ exec filter ตัวอื่นๆ ที่ "เลือกไว้แล้ว" (ไม่ใช่ type ที่กำลังจะหา default ให้)
+    // หรือไม่ - ใช้กันไม่ให้ default ของแต่ละ type ถูกเลือกแบบแยกอิสระจากกันจนขัดแย้งกันเอง
+    // (เช่น Product default ได้ 'Plus' แต่ SubProduct default ได้ 'Kides original' ซึ่งไม่มีแถวไหนตรงทั้งคู่พร้อมกัน
+    // -> AND รวมกันแล้วไม่เหลือข้อมูลเลย ทั้งที่ปีนั้นมีข้อมูลขายจริง)
+    function rowMatchesOtherExecFilters(row, excludeType) {
+      for (const otherType of EXEC_OPTION_FILTER_TYPES) {
+        if (otherType === excludeType) continue;
+        const wanted = execFilters[otherType];
+        if (!wanted) continue;
+        const otherGetter = EXEC_TYPE_GETTERS[otherType];
+        if (otherGetter && otherGetter(row) !== wanted) return false;
+      }
+      return true;
+    }
     function pickDefaultExecOption(type, options) {
       if (options.length === 0) return '';
       const getter = EXEC_TYPE_GETTERS[type];
       if (!getter) return options[0];
       const present = new Set();
+      const presentIgnoringOtherFilters = new Set();
       for (const row of rawData) {
         if (!isSaleOrder(row)) continue;
         const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         const d = dateStr ? parseDate(dateStr) : null;
         if (execFilters.Year && (!d || d.y.toString() !== execFilters.Year)) continue;
+        presentIgnoringOtherFilters.add(getter(row));
+        // ต้อง match กับ filter ตัวอื่นที่ตั้งไว้แล้วด้วย (เลือกทีละ type ตามลำดับใน EXEC_OPTION_FILTER_TYPES
+        // ดู refreshExecOptionDropdowns - execFilters[otherType] ของ type ก่อนหน้าจะถูกตั้งไว้แล้วเสมอตอนนี้)
+        if (!rowMatchesOtherExecFilters(row, type)) continue;
         present.add(getter(row));
       }
-      return options.find(opt => present.has(opt)) || options[0];
+      // เลือกจาก combo ที่สอดคล้องกับ filter อื่นๆ ก่อน ถ้าไม่มีเลย (เช่น filter ก่อนหน้าเลือกมาไม่มีข้อมูลในปีนี้จริงๆ)
+      // ค่อย fallback ไปหาตัวที่มีข้อมูลอยู่บ้างแบบไม่เช็ค filter อื่น กันไม่ให้ตกไปที่ options[0] เฉยๆ
+      return options.find(opt => present.has(opt))
+        || options.find(opt => presentIgnoringOtherFilters.has(opt))
+        || options[0];
     }
 
     function refreshExecOptionDropdowns() {
