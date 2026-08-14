@@ -12,6 +12,19 @@ const SETTINGS_CATEGORIES = [
 
 const SETTINGS_ROLES = ['Super Admin', 'Manager', 'Sales Admin'];
 
+// หน้าที่ (สิทธิ์การเข้าถึง) ของแต่ละ Role — อิงตามสิทธิ์จริงที่ระบบบังคับใช้อยู่ตอนนี้:
+// มีเพียงเมนู Settings เท่านั้นที่ถูกจำกัดให้ Super Admin เห็น/เข้าถึงได้ (ดู checkSessionOrRedirect ใน dashboard.html)
+// ส่วนหน้าอื่น ๆ (Overview, Executive, Retention, Cohort ฯลฯ) ทุก Role เข้าถึงได้เหมือนกัน
+const SETTINGS_ROLE_PERMISSIONS = {
+  'Super Admin': 'เข้าถึงข้อมูลทั้งหมด และจัดการระบบ (Settings)',
+  'Manager': 'เข้าถึงข้อมูลทั้งหมด ยกเว้นหน้า Settings',
+  'Sales Admin': 'เข้าถึงข้อมูลทั้งหมด ยกเว้นหน้า Settings'
+};
+
+function stgRolePermission(role) {
+  return SETTINGS_ROLE_PERMISSIONS[role] || '-';
+}
+
 // --- Demo default data (ใช้ตอนยังไม่เคยบันทึกอะไรเลย) ---
 function settingsDefaultState() {
   const mk = (names) => names.map(name => ({ id: stgUid(), name, active: true }));
@@ -403,16 +416,18 @@ function stgBuildUsersSection() {
               <th style="text-align:left;">Username</th>
               <th style="text-align:left;">ชื่อ</th>
               <th>Role</th>
+              <th style="text-align:left;">หน้าที่</th>
               <th>สถานะ</th>
               <th style="width:130px;">จัดการ</th>
             </tr>
           </thead>
           <tbody>
-            ${users.length === 0 ? `<tr><td colspan="5" class="stg-empty">ยังไม่มีผู้ใช้งาน</td></tr>` : users.map(u => `
+            ${users.length === 0 ? `<tr><td colspan="6" class="stg-empty">ยังไม่มีผู้ใช้งาน</td></tr>` : users.map(u => `
               <tr>
                 <td style="text-align:left; font-weight:600;">${stgEscapeHtml(u.username)}</td>
                 <td style="text-align:left;">${stgEscapeHtml(u.name)}</td>
                 <td><span class="stg-role-badge">${stgEscapeHtml(u.role)}</span></td>
+                <td style="text-align:left; color:#7a665e; font-size:12px;">${stgEscapeHtml(stgRolePermission(u.role))}</td>
                 <td>
                   <span class="stg-badge ${u.active ? 'stg-badge-on' : 'stg-badge-off'}" style="cursor:pointer;"
                     title="คลิกเพื่อสลับสถานะ" onclick="stgToggleUserActive('${u.id}')">
@@ -580,7 +595,7 @@ function stgInjectStyles() {
       font-weight: 600; font-size: 13px; cursor: pointer; color: #555;
       display: flex; align-items: center; gap: 8px;
     }
-    .stg-maintab-btn.active { background-color: #fce268; border-color: #fce268; color: #333; }
+    .stg-maintab-btn.active { background-color: #1e293b; border-color: #1e293b; color: #ffffff; }
 
     .stg-card {
       background: #fff; border-radius: 16px; padding: 22px;
@@ -594,7 +609,7 @@ function stgInjectStyles() {
       display: flex; align-items: center; gap: 6px;
     }
     .stg-subtab-btn:hover { background: #fdf1e6; }
-    .stg-subtab-btn.active { background: #d95f1d; border-color: #d95f1d; color: #fff; }
+    .stg-subtab-btn.active { background: #1e293b; border-color: #1e293b; color: #fff; }
 
     .stg-section-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
     .stg-section-toolbar h3 { font-size: 15px; font-weight: 700; color: #1e293b; margin: 0 0 3px 0; }
@@ -605,7 +620,7 @@ function stgInjectStyles() {
       cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: opacity 0.15s;
     }
     .stg-btn:hover { opacity: 0.9; }
-    .stg-btn-primary { background: #d95f1d; color: #fff; }
+    .stg-btn-primary { background: #1e293b; color: #fff; }
     .stg-btn-ghost { background: #eee; color: #333; }
 
     .stg-table-wrapper { overflow-x: auto; }
@@ -653,7 +668,7 @@ function stgInjectStyles() {
       width: 100%; padding: 9px 12px; font-size: 13px; border: 1px solid #e2e8f0; border-radius: 8px;
       box-sizing: border-box; font-family: 'Inter', sans-serif;
     }
-    .stg-input:focus { border-color: #d95f1d; outline: none; }
+    .stg-input:focus { border-color: #1e293b; outline: none; }
     .stg-input:disabled { background: #f8fafc; color: #94a3b8; }
 
     .stg-toast-container {
