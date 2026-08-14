@@ -37,7 +37,7 @@ function settingsDefaultState() {
       Admin: mk(['May', 'บี', 'มิ้ว', 'แอน', 'แอล'])
     },
     users: [
-      { id: stgUid(), username: 'admin', password: 'admin123', name: 'ผู้ดูแลระบบ', role: 'Super Admin', active: true, createdAt: new Date().toISOString() }
+      { id: stgUid(), username: 'admin', password: 'admin123', name: 'ผู้ดูแลระบบ', role: 'Super Admin', permission: SETTINGS_ROLE_PERMISSIONS['Super Admin'], active: true, createdAt: new Date().toISOString() }
     ]
   };
 }
@@ -427,7 +427,7 @@ function stgBuildUsersSection() {
                 <td style="text-align:left; font-weight:600;">${stgEscapeHtml(u.username)}</td>
                 <td style="text-align:left;">${stgEscapeHtml(u.name)}</td>
                 <td><span class="stg-role-badge">${stgEscapeHtml(u.role)}</span></td>
-                <td style="text-align:left; color:#7a665e; font-size:12px;">${stgEscapeHtml(stgRolePermission(u.role))}</td>
+                <td style="text-align:left; color:#7a665e; font-size:12px;">${stgEscapeHtml(u.permission || stgRolePermission(u.role))}</td>
                 <td>
                   <span class="stg-badge ${u.active ? 'stg-badge-on' : 'stg-badge-off'}" style="cursor:pointer;"
                     title="คลิกเพื่อสลับสถานะ" onclick="stgToggleUserActive('${u.id}')">
@@ -473,6 +473,10 @@ window.stgOpenUserModal = function(userId) {
       </select>
     </div>
     <div class="stg-form-group">
+      <label>หน้าที่ (สิทธิ์การเข้าถึง)</label>
+      <textarea id="stg-user-permission" class="stg-input" rows="3" placeholder="เช่น เข้าถึงข้อมูลทั้งหมด ยกเว้นหน้า Settings">${stgEscapeHtml(user && user.permission ? user.permission : stgRolePermission(user ? user.role : SETTINGS_ROLES[0]))}</textarea>
+    </div>
+    <div class="stg-form-group">
       <label>สถานะ</label>
       <select id="stg-user-active" class="stg-input">
         <option value="1" ${!user || user.active ? 'selected' : ''}>Active</option>
@@ -480,6 +484,12 @@ window.stgOpenUserModal = function(userId) {
       </select>
     </div>
   `;
+
+  const roleSelect = document.getElementById('stg-user-role');
+  roleSelect.onchange = () => {
+    const permField = document.getElementById('stg-user-permission');
+    if (permField) permField.value = stgRolePermission(roleSelect.value);
+  };
 
   const saveBtn = document.getElementById('stg-modal-save-btn');
   saveBtn.onclick = () => stgSaveUserModal(userId);
@@ -492,6 +502,7 @@ function stgSaveUserModal(userId) {
   const password = document.getElementById('stg-user-password').value;
   const name = document.getElementById('stg-user-name').value.trim();
   const role = document.getElementById('stg-user-role').value;
+  const permission = document.getElementById('stg-user-permission').value.trim();
   const active = document.getElementById('stg-user-active').value === '1';
 
   if (!isEdit && !username) { stgToast('กรุณากรอก Username', 'error'); return; }
@@ -503,7 +514,7 @@ function stgSaveUserModal(userId) {
   if (isEdit) {
     const idx = users.findIndex(x => x.id === userId);
     if (idx < 0) return;
-    const updated = Object.assign({}, users[idx], { name, role, active });
+    const updated = Object.assign({}, users[idx], { name, role, permission, active });
     if (password) updated.password = password;
     users[idx] = updated;
   } else {
@@ -511,7 +522,7 @@ function stgSaveUserModal(userId) {
       stgToast('Username นี้ถูกใช้งานแล้ว', 'error');
       return;
     }
-    users.push({ id: stgUid(), username, password, name, role, active, createdAt: new Date().toISOString() });
+    users.push({ id: stgUid(), username, password, name, role, permission, active, createdAt: new Date().toISOString() });
   }
 
   settingsApiSaveUsers(users).then(() => {
@@ -670,6 +681,7 @@ function stgInjectStyles() {
     }
     .stg-input:focus { border-color: #1e293b; outline: none; }
     .stg-input:disabled { background: #f8fafc; color: #94a3b8; }
+    textarea.stg-input { resize: vertical; line-height: 1.5; }
 
     .stg-toast-container {
       position: fixed; top: 20px; right: 20px; z-index: 2000;
