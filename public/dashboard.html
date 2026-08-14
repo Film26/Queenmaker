@@ -117,7 +117,7 @@
             <i class="fas fa-file-import"></i> Import Data
           </button>
           <input type="file" id="fileInput" accept=".csv" style="display: none;">
-          <a href="#" class="btn" id="logoutBtn" onclick="event.preventDefault(); doLogout();" style="background: #eee; color: #333; text-decoration: none; border-radius: 20px; padding: 8px 20px; font-weight: 600;">Logout</a>
+          <a href="#" class="btn" id="logoutBtn" onclick="event.preventDefault(); doLogout();" style="background: #1e293b; color: #fff; text-decoration: none; border-radius: 20px; padding: 8px 20px; font-weight: 600;">Logout</a>
         </div>
       </header>
       <div class="dashboard-content">
@@ -131,31 +131,31 @@
         </div>
         <div class="filters-bar" id="mainFiltersBar">
           <div class="filter-dropdown">
-            <button class="filter-btn-new" id="btn-Year" onclick="toggleFilter('menu-Year')">Year: <span id="lbl-Year">-</span> <i class="fas fa-caret-down"></i></button>
+            <button class="filter-btn-new" id="btn-Year" onclick="toggleFilter('menu-Year')">Year: <span id="lbl-Year">All</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Year" class="filter-content"></div>
           </div>
           <div class="filter-dropdown">
-            <button class="filter-btn-new" id="btn-Month" onclick="toggleFilter('menu-Month')">Month: <span id="lbl-Month">-</span> <i class="fas fa-caret-down"></i></button>
+            <button class="filter-btn-new" id="btn-Month" onclick="toggleFilter('menu-Month')">Month: <span id="lbl-Month">All</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Month" class="filter-content"></div>
           </div>
           <div class="filter-dropdown">
-            <button class="filter-btn-new" id="btn-Channel" onclick="toggleFilter('menu-Channel')">Channel: <span id="lbl-Channel">-</span> <i class="fas fa-caret-down"></i></button>
+            <button class="filter-btn-new" id="btn-Channel" onclick="toggleFilter('menu-Channel')">Channel: <span id="lbl-Channel">All</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Channel" class="filter-content"></div>
           </div>
           <div class="filter-dropdown">
-            <button class="filter-btn-new" id="btn-SubChannel" onclick="toggleFilter('menu-SubChannel')">SubChannel: <span id="lbl-SubChannel">-</span> <i class="fas fa-caret-down"></i></button>
+            <button class="filter-btn-new" id="btn-SubChannel" onclick="toggleFilter('menu-SubChannel')">SubChannel: <span id="lbl-SubChannel">All</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-SubChannel" class="filter-content"></div>
           </div>
           <div class="filter-dropdown">
-            <button class="filter-btn-new" id="btn-Product" onclick="toggleFilter('menu-Product')">Product: <span id="lbl-Product">-</span> <i class="fas fa-caret-down"></i></button>
+            <button class="filter-btn-new" id="btn-Product" onclick="toggleFilter('menu-Product')">Product: <span id="lbl-Product">All</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Product" class="filter-content"></div>
           </div>
           <div class="filter-dropdown">
-            <button class="filter-btn-new" id="btn-SubProduct" onclick="toggleFilter('menu-SubProduct')">Sub Product: <span id="lbl-SubProduct">-</span> <i class="fas fa-caret-down"></i></button>
+            <button class="filter-btn-new" id="btn-SubProduct" onclick="toggleFilter('menu-SubProduct')">Sub Product: <span id="lbl-SubProduct">All</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-SubProduct" class="filter-content"></div>
           </div>
           <div class="filter-dropdown">
-            <button class="filter-btn-new" id="btn-Admin" onclick="toggleFilter('menu-Admin')">Admin: <span id="lbl-Admin">-</span> <i class="fas fa-caret-down"></i></button>
+            <button class="filter-btn-new" id="btn-Admin" onclick="toggleFilter('menu-Admin')">Admin: <span id="lbl-Admin">All</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Admin" class="filter-content"></div>
           </div>
           <div class="filter-dropdown">
@@ -332,16 +332,8 @@
     let filteredData = [];
 
     // คอยเก็บสถานะ Filter โดยเพิ่ม 'KPI' เข้ามา (ตั้งค่าเริ่มต้นเป็น Off)
-    // ไม่มีตัวเลือก "All" อีกต่อไป (เดิมมี All ทำให้ข้อมูลผิดพลาดบ่อย) - ทุก dimension เริ่มเป็น '' แล้ว
-    // auto-select ค่าจริงล่าสุดที่มีข้อมูลให้อัตโนมัติ (ดู populateYearMenu/populateMonthMenu/
-    // refreshOptionDropdownsFromConfig ด้านล่าง) ตาม pattern เดียวกับ execFilters ที่ใช้อยู่แล้วในแท็บ Executive
-    let filters = { Month: '', Year: '', Channel: '', SubChannel: '', Product: '', SubProduct: '', Admin: '', KPI: 'Off' };
+    let filters = { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All', KPI: 'Off' };
     window.filters = filters;
-    // filtersTouched: มิเรอร์ execFiltersTouched - กันไม่ให้ dropdown ที่ผู้ใช้เลือกเองโดนรีเซ็ตทิ้งตอนเปลี่ยน Year
-    // (Channel/SubChannel/Product/SubProduct/Admin) และใช้บอกด้วยว่าควรโชว์ปุ่ม "Clear Filters" หรือไม่
-    // (Year/Month รวมอยู่ด้วยเพื่อจุดประสงค์หลังนี้ - ต่างจาก execFiltersTouched ที่ไม่มี Month)
-    let filtersTouched = { Year: false, Month: false, Channel: false, SubChannel: false, Product: false, SubProduct: false, Admin: false };
-    window.filtersTouched = filtersTouched;
 
     // --- Auth/session (Task 4/7) ---
     // The server already redirects an unauthenticated GET /dashboard.html to the login page
@@ -898,8 +890,7 @@
     }
 
     // สร้างเมนู Dropdown ของ Channel/SubChannel/Product/SubProduct/Admin ใหม่จาก window.AppData.config
-    // (ไม่แตะ Year/Month) ไม่มีตัวเลือก "All" อีกต่อไป - ถ้า filter ที่เลือกค้างไว้ถูกลบ/ปิดใช้งานไปแล้ว จะเลือกค่า
-    // default ใหม่ที่มีข้อมูลจริงให้อัตโนมัติแทน (ใช้ pickDefaultOption เดียวกับที่ execFilters ใช้อยู่แล้ว)
+    // (ไม่แตะ Year/Month) ถ้า filter ที่เลือกค้างไว้ถูกลบ/ปิดใช้งานไปแล้ว จะรีเซ็ตกลับเป็น 'All' ให้อัตโนมัติ
     // หมายเหตุ: ฟังก์ชันนี้ไม่เรียก applyFilters() เอง เพื่อกันการเรียกซ้อนกันเป็น infinite loop
     // (ฟังก์ชันนี้ถูกเรียกจากภายใน applyFilters() ผ่าน populateDropdowns() ด้วย) ผู้เรียกที่ต้องการรีเฟรชข้อมูล
     // ต้องเรียก applyFilters() เองอีกทีหลังจากนี้ (ดู appDataChanged listener ด้านล่าง)
@@ -909,17 +900,19 @@
         const menu = document.getElementById('menu-' + type);
         if (!menu) return;
         const options = getConfigOptionList(type);
+        menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
+        options.forEach(val => {
+          menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
+        });
 
-        if (!filters[type] || options.indexOf(filters[type]) === -1) {
-          filters[type] = pickDefaultOption(type, options, filters);
-          filtersTouched[type] = false;
+        if (filters[type] !== 'All' && options.indexOf(filters[type]) === -1) {
+          filters[type] = 'All';
+          const lbl = document.getElementById('lbl-' + type);
+          if (lbl) lbl.textContent = 'All';
+          const btn = document.getElementById('btn-' + type);
+          if (btn) btn.classList.remove('active');
           needReapply = true;
         }
-        menu.innerHTML = options.map(val => `<div onclick="setFilter('${type}', '${val}')">${val}</div>`).join('');
-        const lbl = document.getElementById('lbl-' + type);
-        if (lbl) lbl.textContent = filters[type] || '-';
-        const btn = document.getElementById('btn-' + type);
-        if (btn) btn.classList.toggle('active', !!filters[type]);
       });
       return needReapply;
     }
@@ -990,32 +983,30 @@
     // อยู่ในปีที่กำลังเลือก (execFilters.Year) บ้าง - ใช้เลือกค่า default ให้ตอน auto-select แทนการหยิบ options[0]
     // เฉยๆ เพราะถ้า config เรียง option แรกเป็นค่าที่ไม่มีข้อมูลขายจริงเลย ตาราง CRM Report จะว่างเปล่าทั้งที่ปีนั้น
     // มีข้อมูลอยู่จริง (ดู renderExecutive1: filteredData.length === 0 -> "No data available")
-    // Generalized: ใช้ร่วมกันได้ทั้ง execFilters (แท็บ Executive) และ filters (mainFiltersBar - Overview/Cohort/
-    // Migration/Retention) - รับ filtersObj เป็น parameter แทนการผูกกับ execFilters ตรงๆ เหมือนเดิม
-    const OPTION_TYPE_GETTERS = {
+    const EXEC_TYPE_GETTERS = {
       Channel: (row) => getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row),
       SubChannel: (row) => getNormalizedSubChannel(row),
       Product: (row) => getNormalizedProduct(getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set'])),
       SubProduct: (row) => getNormalizedSubProduct(getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set'])),
       Admin: (row) => getNormalizedAdmin(row)
     };
-    // เช็คว่าแถวนี้ตรงกับ filter ตัวอื่นๆ ใน filtersObj ที่ "เลือกไว้แล้ว" (ไม่ใช่ type ที่กำลังจะหา default ให้)
+    // เช็คว่าแถวนี้ตรงกับ exec filter ตัวอื่นๆ ที่ "เลือกไว้แล้ว" (ไม่ใช่ type ที่กำลังจะหา default ให้)
     // หรือไม่ - ใช้กันไม่ให้ default ของแต่ละ type ถูกเลือกแบบแยกอิสระจากกันจนขัดแย้งกันเอง
     // (เช่น Product default ได้ 'Plus' แต่ SubProduct default ได้ 'Kides original' ซึ่งไม่มีแถวไหนตรงทั้งคู่พร้อมกัน
     // -> AND รวมกันแล้วไม่เหลือข้อมูลเลย ทั้งที่ปีนั้นมีข้อมูลขายจริง)
-    function rowMatchesOtherFilters(row, excludeType, filtersObj) {
-      for (const otherType of OPTION_FILTER_TYPES) {
+    function rowMatchesOtherExecFilters(row, excludeType) {
+      for (const otherType of EXEC_OPTION_FILTER_TYPES) {
         if (otherType === excludeType) continue;
-        const wanted = filtersObj[otherType];
+        const wanted = execFilters[otherType];
         if (!wanted) continue;
-        const otherGetter = OPTION_TYPE_GETTERS[otherType];
+        const otherGetter = EXEC_TYPE_GETTERS[otherType];
         if (otherGetter && otherGetter(row) !== wanted) return false;
       }
       return true;
     }
-    function pickDefaultOption(type, options, filtersObj) {
+    function pickDefaultExecOption(type, options) {
       if (options.length === 0) return '';
-      const getter = OPTION_TYPE_GETTERS[type];
+      const getter = EXEC_TYPE_GETTERS[type];
       if (!getter) return options[0];
       const present = new Set();
       const presentIgnoringOtherFilters = new Set();
@@ -1023,12 +1014,11 @@
         if (!isSaleOrder(row)) continue;
         const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         const d = dateStr ? parseDate(dateStr) : null;
-        if (filtersObj.Year && (!d || d.y.toString() !== filtersObj.Year)) continue;
+        if (execFilters.Year && (!d || d.y.toString() !== execFilters.Year)) continue;
         presentIgnoringOtherFilters.add(getter(row));
-        // ต้อง match กับ filter ตัวอื่นที่ตั้งไว้แล้วด้วย (เลือกทีละ type ตามลำดับใน OPTION_FILTER_TYPES
-        // ดู refreshExecOptionDropdowns/refreshOptionDropdownsFromConfig - filtersObj[otherType] ของ type
-        // ก่อนหน้าจะถูกตั้งไว้แล้วเสมอตอนนี้)
-        if (!rowMatchesOtherFilters(row, type, filtersObj)) continue;
+        // ต้อง match กับ filter ตัวอื่นที่ตั้งไว้แล้วด้วย (เลือกทีละ type ตามลำดับใน EXEC_OPTION_FILTER_TYPES
+        // ดู refreshExecOptionDropdowns - execFilters[otherType] ของ type ก่อนหน้าจะถูกตั้งไว้แล้วเสมอตอนนี้)
+        if (!rowMatchesOtherExecFilters(row, type)) continue;
         present.add(getter(row));
       }
       // เลือกจาก combo ที่สอดคล้องกับ filter อื่นๆ ก่อน ถ้าไม่มีเลย (เช่น filter ก่อนหน้าเลือกมาไม่มีข้อมูลในปีนี้จริงๆ)
@@ -1042,7 +1032,7 @@
       EXEC_OPTION_FILTER_TYPES.forEach(type => {
         const options = getConfigOptionList(type);
         if (!execFilters[type] || options.indexOf(execFilters[type]) === -1) {
-          execFilters[type] = pickDefaultOption(type, options, execFilters);
+          execFilters[type] = pickDefaultExecOption(type, options);
         }
         const menu = document.getElementById('menu-Exec-' + type);
         if (menu) menu.innerHTML = options.map(val => `<div onclick="setExecFilter('${type}', '${val}')">${val}</div>`).join('');
@@ -1107,8 +1097,6 @@
     });
 
     // Year list never depends on the current filter selection - built once from all raw data.
-    // ไม่มีตัวเลือก "All" อีกต่อไป - auto-select ปีล่าสุดที่มีข้อมูลจริงให้ ถ้าค่าปัจจุบันว่าง/ไม่ตรงกับข้อมูลที่มี
-    // (มิเรอร์ populateExecYearMenu ของแท็บ Executive)
     function populateYearMenu() {
       const yearsSet = new Set();
       rawData.forEach(row => {
@@ -1118,22 +1106,17 @@
         if (!d) return;
         yearsSet.add(d.y.toString());
       });
-      const sortedYears = Array.from(yearsSet).sort();
-      if (!filters.Year || sortedYears.indexOf(filters.Year) === -1) {
-        filters.Year = sortedYears.length > 0 ? sortedYears[sortedYears.length - 1] : '';
-        filtersTouched.Year = false;
-      }
       const yearMenu = document.getElementById('menu-Year');
-      if (yearMenu) yearMenu.innerHTML = sortedYears.map(val => `<div onclick="setFilter('Year', '${val}')">${val}</div>`).join('');
-      const lbl = document.getElementById('lbl-Year');
-      if (lbl) lbl.textContent = filters.Year || '-';
-      const btn = document.getElementById('btn-Year');
-      if (btn) btn.classList.toggle('active', !!filters.Year);
+      if (yearMenu) {
+        yearMenu.innerHTML = `<div onclick="setFilter('Year', 'All')">All</div>`;
+        Array.from(yearsSet).sort().forEach(val => {
+          yearMenu.innerHTML += `<div onclick="setFilter('Year', '${val}')">${val}</div>`;
+        });
+      }
     }
 
     // Month list is scoped to the selected Year so you don't have to re-pick the month
-    // after switching years. ไม่มีตัวเลือก "All" อีกต่อไป - auto-select เดือนล่าสุดของปีนั้นให้ ถ้าเดือนที่เลือกไว้
-    // ไม่มีข้อมูลในปีใหม่ (มิเรอร์ populateExecMonthMenu ของแท็บ Executive)
+    // after switching years. Resets the Month filter if it's no longer valid for the new year.
     function populateMonthMenu(selectedYear) {
       const monthsSet = new Set();
       rawData.forEach(row => {
@@ -1141,48 +1124,41 @@
         if (!dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
-        if (selectedYear && d.y.toString() !== selectedYear) return;
+        if (selectedYear && selectedYear !== 'All' && d.y.toString() !== selectedYear) return;
         monthsSet.add(d.str);
       });
-      const sortedMonths = Array.from(monthsSet).sort().reverse();
-      if (!filters.Month || sortedMonths.indexOf(filters.Month) === -1) {
-        filters.Month = sortedMonths.length > 0 ? sortedMonths[0] : '';
-        filtersTouched.Month = false;
-      }
       const monthMenu = document.getElementById('menu-Month');
-      if (monthMenu) monthMenu.innerHTML = sortedMonths.map(val => `<div onclick="setFilter('Month', '${val}')">${val}</div>`).join('');
-      const lbl = document.getElementById('lbl-Month');
-      if (lbl) lbl.textContent = filters.Month || '-';
-      const btn = document.getElementById('btn-Month');
-      if (btn) btn.classList.toggle('active', !!filters.Month);
-    }
-
-    // แสดง/ซ่อนปุ่ม "Clear Filters" ตามว่าผู้ใช้เคยเลือก filter เองไปจาก default (ปี/เดือน/ตัวเลือกล่าสุดที่มีข้อมูลจริง)
-    // แล้วหรือยัง - เดิม element id พิมพ์ผิด (clearFilterBtn แทนที่จะเป็น clearFiltersBtn) ทำให้ไม่เคยแสดงผลเลย
-    function updateClearFiltersVisibility() {
-      const anyTouched = Object.keys(filtersTouched).some(k => filtersTouched[k]);
-      const btn = document.getElementById('clearFiltersBtn');
-      if (btn) btn.style.display = anyTouched ? 'inline-block' : 'none';
+      if (monthMenu) {
+        monthMenu.innerHTML = `<div onclick="setFilter('Month', 'All')">All</div>`;
+        Array.from(monthsSet).sort().reverse().forEach(val => {
+          monthMenu.innerHTML += `<div onclick="setFilter('Month', '${val}')">${val}</div>`;
+        });
+      }
+      if (filters.Month !== 'All' && !monthsSet.has(filters.Month)) {
+        filters.Month = 'All';
+        const lbl = document.getElementById('lbl-Month');
+        if (lbl) lbl.textContent = 'All';
+        const btn = document.getElementById('btn-Month');
+        if (btn) btn.classList.remove('active');
+      }
     }
 
     function setFilter(type, val) {
       filters[type] = val;
-      if (type !== 'KPI') filtersTouched[type] = true;
-      const lbl = document.getElementById('lbl-' + type);
-      if (lbl) lbl.textContent = val || '-';
+      document.getElementById('lbl-' + type).textContent = val;
       const menu = document.getElementById('menu-' + type);
       if (menu) menu.classList.remove('show');
 
-      const btn = document.getElementById('btn-' + type);
-      if (btn) btn.classList.toggle('active', type === 'KPI' ? val === 'On' : !!val);
+      if (val !== 'All' && val !== 'Off') {
+        document.getElementById('btn-' + type).classList.add('active');
+        if(document.getElementById('clearFilterBtn')) {
+          document.getElementById('clearFilterBtn').style.display = 'inline-block';
+        }
+      } else {
+        document.getElementById('btn-' + type).classList.remove('active');
+      }
 
       if (type === 'Year') {
-        // เปลี่ยน Year แล้ว - ตัวที่ผู้ใช้ยังไม่เคยกดเลือกเอง (ไม่ touched) ให้คำนวณ default ใหม่ตามปีล่าสุด
-        // แทนที่จะค้างค่าเดิมซึ่งอาจไม่มีข้อมูลในปีใหม่ (มิเรอร์ setExecFilter)
-        OPTION_FILTER_TYPES.forEach(t => {
-          if (!filtersTouched[t]) filters[t] = '';
-        });
-        refreshOptionDropdownsFromConfig();
         populateMonthMenu(val);
       }
       if (type === 'KPI') {
@@ -1190,7 +1166,6 @@
         if (icon) icon.className = val === 'On' ? 'fas fa-toggle-on' : 'fas fa-toggle-off';
       }
 
-      updateClearFiltersVisibility();
       applyFilters();
     }
 
@@ -1199,25 +1174,23 @@
       setFilter('KPI', filters.KPI === 'On' ? 'Off' : 'On');
     }
 
-    // "Clear Filters" ไม่มีความหมายเป็น "ตั้งกลับเป็น All" อีกต่อไป (ไม่มี All แล้ว) - เปลี่ยนเป็น "รีเซ็ตกลับไปที่ค่า
-    // default" (ปี/เดือนล่าสุดที่มีข้อมูลจริง + ตัวเลือกที่มีข้อมูลจริง) เหมือนตอนโหลดข้อมูลครั้งแรก โดยเรียก
-    // populateDropdowns() ซ้ำหลังเคลียร์ touched state ทั้งหมด (reuse logic เดิม ไม่ต้องเขียนใหม่)
     function clearFilters() {
-      filters.Year = '';
-      filters.Month = '';
-      OPTION_FILTER_TYPES.forEach(type => { filters[type] = ''; });
-      Object.keys(filtersTouched).forEach(k => { filtersTouched[k] = false; });
+      ['Month', 'Year', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].forEach(type => {
+        filters[type] = 'All';
+        document.getElementById('lbl-' + type).textContent = 'All';
+        document.getElementById('btn-' + type).classList.remove('active');
+      });
 
       filters['KPI'] = 'Off';
-      const lblKpi = document.getElementById('lbl-KPI');
-      if (lblKpi) lblKpi.textContent = 'Off';
-      const btnKpi = document.getElementById('btn-KPI');
-      if (btnKpi) btnKpi.classList.remove('active');
+      document.getElementById('lbl-KPI').textContent = 'Off';
+      document.getElementById('btn-KPI').classList.remove('active');
       const kpiIcon = document.getElementById('icon-KPI');
       if (kpiIcon) kpiIcon.className = 'fas fa-toggle-off';
 
-      populateDropdowns();
-      updateClearFiltersVisibility();
+      if(document.getElementById('clearFilterBtn')) {
+        document.getElementById('clearFilterBtn').style.display = 'none';
+      }
+      populateMonthMenu('All');
       applyFilters();
     }
 
@@ -1242,14 +1215,12 @@
         const admin = getNormalizedAdmin(row);
 
         if (!isProductActive(product)) return false;
-        // ไม่มีค่า 'All' อีกต่อไปทั้งใน filters (mainFiltersBar) และ execFilters (แท็บ Executive) - เทียบตรงๆ
-        // ได้เลย (ค่าว่าง '' ก่อนข้อมูล/ตัวเลือกถูก populate จะทำให้แถวไม่ผ่านเงื่อนไข ซึ่งถูกต้องแล้ว)
-        if (sourceFilters.Year !== d.y.toString()) return false;
-        if (sourceFilters.Channel !== channel) return false;
-        if (sourceFilters.SubChannel !== subChannel) return false;
-        if (sourceFilters.Product !== product) return false;
-        if (sourceFilters.SubProduct !== subProduct) return false;
-        if (sourceFilters.Admin !== admin) return false;
+        if (sourceFilters.Year !== 'All' && d.y.toString() !== sourceFilters.Year) return false;
+        if (sourceFilters.Channel !== 'All' && channel !== sourceFilters.Channel) return false;
+        if (sourceFilters.SubChannel !== 'All' && subChannel !== sourceFilters.SubChannel) return false;
+        if (sourceFilters.Product !== 'All' && product !== sourceFilters.Product) return false;
+        if (sourceFilters.SubProduct !== 'All' && subProduct !== sourceFilters.SubProduct) return false;
+        if (sourceFilters.Admin !== 'All' && admin !== sourceFilters.Admin) return false;
         return true;
       });
     }
@@ -1262,12 +1233,7 @@
       const __savedScrollTop = __scrollBox.scrollTop;
       try {
 
-      // เรียก populateDropdowns() ทุกครั้ง (ไม่ใช่แค่ครั้งแรกที่เมนูยังว่าง) เพื่อ validate ค่า filter ปัจจุบันใหม่เสมอ
-      // มิเรอร์วิธีที่ populateExecDropdowns() ของแท็บ Executive ถูกเรียกด้านล่าง - จำเป็นเพราะตอนนี้ filters.Year/Month
-      // ไม่มีค่า 'All' ที่ทนทานต่อการ import ไฟล์ใหม่ที่มีช่วงปี/เดือนต่างจากเดิมอีกต่อไป ต้อง re-validate จริง
-      // (ฟังก์ชันเหล่านี้ idempotent อยู่แล้ว - จะไม่ไปรีเซ็ตค่าที่ยังถูกต้องอยู่ ดู populateYearMenu/populateMonthMenu/
-      // refreshOptionDropdownsFromConfig)
-      if (rawData.length > 0) populateDropdowns();
+      if (rawData.length > 0 && document.getElementById('menu-Year').children.length === 0) populateDropdowns();
       filteredData = computeFilteredData(filters);
 
       processData(filteredData);
@@ -1367,10 +1333,8 @@
       if (availableMonths.length === 0) { renderEmpty(); return; }
       // เลือก Month แล้วต้องมีข้อมูลจริงของเดือนนั้นเท่านั้น (ตาม Channel/SubChannel/Product/SubProduct/Admin
       // ที่กรองอยู่ด้วย) ห้ามย้อนไปโชว์ยอดของเดือนก่อนหน้าแทน ไม่งั้นจะดูเหมือนมีข้อมูลทั้งที่เดือนที่เลือกจริงๆ ไม่มี
-      // filters.Month ไม่มีค่า 'All' อีกต่อไป (populateMonthMenu รับประกันว่ามีค่าจริงเสมอก่อนถึงจุดนี้) - เหลือ
-      // fallback ไปเดือนล่าสุดไว้เผื่อกรณี edge case ที่ยังไม่ทัน populate เท่านั้น
-      if (filters.Month && !monthlyData[filters.Month]) { renderEmpty(); return; }
-      const selectedMonthStr = filters.Month || availableMonths[availableMonths.length - 1];
+      if (filters.Month !== 'All' && !monthlyData[filters.Month]) { renderEmpty(); return; }
+      const selectedMonthStr = filters.Month !== 'All' ? filters.Month : availableMonths[availableMonths.length - 1];
       const idx = availableMonths.indexOf(selectedMonthStr);
       const curr = monthlyData[selectedMonthStr];
       const prev = idx > 0 ? monthlyData[availableMonths[idx - 1]] : null;
