@@ -101,7 +101,7 @@ function renderExecutive2(filteredData, rawData) {
         const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
         const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
         const sc = getExec2Group(row);
-        const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+        const dateStr = getVal(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         if (!id || !dateStr) return;
         const d = parseD(dateStr);
         if (!d) return;
@@ -121,7 +121,7 @@ function renderExecutive2(filteredData, rawData) {
   // month as a meaningful snapshot instead of a whole-year sum (percentages skew badly over a full year).
   const rowMonthStr = (row) => {
     const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-    const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+    const dateStr = getVal(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
     const d = parseD(dateStr);
     return d ? `${d.y}-${String(d.m).padStart(2, '0')}` : '';
   };
@@ -154,8 +154,8 @@ function renderExecutive2(filteredData, rawData) {
     
     const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
     const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
-    const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-    const revenueStr = getVal(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+    const dateStr = getVal(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+    const revenueStr = getVal(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
     
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
