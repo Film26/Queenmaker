@@ -1,458 +1,575 @@
-// public/retention.jsฃ
+// public/retention.js
+
 function renderRetention(filteredData, rawData) {
   const container = document.getElementById('view-retention');
-  const dataSrc = (filteredData && filteredData.length > 0) ? filteredData : [];
-
-  if (!dataSrc || dataSrc.length === 0) {
-    container.innerHTML = `
-      <div style="text-align:center; padding:60px 20px; color:#64748b; font-family:'Prompt',sans-serif; background: white; border-radius:16px; border:1px dashed #cbd5e1; margin: 20px;">
-        <span style="font-size: 40px; display:block; margin-bottom:15px;">📊</span>
-        <b style="font-size:16px; color:#0f172a; display:block; margin-bottom:5px;">ไม่พบข้อมูลสำหรับการวิเคราะห์ประสิทธิภาพ</b>
-        <p style="font-size:13px; color:#94a3b8; margin:0 auto; max-width:400px;">กรุณาตรวจสอบว่าได้ทำการอัปโหลดไฟล์ข้อมูลยอดขาย และตรวจสอบระบบคัดกรองวันที่ (Filter) ด้านบนเรียบร้อยแล้ว</p>
-      </div>
-    `;
+  
+  if (!filteredData || filteredData.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">No data available. Please adjust filters or load data.</div>';
     return;
   }
 
-  // --- ฟังก์ชันดักจับชื่อคอลัมน์ภาษาไทย/อังกฤษ ยืดหยุ่นตามไฟล์ดิบ ---
-  const getFlexibleValue = (row, keys) => {
-    for (let key of keys) {
-      if (row[key] !== undefined && row[key] !== null) return row[key];
-    }
-    for (let rKey in row) {
-      const cleanRKey = rKey.replace(/\s+/g, '').toLowerCase();
-      for (let key of keys) {
-        const cleanKey = key.replace(/\s+/g, '').toLowerCase();
-        if (cleanRKey === cleanKey && row[rKey] !== undefined) return row[rKey];
-      }
-    }
-    return '';
-  };
+  // Store active toggle state globally to persist across filter changes
+  window.retentionActiveToggle = window.retentionActiveToggle || 'category';
 
-  const checkIsSaleOrder = (row) => {
-    const status = getFlexibleValue(row, ['สถานะ', 'Status', 'สถานะออเดอร์', 'ประเภท']).toString().toLowerCase();
-    if (status.includes('ยกเลิก') || status.includes('cancel') || status.includes('คืนสินค้า')) return false;
-    return true;
-  };
-
-  const getCustId = (row) => {
-    return getFlexibleValue(row, ['รหัสลูกค้า', 'Customer ID', 'เบอร์โทร', 'Phone', 'ชื่อลูกค้า', 'Customer Name', 'ID']);
-  };
-
-  // --- 1. PREMIUM ENTREPRENEUR STYLES ---
-  if (!document.getElementById('retention-entrepreneur-styles')) {
+  // 1. Inject CSS Styles
+  if (!document.getElementById('retention-styles')) {
     const style = document.createElement('style');
-    style.id = 'retention-entrepreneur-styles';
+    style.id = 'retention-styles';
     style.innerHTML = `
-      .biz-dashboard { font-family: 'Inter', 'Prompt', sans-serif; color: #0f172a; background-color: #f8fafc; padding: 5px; }
-      .biz-header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; padding: 24px 30px; border-radius: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 25px -5px rgba(15,23,42,0.1); }
-      .biz-header-title h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-      .biz-header-title p { margin: 6px 0 0 0; font-size: 13px; color: #94a3b8; }
-      .biz-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 24px; }
-      .biz-kpi-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px; display: flex; align-items: center; justify-content: space-between; position: relative; overflow: hidden; }
-      .biz-kpi-card::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; background: #cbd5e1; }
-      .biz-kpi-card.card-revenue::before { background: #10b981; }
-      .biz-kpi-card.card-orders::before { background: #3b82f6; }
-      .biz-kpi-card.card-buyers::before { background: #8b5cf6; }
-      .biz-kpi-card.card-share::before { background: #f59e0b; }
-      .biz-kpi-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
-      .biz-kpi-value { font-size: 26px; font-weight: 700; color: #0f172a; margin: 6px 0 2px 0; }
-      .biz-kpi-desc { font-size: 11.5px; color: #94a3b8; font-weight: 500; }
-      .biz-kpi-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+      .retention-container {
+        font-family: 'Inter', 'Outfit', sans-serif;
+        color: #1e293b;
+        background-color: #f8fafc;
+      }
+      .retention-header {
+        background: linear-gradient(135deg, #0b2240 0%, #1e293b 100%);
+        color: white;
+        padding: 25px 30px;
+        border-radius: 16px;
+        margin-bottom: 25px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .retention-header-text h2 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 0.5px; }
+      .retention-header-text p { margin: 6px 0 0 0; font-size: 13.5px; color: #cbd5e1; }
       
-      .report-summary-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-      .report-summary-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-      .report-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
-      .report-formula-card { padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 8px; background: #f8fafc; }
-      .report-formula-header { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
-      .report-formula-det { font-size: 13px; color: #334155; font-weight: 500; margin: 0; padding-left: 18px; }
-
-      .biz-main-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; margin-bottom: 24px; }
-      @media (max-width: 1024px) { .biz-main-grid { grid-template-columns: 1fr; } }
-      .biz-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-      .biz-card-title { font-size: 16px; font-weight: 700; color: #0f172a; margin: 0 0 18px 0; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
-      .biz-card-subtitle { font-size: 12px; font-weight: 400; color: #64748b; margin-top: 2px; }
+      .retention-toggle-container {
+        display: flex;
+        background: #e2e8f0;
+        padding: 4px;
+        border-radius: 10px;
+        margin-bottom: 25px;
+        width: fit-content;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+      }
+      .retention-toggle-btn {
+        border: none;
+        background: transparent;
+        padding: 8px 18px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #475569;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .retention-toggle-btn.active {
+        background: white;
+        color: #0b2240;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      }
       
-      .biz-chart-container { display: flex; align-items: flex-end; justify-content: flex-start; height: 180px; padding: 20px 15px 10px 15px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 15px; gap: 16px; overflow-x: auto; }
-      .biz-chart-bar-wrapper { display: flex; flex-direction: column; align-items: center; min-width: 45px; flex: 1; height: 100%; justify-content: flex-end; }
-      .biz-chart-bar { width: 100%; max-width: 32px; border-radius: 6px 6px 0 0; background: #3b82f6; transition: height 0.4s ease; position: relative; cursor: pointer; }
-      .biz-chart-bar:hover .biz-chart-tooltip { display: block; }
-      .biz-chart-tooltip { display: none; position: absolute; top: -35px; left: 50%; transform: translateX(-50%); background: #0f172a; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-      .biz-chart-label { font-size: 11px; font-weight: 600; color: #64748b; margin-top: 8px; text-align: center; }
-
-      .biz-rank-list { display: flex; flex-direction: column; gap: 14px; }
-      .biz-rank-item { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9; }
-      .biz-rank-badge { width: 26px; height: 26px; border-radius: 50%; background: #e2e8f0; color: #475569; font-size: 11.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-      .biz-rank-badge.rank-1 { background: #fef3c7; color: #d97706; }
-      .biz-rank-badge.rank-2 { background: #dbeafe; color: #2563eb; }
-      .biz-rank-badge.rank-3 { background: #d1fae5; color: #059669; }
-      .biz-rank-meta { display: flex; flex-direction: column; flex-grow: 1; margin-left: 12px; min-width: 0; }
-      .biz-rank-name { font-size: 13px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .biz-progress-bg { width: 100%; height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; margin-top: 5px; }
-      .biz-progress-bar { height: 100%; border-radius: 3px; }
-      .biz-rank-vals { text-align: right; margin-left: 15px; flex-shrink: 0; }
-      .biz-val-m { font-size: 13px; font-weight: 700; color: #0f172a; }
-      .biz-val-s { font-size: 11px; color: #64748b; }
+      .retention-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 25px;
+      }
+      @media (max-width: 1024px) {
+        .retention-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      }
+      @media (max-width: 600px) {
+        .retention-kpi-grid { grid-template-columns: 1fr; }
+      }
       
-      .biz-table-wrapper { background: white; border: 1px solid #e2e8f0; border-radius: 16px; overflow-x: auto; }
-      .biz-table { width: 100%; border-collapse: collapse; text-align: left; }
-      .biz-table th, .biz-table td { padding: 14px 18px; border-bottom: 1px solid #f1f5f9; }
-      .biz-table th { background: #f8fafc; color: #475569; font-weight: 600; font-size: 12px; text-transform: uppercase; }
-      .biz-status-pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; }
-      .pill-pass { color: #065f46; background: #d1fae5; }
-      .pill-fail { color: #991b1b; background: #fee2e2; }
+      .retention-kpi-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 22px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .retention-kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+      }
+      .retention-kpi-info { display: flex; flex-direction: column; gap: 4px; }
+      .retention-kpi-lbl { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+      .retention-kpi-val { font-size: 26px; font-weight: 700; color: #0f172a; }
+      .retention-kpi-icon {
+        width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px;
+      }
+      
+      .retention-layout-grid {
+        display: grid;
+        grid-template-columns: 1.6fr 1fr;
+        gap: 24px;
+        margin-bottom: 30px;
+      }
+      @media (max-width: 1024px) {
+        .retention-layout-grid { grid-template-columns: 1fr; }
+      }
+      
+      .retention-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+        margin-bottom: 24px;
+      }
+      .retention-card h3 {
+        font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 20px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 14px;
+        display: flex; justify-content: space-between; align-items: center;
+      }
+      .retention-card-subtitle { font-size: 11.5px; font-weight: normal; color: #64748b; margin-top: 4px; text-transform: none; }
+      
+      /* Monthly product grid */
+      .monthly-prod-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+      @media (max-width: 768px) {
+        .monthly-prod-grid { grid-template-columns: repeat(2, 1fr); }
+      }
+      @media (max-width: 480px) {
+        .monthly-prod-grid { grid-template-columns: 1fr; }
+      }
+      .monthly-prod-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        transition: all 0.2s ease;
+      }
+      .monthly-prod-box:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.04);
+        border-color: #cbd5e1;
+        background: white;
+      }
+      .month-name-lbl { font-size: 11px; font-weight: 800; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; }
+      .month-prod-name { font-size: 13.5px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .month-prod-stat { font-size: 11px; color: #64748b; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+      
+      /* Lists and rankings styling */
+      .rank-list { display: flex; flex-direction: column; gap: 16px; }
+      .rank-item { display: flex; align-items: center; justify-content: space-between; padding-bottom: 14px; border-bottom: 1px solid #f8fafc; }
+      .rank-item:last-child { border-bottom: none; padding-bottom: 0; }
+      .rank-item-info { display: flex; align-items: center; gap: 14px; flex-grow: 1; min-width: 0; }
+      .rank-number {
+        width: 26px; height: 26px; border-radius: 50%; background: #e2e8f0; color: #475569; font-size: 12px; font-weight: 700;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      }
+      .rank-number.top-1 { background: #fdf1e6; color: #d95f1d; }
+      .rank-number.top-2 { background: #eff6ff; color: #2563eb; }
+      .rank-number.top-3 { background: #ecfdf5; color: #059669; }
+      
+      .rank-details { display: flex; flex-direction: column; gap: 4px; flex-grow: 1; min-width: 0; }
+      .rank-name { font-size: 13.5px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .rank-progress-container { width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 4px; }
+      .rank-progress-bar { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+      
+      .rank-values { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; padding-left: 15px; }
+      .rank-val-primary { font-size: 13.5px; font-weight: 700; color: #0f172a; }
+      .rank-val-secondary { font-size: 11.5px; color: #64748b; font-weight: 500; }
     `;
     document.head.appendChild(style);
   }
 
-  // --- 2. DATE PARSING LOGIC ---
-  const parseDateObj = (dateStr) => {
+  // 2. Helper to parse date from string
+  const parseD = (dateStr) => {
     if (!dateStr) return null;
-    const clean = dateStr.toString().trim().split(' ')[0];
-    let parts = clean.split('-');
-    if (parts.length < 3) parts = clean.split('/');
-    if (parts.length >= 3) {
-      let p0 = parseInt(parts[0], 10), p1 = parseInt(parts[1], 10), p2 = parseInt(parts[2], 10);
-      let y = p0 > 1000 ? p0 : p2, m = p1, d = p0 > 1000 ? p2 : p0;
-      if (y < 2000) y += 2000;
-      if (y > 2500) y -= 543;
-      return { y, m, d, val: y * 10000 + m * 100 + d };
+    if (window.parseDate) {
+      const parsed = window.parseDate(dateStr);
+      if (parsed) {
+        return { y: parsed.y, m: parsed.m, d: parsed.d, val: parsed.y * 10000 + parsed.m * 100 + parsed.d };
+      }
     }
-    return null;
+    const parts = dateStr.split(' ')[0].split('/');
+    if (parts.length < 3) return null;
+    let y = parseInt(parts[2]);
+    let m = parseInt(parts[1]);
+    let d = parseInt(parts[0]);
+    if (y < 2000) y += 2000;
+    return { y, m, d, val: y * 10000 + m * 100 + d };
   };
 
-  // --- 3. HIGH-ACCURACY PARSER CONFIG ---
-  const FORMULA_MAP = {
-    plus: ['PLUS', 'พลัส'],
-    gold: ['GOLD', 'โกลด์'],
-    wiss: ['WISS', 'วิสส์'],
-    kides: ['KIDES', 'คิดส์'],
-    collagen: ['COLLAGEN', 'คลอลาเจน', 'คอลลาเจน']
-  };
-
-  const parseProductItemToFlatList = (productString) => {
-    if (!productString) return [];
-    const items = productString.split('|');
-    const results = [];
-
-    items.forEach(item => {
-      if (!item.includes('=')) return;
-      let [name, quantityStr] = item.split('=');
-      let orderQty = parseInt(quantityStr) || 0;
-      let nameUpper = name.toUpperCase().trim();
-
-      let targetFormula = null;
-      for (const [formula, keywords] of Object.entries(FORMULA_MAP)) {
-        if (keywords.some(k => nameUpper.includes(k))) {
-          targetFormula = formula;
-          break;
-        }
+  // Helper to parse individual products and quantities from the order string
+  const parseProductsFromRow = (row) => {
+    const rawProd = window.getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']) || 'Other';
+    if (!rawProd || rawProd === 'Other') {
+      return [{ rawName: 'Other', cleanName: 'Other', category: 'Other', qty: 1 }];
+    }
+    
+    const products = [];
+    const parts = rawProd.split('|');
+    
+    parts.forEach(part => {
+      const subParts = part.split('=');
+      const rawName = subParts[0].trim();
+      let qty = 1;
+      if (subParts.length > 1) {
+        const parsedQty = parseInt(subParts[1].trim());
+        if (!isNaN(parsedQty)) qty = parsedQty;
       }
       
-      if (!targetFormula) return; 
-
-      let isSachet = nameUpper.includes('ซอง') || nameUpper.includes('แบบซอง') || nameUpper.includes('SACHET');
-      let calculatedQty = orderQty;
-
-      const boxMatch = nameUpper.match(/(\d+)\s*กล่อง/);
-      if (boxMatch) {
-        calculatedQty = parseInt(boxMatch[1]) * orderQty;
+      if (rawName) {
+        // Clean name (remove trailing spaces, quantities)
+        let cleanName = rawName;
+        
+        // Category normalization
+        let category = 'Other';
+        const nameLower = rawName.toLowerCase();
+        if (nameLower.includes('plus')) category = 'Plus';
+        else if (nameLower.includes('gold')) category = 'Gold';
+        else if (nameLower.includes('wiss')) category = 'Wiss';
+        else if (nameLower.includes('kides') || nameLower.includes('kide')) category = 'Kides';
+        else if (nameLower.includes('collagen') || nameLower.includes('callagen')) category = 'Collagen';
+        
+        products.push({ rawName, cleanName, category, qty });
       }
-      if (nameUpper.includes('1แถม1')) {
-        calculatedQty = 2 * orderQty;
-      }
-
-      // บังคับการแสดงผลกลุ่มเป็นชื่อสูตรหลัก (Category) เท่านั้น
-      let displayKey = targetFormula.toUpperCase();
-
-      results.push({
-        formula: targetFormula,
-        isSachet: isSachet,
-        qty: calculatedQty,
-        key: displayKey
-      });
     });
-
-    return results;
+    
+    if (products.length === 0) {
+      products.push({ rawName: 'Other', cleanName: 'Other', category: 'Other', qty: 1 });
+    }
+    return products;
   };
 
-  // --- 4. RETENTION CORE DATA FILTERING ---
-  const localFirstPurchaseMap = {};
-  rawData.forEach(row => {
-    if (!checkIsSaleOrder(row)) return;
-    const id = getCustId(row);
-    const dateStr = getFlexibleValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'วันที่', 'Date']);
-    if (!id || !dateStr) return;
-    const d = parseDateObj(dateStr);
-    if (!d) return;
-    if (!localFirstPurchaseMap[id] || d.val < localFirstPurchaseMap[id].val) {
-      localFirstPurchaseMap[id] = d;
-    }
+  // Safe global first purchase resolution
+  const firstPurchaseMap = typeof globalFirstPurchase !== 'undefined' ? globalFirstPurchase : {};
+
+  // 3. Process data
+  // Month filter (top filter bar) is applied here as a point-in-time cutoff, same convention used in
+  // executive1.js/dashboard.html: without this, repeat-purchase KPIs always summed the whole filtered
+  // year regardless of the Month filter (Task 3 bug).
+  const monthCutoff = (window.filters && window.filters.Month !== 'All') ? window.filters.Month : null;
+  // [Fix] เดิมเทียบแค่ `rowMonthStr <= monthCutoff` แบบ string โดยไม่เช็คปี - ถ้า Year ยังกว้างกว่าปีของ
+  // monthCutoff (เช่น Year='All') แถวจากปีก่อนๆ ทั้งหมดจะเข้าเงื่อนไขนี้ไปด้วย ทำให้ยอด "ซื้อซ้ำ" ของเดือนที่เลือก
+  // กลายเป็นยอดสะสมหลายปีปนกัน -> ต้องบังคับให้ตรงปีของ monthCutoff เองด้วยเสมอ
+  const cutoffYear = monthCutoff ? monthCutoff.split('-')[0] : null;
+  const saleOrders = filteredData.filter(row => {
+    if (!window.isSaleOrder(row)) return false;
+    if (!monthCutoff) return true;
+    const dateStr = window.getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+    const d = parseD(dateStr);
+    if (!d) return true;
+    if (cutoffYear && d.y.toString() !== cutoffYear) return false;
+    const rowMonthStr = `${d.y}-${String(d.m).padStart(2, '0')}`;
+    return rowMonthStr <= monthCutoff;
+  });
+  const uniqueBuyers = new Set();
+  saleOrders.forEach(row => {
+    const id = window.getCustomerUniqueId(row);
+    if (id) uniqueBuyers.add(id);
   });
 
-  const validSaleOrders = dataSrc.filter(row => {
-    if (!checkIsSaleOrder(row)) return false;
-    const revStr = getFlexibleValue(row, ['ยอดขาย', 'ยอดโอน', 'Revenue', 'จำนวนเงิน', 'ยอดเงิน']) || '0';
-    const rev = parseFloat(revStr.toString().replace(/,/g, ''));
-    return !isNaN(rev) && rev > 0;
-  });
-
-  const repeatOrders = validSaleOrders.filter(row => {
-    const id = getCustId(row);
-    const dateStr = getFlexibleValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'วันที่', 'Date']);
+  // Identify Repeat Purchases
+  const repeatOrders = saleOrders.filter(row => {
+    const id = window.getCustomerUniqueId(row);
+    const dateStr = window.getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
     if (!id || !dateStr) return false;
-    const d = parseDateObj(dateStr);
-    return d && localFirstPurchaseMap[id] && localFirstPurchaseMap[id].val < d.val;
+    const d = parseD(dateStr);
+    if (!d) return false;
+    const firstDate = firstPurchaseMap[id];
+    return firstDate && firstDate.val < d.val;
   });
 
-  const totalActiveBuyersInPeriod = new Set();
-  validSaleOrders.forEach(row => {
-    const id = getCustId(row);
-    if (id) totalActiveBuyersInPeriod.add(id);
-  });
-
-  let totalRepeatRevenue = 0;
-  const periodRepeatBuyers = new Set();
+  // Calculate repeat metrics
+  let repeatRevenue = 0;
+  const repeatBuyers = new Set();
   
   repeatOrders.forEach(row => {
-    const id = getCustId(row);
-    if (id) periodRepeatBuyers.add(id);
-    const revStr = getFlexibleValue(row, ['ยอดขาย', 'ยอดโอน', 'Revenue', 'จำนวนเงิน', 'ยอดเงิน']) || '0';
-    const rev = parseFloat(revStr.toString().replace(/,/g, ''));
-    if (!isNaN(rev)) totalRepeatRevenue += rev;
+    const id = window.getCustomerUniqueId(row);
+    if (id) repeatBuyers.add(id);
+    const revStr = window.getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+    const rev = parseFloat(revStr.replace(/,/g, ''));
+    if (!isNaN(rev)) repeatRevenue += rev;
   });
 
-  const totalRepeatOrdersCount = repeatOrders.length;
-  const repeatBuyerSharePct = totalActiveBuyersInPeriod.size === 0 ? 0 : (periodRepeatBuyers.size / totalActiveBuyersInPeriod.size) * 100;
+  const repeatCount = repeatOrders.length;
+  const totalCount = saleOrders.length;
+  
+  const repeatBuyerPct = uniqueBuyers.size === 0 ? 0 : (repeatBuyers.size / uniqueBuyers.size) * 100;
+  const repeatRate = uniqueBuyers.size === 0 ? 0 : (totalCount / uniqueBuyers.size);
 
-  // --- 5. CALCULATE REPORT SUMMARY & MONTHLY BARS ---
-  const finalReportSummary = {
-    plus: { boxes: 0, sachets: 0 },
-    gold: { boxes: 0, sachets: 0 },
-    wiss: { boxes: 0, sachets: 0 },
-    kides: { boxes: 0, sachets: 0 },
-    collagen: { boxes: 0, sachets: 0 }
-  };
-
-  const productSummaryMap = {};
-  const dynamicMonthlyMap = {};
-  const monthsArr = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  // 4. Group repeat purchases by Product
+  const annualProdMap = {};
+  const monthlyProdMap = {}; // 1-12 -> { prodName -> { count, revenue } }
+  for (let m = 1; m <= 12; m++) {
+    monthlyProdMap[m] = {};
+  }
 
   repeatOrders.forEach(row => {
-    const revStr = getFlexibleValue(row, ['ยอดขาย', 'ยอดโอน', 'Revenue', 'จำนวนเงิน', 'ยอดเงิน']) || '0';
-    const orderRev = parseFloat(revStr.toString().replace(/,/g, '')) || 0;
+    const dateStr = window.getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+    if (!dateStr) return;
+    const d = parseD(dateStr);
+    if (!d || d.m < 1 || d.m > 12) return;
     
-    const dateStr = getFlexibleValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'วันที่', 'Date']);
-    const d = parseDateObj(dateStr);
-    let mLabel = "Unknown";
-    if (d && d.m >= 1 && d.m <= 12) {
-      mLabel = monthsArr[d.m - 1];
-    }
+    // Parse individual products and split revenue proportionally
+    const parsedProds = parseProductsFromRow(row);
+    const totalQty = parsedProds.reduce((sum, p) => sum + p.qty, 0) || 1;
     
-    const salesData = getFlexibleValue(row, ['รายการขาย', 'ชื่อสินค้า', 'Product', 'Product Set', 'สินค้า']) || '';
-    const parsedItems = parseProductItemToFlatList(salesData);
-    const totalItemsInOrder = parsedItems.reduce((acc, p) => acc + p.qty, 0) || 1;
+    const revStr = window.getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+    const orderRev = parseFloat(revStr.replace(/,/g, '')) || 0;
 
-    parsedItems.forEach(p => {
-      if (finalReportSummary[p.formula]) {
-        if (p.isSachet) {
-          finalReportSummary[p.formula].sachets += p.qty;
-        } else {
-          finalReportSummary[p.formula].boxes += p.qty;
-        }
-      }
+    parsedProds.forEach(p => {
+      const pRevenue = orderRev * (p.qty / totalQty);
+      const groupName = window.retentionActiveToggle === 'category' ? p.category : p.cleanName;
 
-      const distributedRev = orderRev * (p.qty / totalItemsInOrder);
-      if (!productSummaryMap[p.key]) {
-        productSummaryMap[p.key] = { key: p.key, count: 0, revenue: 0, formula: p.formula };
+      // YTD Grouping
+      if (!annualProdMap[groupName]) {
+        annualProdMap[groupName] = { name: groupName, count: 0, revenue: 0, category: p.category };
       }
-      productSummaryMap[p.key].count += p.qty;
-      productSummaryMap[p.key].revenue += distributedRev;
+      annualProdMap[groupName].count += p.qty;
+      annualProdMap[groupName].revenue += pRevenue;
 
-      if (mLabel !== "Unknown") {
-        if (!dynamicMonthlyMap[mLabel]) dynamicMonthlyMap[mLabel] = 0;
-        dynamicMonthlyMap[mLabel] += p.qty;
+      // Monthly Grouping
+      if (!monthlyProdMap[d.m][groupName]) {
+        monthlyProdMap[d.m][groupName] = { count: 0, revenue: 0 };
       }
+      monthlyProdMap[d.m][groupName].count += p.qty;
+      monthlyProdMap[d.m][groupName].revenue += pRevenue;
     });
   });
 
-  const sortedProducts = Object.values(productSummaryMap).sort((a, b) => b.count - a.count);
-  const topProductMaxCount = sortedProducts.length > 0 ? sortedProducts[0].count : 1;
+  const rankedProducts = Object.values(annualProdMap).sort((a, b) => b.count - a.count);
+  const maxProductCount = rankedProducts.length > 0 ? rankedProducts[0].count : 1;
 
-  const sortedChartMonths = Object.keys(dynamicMonthlyMap).sort((a, b) => monthsArr.indexOf(a) - monthsArr.indexOf(b));
-  const maxMonthlyQtyVal = Math.max(...Object.values(dynamicMonthlyMap)) || 1;
-
-  // --- 6. CHANNELS KPI PROCESSING ---
-  const bizChannels = ['Facebook', 'Line', 'Call', 'CRM', 'Other'];
-  const channelDataStore = {};
-  bizChannels.forEach(ch => { channelDataStore[ch] = { name: ch, count: 0, revenue: 0 }; });
-
-  repeatOrders.forEach(row => {
-    let rawCh = getFlexibleValue(row, ['ช่องทาง', 'Channel', 'ช่องทางการขาย', 'Platform']) || 'Other';
-    let normCh = 'Other';
-    const low = rawCh.toString().toLowerCase();
-    if (low.includes('facebook') || low === 'fb' || low.includes('เพจ')) normCh = 'Facebook';
-    else if (low.includes('line') || low.includes('ไลน์')) normCh = 'Line';
-    else if (low.includes('crm') || low.includes('ระบบ')) normCh = 'CRM';
-    else if (low.includes('call') || low.includes('phone') || low.includes('โทร')) normCh = 'Call';
-
-    const revStr = getFlexibleValue(row, ['ยอดขาย', 'ยอดโอน', 'Revenue', 'จำนวนเงิน', 'ยอดเงิน']) || '0';
-    const rev = parseFloat(revStr.toString().replace(/,/g, ''));
-    
-    channelDataStore[normCh].count++;
-    if (!isNaN(rev)) channelDataStore[normCh].revenue += rev;
-  });
-
-  const sortedChannels = Object.values(channelDataStore).sort((a,b) => b.revenue - a.revenue);
-  const maxChannelRevVal = sortedChannels.length > 0 ? sortedChannels[0].revenue : 1;
-
-  const bizTargetPlans = {
-    'Facebook': { targetOrders: Math.max(Math.round(totalRepeatOrdersCount * 0.15), 5), targetRev: Math.round(totalRepeatRevenue * 0.15) },
-    'Line': { targetOrders: Math.max(Math.round(totalRepeatOrdersCount * 0.20), 8), targetRev: Math.round(totalRepeatRevenue * 0.20) },
-    'Call': { targetOrders: Math.max(Math.round(totalRepeatOrdersCount * 0.08), 3), targetRev: Math.round(totalRepeatRevenue * 0.08) },
-    'CRM': { targetOrders: Math.max(Math.round(totalRepeatOrdersCount * 0.55), 15), targetRev: Math.round(totalRepeatRevenue * 0.55) },
-    'Other': { targetOrders: Math.max(Math.round(totalRepeatOrdersCount * 0.02), 1), targetRev: Math.round(totalRepeatRevenue * 0.02) }
+  const thaiMonths = {
+    1: 'มกราคม', 2: 'กุมภาพันธ์', 3: 'มีนาคม', 4: 'เมษายน',
+    5: 'พฤษภาคม', 6: 'มิถุนายน', 7: 'กรกฎาคม', 8: 'สิงหาคม',
+    9: 'กันยายน', 10: 'ตุลาคม', 11: 'พฤศจิกายน', 12: 'ธันวาคม'
   };
 
-  const getChannelColor = (ch) => ({ 'Facebook': '#38bdf8', 'Line': '#06c755', 'CRM': '#ea580c', 'Call': '#64748b', 'Other': '#94a3b8' }[ch] || '#94a3b8');
-  const getFormulaColor = (f) => ({ 'plus': '#10b981', 'gold': '#eab308', 'wiss': '#3b82f6', 'kides': '#f97316', 'collagen': '#ef4444' }[f] || '#64748b');
+  const monthlyTopProducts = [];
+  for (let m = 1; m <= 12; m++) {
+    const prods = Object.keys(monthlyProdMap[m]).map(name => ({
+      name,
+      count: monthlyProdMap[m][name].count,
+      revenue: monthlyProdMap[m][name].revenue,
+      category: window.retentionActiveToggle === 'category' ? name : (annualProdMap[name] ? annualProdMap[name].category : 'Other')
+    }));
+    
+    if (prods.length > 0) {
+      prods.sort((a, b) => b.count - a.count);
+      monthlyTopProducts.push({ month: m, monthName: thaiMonths[m], topProduct: prods[0] });
+    } else {
+      monthlyTopProducts.push({ month: m, monthName: thaiMonths[m], topProduct: null });
+    }
+  }
 
-  // --- 7. BUILD DASHBOARD TEMPLATE ---
+  // 5. Group repeat purchases by Sub-Channel
+  const channelMap = {};
+  repeatOrders.forEach(row => {
+    const channel = window.getNormalizedSubChannel ? window.getNormalizedSubChannel(row) : 'Other';
+
+    const revStr = window.getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+    const rev = parseFloat(revStr.replace(/,/g, ''));
+
+    if (!channelMap[channel]) {
+      channelMap[channel] = { name: channel, count: 0, revenue: 0 };
+    }
+    channelMap[channel].count++;
+    if (!isNaN(rev)) channelMap[channel].revenue += rev;
+  });
+
+  // ซ่อน Sub-Channel ที่ไม่มียอดขาย (revenue <= 0)
+  const rankedChannels = Object.values(channelMap)
+    .filter(c => c.revenue > 0)
+    .sort((a, b) => b.revenue - a.revenue);
+  const maxChannelRevenue = rankedChannels.length > 0 ? rankedChannels[0].revenue : 1;
+
+  // Sub-Channel color mapping helper
+  const getChannelColor = (ch) => {
+    const colors = {
+      'Call': '#71717a',
+      'CRM': '#d95f1d',
+      'Email': '#f59e0b',
+      'FB': '#1877f2',
+      'FBC': '#0d6efd',
+      'FBD': '#3b82f6',
+      'FBG': '#2563eb',
+      'FBH': '#1d4ed8',
+      'FBH-IG': '#4338ca',
+      'FBK': '#0ea5e9',
+      'FBM': '#0284c7',
+      'FBP': '#0369a1',
+      'FBP-W': '#0891b2',
+      'FBSS': '#075985',
+      'FBW': '#38bdf8',
+      'IG': '#e1306c',
+      'IG-FBH': '#c13584',
+      'IG-FBSS': '#833ab4',
+      'IG-FBW': '#fd1d1d',
+      'Lazada': '#1a1446',
+      'Line': '#06c755',
+      'Other': '#9ca3af',
+      'PC': '#64748b',
+      'Shopee': '#ff5722',
+      'Telesale': '#8b5cf6',
+      'Tiktok': '#ff0050',
+      'Website': '#14b8a6'
+    };
+    return colors[ch] || '#9ca3af';
+  };
+
+  // Product category color helper
+  const getProductColor = (prod) => {
+    const colors = {
+      'Plus': '#ea580c',     // Theme Orange
+      'Gold': '#d97706',     // Yellow-Gold
+      'Wiss': '#2563eb',     // Blue
+      'Collagen': '#ec4899', // Pink
+      'Kides': '#059669',    // Emerald Green
+      'Other': '#64748b'     // Slate Grey
+    };
+    return colors[prod] || '#d95f1d';
+  };
+
+  // Closure function for the toggle switcher
+  window.setRetentionToggle = (type) => {
+    window.retentionActiveToggle = type;
+    renderRetention(filteredData, rawData);
+  };
+
+  // 6. Build Page HTML
   let html = `
-    <div class="biz-dashboard">
-      <div class="biz-header">
-        <div class="biz-header-title">
-          <h1>แดชบอร์ดกลยุทธ์การซื้อซ้ำและรักษารากฐานลูกค้า (Strategic Customer Retention Dashboard)</h1>
-          <p>ข้อมูลและกราฟแท่งทั้งหมดเชื่อมโยงและแปรผันตามเงื่อนไขตัวกรอง (Filter) หลักของระบบโดยตรง</p>
+    <div class="retention-container">
+      <div class="retention-header">
+        <div class="retention-header-text">
+          <h2>Customer Retention Analysis</h2>
+          <p>สถิติการสั่งซื้อซ้ำ การจัดอันดับสินค้าที่ลูกค้าซื้อซ้ำสูงสุด และช่องทางขายที่ทำยอดขายซ้ำได้มากที่สุด</p>
         </div>
       </div>
 
-      <div class="biz-kpi-grid">
-        <div class="biz-kpi-card card-revenue">
-          <div><div class="biz-kpi-label">รายได้จากการซื้อซ้ำ</div><div class="biz-kpi-value">฿${Math.round(totalRepeatRevenue).toLocaleString()}</div><div class="biz-kpi-desc">กระแสเงินสดหลักจากฐานลูกค้าเดิม</div></div>
-          <div class="biz-kpi-icon" style="color:#10b981; background:#d1fae5;">💵</div>
-        </div>
-        <div class="biz-kpi-card card-orders">
-          <div><div class="biz-kpi-label">จำนวนออเดอร์ซ้ำ</div><div class="biz-kpi-value">${totalRepeatOrdersCount.toLocaleString()} ครั้ง</div><div class="biz-kpi-desc">ปริมาณความถี่ในการซื้อซ้ำ</div></div>
-          <div class="biz-kpi-icon" style="color:#3b82f6; background:#dbeafe;">🛒</div>
-        </div>
-        <div class="biz-kpi-card card-buyers">
-          <div><div class="biz-kpi-label">จำนวนลูกค้าที่ซื้อซ้ำ</div><div class="biz-kpi-value">${periodRepeatBuyers.size.toLocaleString()} ราย</div><div class="biz-kpi-desc">จำนวนลูกค้า Loyalty</div></div>
-          <div class="biz-kpi-icon" style="color:#8b5cf6; background:#f5f3ff;">👤</div>
-        </div>
-        <div class="biz-kpi-card card-share">
-          <div><div class="biz-kpi-label">สัดส่วนลูกค้าซื้อซ้ำ</div><div class="biz-kpi-value">${repeatBuyerSharePct.toFixed(1)}%</div><div class="biz-kpi-desc">สัดส่วนเทียบกับลูกค้าทั้งหมด</div></div>
-          <div class="biz-kpi-icon" style="color:#f59e0b; background:#fef3c7;">📊</div>
-        </div>
+      <!-- Segment/Toggle Selection -->
+      <div class="retention-toggle-container">
+        <button class="retention-toggle-btn ${window.retentionActiveToggle === 'category' ? 'active' : ''}" onclick="window.setRetentionToggle('category')">
+          ตามกลุ่มสินค้า (Product Brand)
+        </button>
+        <button class="retention-toggle-btn ${window.retentionActiveToggle === 'item' ? 'active' : ''}" onclick="window.setRetentionToggle('item')">
+          ตามรายการสินค้า/แพ็กเกจ (Product Package)
+        </button>
       </div>
 
-      <!-- 📋 SECTION 1: สรุปผลรายงานยอดขายเวอร์ชันความแม่นยำสูง (กล่อง VS ซองแยก) -->
-      <div class="report-summary-box">
-        <div class="report-summary-title">
-          <span>📊 ผลรายงานสรุปปริมาณผลิตภัณฑ์จากการซื้อซ้ำในรอบเวลาที่เลือก</span>
+      <!-- Summary KPI Grid -->
+      <div class="retention-kpi-grid">
+        <div class="retention-kpi-card">
+          <div class="retention-kpi-info">
+            <span class="retention-kpi-lbl">Repeat Revenue</span>
+            <span class="retention-kpi-val">฿${Math.round(repeatRevenue).toLocaleString()}</span>
+          </div>
+          <div class="retention-kpi-icon" style="color:#059669; background:#ecfdf5;">
+            <i class="fas fa-dollar-sign"></i>
+          </div>
         </div>
-        <div class="report-summary-grid">
-          <div class="report-formula-card" style="border-left: 4px solid #10b981;">
-            <div class="report-formula-header" style="color:#10b981;">🟢 สูตร Plus</div>
-            <p class="report-formula-det">📦 กล่อง: <b>${finalReportSummary.plus.boxes.toLocaleString()}</b> กล่อง</p>
-            <p class="report-formula-det">✉️ ซองแยก: <b>${finalReportSummary.plus.sachets.toLocaleString()}</b> ซอง</p>
+        <div class="retention-kpi-card">
+          <div class="retention-kpi-info">
+            <span class="retention-kpi-lbl">Repeat Orders</span>
+            <span class="retention-kpi-val">${repeatCount.toLocaleString()}</span>
           </div>
-          <div class="report-formula-card" style="border-left: 4px solid #eab308;">
-            <div class="report-formula-header" style="color:#eab308;">🟡 สูตร Gold</div>
-            <p class="report-formula-det">📦 กล่อง: <b>${finalReportSummary.gold.boxes.toLocaleString()}</b> กล่อง</p>
-            <p class="report-formula-det">✉️ ซองแยก: <b>${finalReportSummary.gold.sachets.toLocaleString()}</b> ซอง</p>
+          <div class="retention-kpi-icon" style="color:#2563eb; background:#eff6ff;">
+            <i class="fas fa-shopping-bag"></i>
           </div>
-          <div class="report-formula-card" style="border-left: 4px solid #3b82f6;">
-            <div class="report-formula-header" style="color:#3b82f6;">🔵 สูตร Wiss</div>
-            <p class="report-formula-det">📦 กล่อง: <b>${finalReportSummary.wiss.boxes.toLocaleString()}</b> กล่อง</p>
-            <p class="report-formula-det">✉️ ซองแยก: <b>${finalReportSummary.wiss.sachets.toLocaleString()}</b> ซอง</p>
+        </div>
+        <div class="retention-kpi-card">
+          <div class="retention-kpi-info">
+            <span class="retention-kpi-lbl">Repeat Buyers</span>
+            <span class="retention-kpi-val">${repeatBuyers.size.toLocaleString()}</span>
           </div>
-          <div class="report-formula-card" style="border-left: 4px solid #f97316;">
-            <div class="report-formula-header" style="color:#f97316;">🟠 สูตร Kides</div>
-            <p class="report-formula-det">📦 กล่อง: <b>${finalReportSummary.kides.boxes.toLocaleString()}</b> กล่อง</p>
-            <p class="report-formula-det">✉️ ซองแยก: <b>${finalReportSummary.kides.sachets.toLocaleString()}</b> ซอง</p>
+          <div class="retention-kpi-icon" style="color:#8b5cf6; background:#f5f3ff;">
+            <i class="fas fa-users"></i>
           </div>
-          <div class="report-formula-card" style="border-left: 4px solid #ef4444;">
-            <div class="report-formula-header" style="color:#ef4444;">🔴 สูตร Collagen</div>
-            <p class="report-formula-det">📦 กล่อง: <b>${finalReportSummary.collagen.boxes.toLocaleString()}</b> กล่อง</p>
-            <p class="report-formula-det">✉️ ซองแยก: <b>${finalReportSummary.collagen.sachets.toLocaleString()}</b> ซอง</p>
+        </div>
+        <div class="retention-kpi-card">
+          <div class="retention-kpi-info">
+            <span class="retention-kpi-lbl">Repeat Buyer Share</span>
+            <span class="retention-kpi-val">${repeatBuyerPct.toFixed(1)}%</span>
+          </div>
+          <div class="retention-kpi-icon" style="color:#ea580c; background:#fdf1e6;">
+            <i class="fas fa-chart-pie"></i>
           </div>
         </div>
       </div>
 
-      <!-- 📈 SECTION 2: ตารางตรวจสอบผลสัมฤทธิ์ทางการตลาดเทียบเป้าหมาย (KPI Matrix) -->
-      <div class="biz-card" style="margin-bottom:24px;">
-        <div class="biz-card-title">ตารางตรวจสอบผลสัมฤทธิ์ทางการตลาดเทียบเป้าหมาย (Retention KPI Matrix)</div>
-        <div class="biz-table-wrapper">
-          <table class="biz-table">
-            <thead>
-              <tr>
-                <th>ช่องทางปิดการขาย</th><th>รายได้จริง (Actual)</th><th>เป้ารายได้ (Plan)</th><th>จำนวนออเดอร์</th><th>เป้าออเดอร์</th><th>ส่วนต่างออเดอร์</th><th>KPI %</th><th>ประเมินสถานะ</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${bizChannels.map(ch => {
-                const act = channelDataStore[ch];
-                const planBase = bizTargetPlans[ch];
-                const diffOrders = act.count - planBase.targetOrders;
-                const achRate = planBase.targetRev === 0 ? 0 : (act.revenue / planBase.targetRev) * 100;
-                return `
-                  <tr>
-                    <td style="font-weight:600;">${ch}</td>
-                    <td style="font-weight:700; color:#059669;">฿${Math.round(act.revenue).toLocaleString()}</td>
-                    <td>฿${planBase.targetRev.toLocaleString()}</td>
-                    <td>${act.count} ครั้ง</td>
-                    <td>${planBase.targetOrders} ครั้ง</td>
-                    <td style="font-weight:600; color:${diffOrders >= 0 ? '#10b981' : '#ef4444'}">${diffOrders >= 0 ? '+' + diffOrders : diffOrders}</td>
-                    <td style="font-weight:700;">${achRate.toFixed(1)}%</td>
-                    <td><span class="biz-status-pill ${achRate >= 100 ? 'pill-pass' : 'pill-fail'}">${achRate >= 100 ? '▲ ทะลุเป้า' : '▼ ต่ำกว่าเป้า'}</span></td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="biz-main-grid">
+      <!-- Main Layout Grid -->
+      <div class="retention-layout-grid">
+        <!-- Left Column: Product Repeat Analysis -->
         <div>
-          <!-- 📊 SECTION 3: กราฟแท่งแสดงปริมาณสินค้าซื้อซ้ำเปรียบเทียบในแต่ละเดือน -->
-          <div class="biz-card" style="margin-bottom:24px;">
-            <div class="biz-card-title">
-              <div>กราฟแท่งเปรียบเทียบปริมาณสินค้าซื้อซ้ำในแต่ละเดือน (Monthly Product Unit Vol.)
+          <!-- Monthly top products grid -->
+          <div class="retention-card">
+            <h3>
+              <div>
+                อันดับสินค้าซื้อซ้ำสูงสุดรายเดือน
+                <div class="retention-card-subtitle">
+                  แบรนด์หรือแพ็กเกจสินค้าที่ลูกค้าซื้อซ้ำมากที่สุดในแต่ละเดือน (${window.retentionActiveToggle === 'category' ? 'แบ่งตามกลุ่มแบรนด์' : 'แบ่งตามแพ็กเกจ'})
+                </div>
               </div>
-            </div>
-            <div class="biz-chart-container">
-              ${sortedChartMonths.length === 0 
-                ? '<div style="color:#94a3b8; text-align:center; width:100%; padding:40px 0;">โปรดระบุช่วงวันที่ที่กว้างขึ้นที่ Filter ด้านบน เพื่อเปรียบเทียบแนวโน้มรายเดือน</div>' 
-                : sortedChartMonths.map(mKey => {
-                    const qty = dynamicMonthlyMap[mKey];
-                    const heightPct = maxMonthlyQtyVal > 0 ? (qty / maxMonthlyQtyVal) * 100 : 0;
-                    return `
-                      <div class="biz-chart-bar-wrapper">
-                        <div class="biz-chart-bar" style="height:${Math.max(heightPct, 8)}%; background-color:#3b82f6;">
-                          <div class="biz-chart-tooltip">${mKey}: ${qty.toLocaleString()} ชิ้น</div>
-                        </div>
-                        <div class="biz-chart-label" style="color:#0f172a; font-weight:700;">${mKey}</div>
-                      </div>
-                    `;
-                  }).join('')
-              }
+              <i class="fas fa-calendar-alt" style="color: #1e293b;"></i>
+            </h3>
+            <div class="monthly-prod-grid">
+              ${monthlyTopProducts.map(m => {
+                if (m.topProduct) {
+                  const barColor = getProductColor(m.topProduct.category);
+                  return `
+                    <div class="monthly-prod-box">
+                      <span class="month-name-lbl" style="color: ${barColor};">${m.monthName}</span>
+                      <span class="month-prod-name" title="${m.topProduct.name}">${m.topProduct.name}</span>
+                      <span class="month-prod-stat">
+                        <i class="fas fa-redo-alt" style="font-size:10px; color:${barColor}; margin-right:4px;"></i>
+                        <b>${m.topProduct.count.toLocaleString()}</b> ชิ้นซ้ำ
+                      </span>
+                      <span class="month-prod-stat" style="font-size: 10px; color: #94a3b8;">
+                        ยอดขาย: ฿${Math.round(m.topProduct.revenue).toLocaleString()}
+                      </span>
+                    </div>
+                  `;
+                } else {
+                  return `
+                    <div class="monthly-prod-box" style="opacity: 0.6;">
+                      <span class="month-name-lbl" style="color:#64748b;">${m.monthName}</span>
+                      <span class="month-prod-name" style="color:#999; font-style:italic;">ไม่มีการซื้อซ้ำ</span>
+                      <span class="month-prod-stat">-</span>
+                    </div>
+                  `;
+                }
+              }).join('')}
             </div>
           </div>
 
-          <div class="biz-card">
-            <div class="biz-card-title"><div>อันดับยอดจำหน่ายสูตรสินค้าที่ลูกค้าเก่าเลือกซื้อสูงสุด</div></div>
-            <div class="biz-rank-list">
-              ${sortedProducts.length === 0 ? '<div style="color:#94a3b8; text-align:center; padding:15px;">ไม่พบประวัติการซื้อสินค้าซ้ำในช่วงเวลานี้</div>' : sortedProducts.map((p, idx) => {
-                const pct = (p.count / topProductMaxCount) * 100;
+          <!-- YTD Top Products List -->
+          <div class="retention-card">
+            <h3>
+              <div>
+                อันดับสินค้าซื้อซ้ำสูงสุดสะสมประจำปี (YTD)
+                <div class="retention-card-subtitle">เรียงลำดับสินค้าที่มีสัดส่วนปริมาณลูกค้ากลับมาซื้อซ้ำมากที่สุด</div>
+              </div>
+              <i class="fas fa-medal" style="color: #f59e0b;"></i>
+            </h3>
+            <div class="rank-list">
+              ${rankedProducts.length === 0 ? `
+                <div style="text-align:center; padding: 20px; color:#999; font-style:italic;">ไม่มีข้อมูลการซื้อซ้ำในส่วนผลิตภัณฑ์</div>
+              ` : rankedProducts.map((p, index) => {
+                const pct = (p.count / maxProductCount) * 100;
+                const topClass = index === 0 ? 'top-1' : index === 1 ? 'top-2' : index === 2 ? 'top-3' : '';
+                const barColor = getProductColor(p.category);
                 return `
-                  <div class="biz-rank-item">
-                    <div style="display:flex; align-items:center; flex-grow:1; min-width:0;">
-                      <div class="biz-rank-badge ${idx<3?'rank-'+(idx+1):''}">${idx+1}</div>
-                      <div class="biz-rank-meta"><span class="biz-rank-name">สูตร ${p.key}</span><div class="biz-progress-bg"><div class="biz-progress-bar" style="width:${pct}%; background-color:${getFormulaColor(p.formula)};"></div></div></div>
+                  <div class="rank-item">
+                    <div class="rank-item-info">
+                      <div class="rank-number ${topClass}">${index + 1}</div>
+                      <div class="rank-details">
+                        <span class="rank-name" title="${p.name}">${p.name}</span>
+                        <div class="rank-progress-container">
+                          <div class="rank-progress-bar" style="width: ${pct}%; background-color: ${barColor};"></div>
+                        </div>
+                      </div>
                     </div>
-                    <div class="biz-rank-vals"><span class="biz-val-m">${p.count.toLocaleString()} ชิ้น</span><span class="biz-val-s">฿${Math.round(p.revenue).toLocaleString()}</span></div>
+                    <div class="rank-values">
+                      <span class="rank-val-primary">${p.count.toLocaleString()} ชิ้นซื้อซ้ำ</span>
+                      <span class="rank-val-secondary">฿${Math.round(p.revenue).toLocaleString()}</span>
+                    </div>
                   </div>
                 `;
               }).join('')}
@@ -460,18 +577,37 @@ function renderRetention(filteredData, rawData) {
           </div>
         </div>
 
-        <div class="biz-card">
-          <div class="biz-card-title"><div>ประสิทธิภาพช่องทางปิดการขายลูกค้าเก่า (เรียงตามรายได้จริง)</div></div>
-          <div class="biz-rank-list">
-            ${sortedChannels.map((c, idx) => {
-              const pct = (c.revenue / maxChannelRevVal) * 100;
+        <!-- Right Column: Sub-Channel Repeat Analysis -->
+        <div class="retention-card">
+          <h3>
+            <div>
+              จัดอันดับ Sub-Channel สั่งซื้อซ้ำ
+              <div class="retention-card-subtitle">เรียงตาม Sub-Channel ที่ลูกค้ากลับมาซื้อซ้ำและทำรายได้สะสมสูงสุด</div>
+            </div>
+            <i class="fas fa-chart-bar" style="color: #2563eb;"></i>
+          </h3>
+          <div class="rank-list" style="margin-top: 10px;">
+            ${rankedChannels.length === 0 ? `
+              <div style="text-align:center; padding: 20px; color:#999; font-style:italic;">ไม่มีข้อมูล Sub-Channel การซื้อซ้ำ</div>
+            ` : rankedChannels.map((c, index) => {
+              const pct = (c.revenue / maxChannelRevenue) * 100;
+              const topClass = index === 0 ? 'top-1' : index === 1 ? 'top-2' : index === 2 ? 'top-3' : '';
+              const barColor = getChannelColor(c.name);
               return `
-                <div class="biz-rank-item">
-                  <div style="display:flex; align-items:center; flex-grow:1; min-width:0;">
-                    <div class="biz-rank-badge ${idx<3?'rank-'+(idx+1):''}">${idx+1}</div>
-                    <div class="biz-rank-meta"><span class="biz-rank-name">${c.name}</span><div class="biz-progress-bg"><div class="biz-progress-bar" style="width:${pct}%; background-color:${getChannelColor(c.name)};"></div></div></div>
+                <div class="rank-item">
+                  <div class="rank-item-info">
+                    <div class="rank-number ${topClass}">${index + 1}</div>
+                    <div class="rank-details">
+                      <span class="rank-name">${c.name}</span>
+                      <div class="rank-progress-container">
+                        <div class="rank-progress-bar" style="width: ${pct}%; background-color: ${barColor};"></div>
+                      </div>
+                    </div>
                   </div>
-                  <div class="biz-rank-vals"><span class="biz-val-m">฿${Math.round(c.revenue).toLocaleString()}</span><span class="biz-val-s">${c.count} ออเดอร์</span></div>
+                  <div class="rank-values">
+                    <span class="rank-val-primary">฿${Math.round(c.revenue).toLocaleString()}</span>
+                    <span class="rank-val-secondary">${c.count.toLocaleString()} ออเดอร์ซื้อซ้ำ</span>
+                  </div>
                 </div>
               `;
             }).join('')}
