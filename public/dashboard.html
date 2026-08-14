@@ -979,11 +979,7 @@
       if (lbl) lbl.textContent = execFilters.Month || '-';
     }
 
-    // เช็คว่า Channel/SubChannel/Product/SubProduct/Admin ตัวไหนใน options (จาก Settings config) "มีข้อมูลจริง"
-    // อยู่ในปีที่กำลังเลือก (execFilters.Year) บ้าง - ใช้เลือกค่า default ให้ตอน auto-select แทนการหยิบ options[0]
-    // เฉยๆ เพราะถ้า config เรียง option แรกเป็นค่าที่ไม่มีข้อมูลขายจริงเลย ตาราง CRM Report จะว่างเปล่าทั้งที่ปีนั้น
-    // มีข้อมูลอยู่จริง (ดู renderExecutive1: filteredData.length === 0 -> "No data available")
-        const EXEC_TYPE_GETTERS = {
+    const EXEC_TYPE_GETTERS = {
       Channel: (row) => getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row),
       SubChannel: (row) => getNormalizedSubChannel(row),
       Product: (row) => getNormalizedProduct(getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set'])),
@@ -999,6 +995,10 @@
     function findExecDefaultRow(typesNeedingDefault) {
       for (const row of rawData) {
         if (!isSaleOrder(row)) continue;
+        // ต้องเช็ค isProductActive ด้วยเหมือน computeFilteredData ไม่งั้นอาจได้แถวตัวอย่างที่ Product
+        // ถูกปิดใช้งานใน Settings มาเป็น default -> พอเอาไปกรองจริงจะโดน isProductActive คัดออกจนไม่เหลือข้อมูล
+        const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
+        if (!isProductActive(getNormalizedProduct(rawProductName))) continue;
         const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         const d = dateStr ? parseDate(dateStr) : null;
         if (execFilters.Year && (!d || d.y.toString() !== execFilters.Year)) continue;
