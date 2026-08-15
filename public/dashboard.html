@@ -1456,6 +1456,68 @@
       }
     }
 
+    // ใช้กับกราฟเส้น "ลูกค้าใหม่ (คน)" / "ลูกค้าเก่า (คน)" เท่านั้น - ทำ area fill ใต้เส้นเป็น gradient
+    // จางลงเรื่อยๆ (ให้ความรู้สึกเทรนด์ ไม่ใช่แท่งทึบ) โดยอิงตามพื้นที่วาดจริงของกราฟ (chartArea) ต้องเป็น
+    // ฟังก์ชัน ไม่ใช่สีคงที่ เพราะ chartArea ยังไม่รู้ขนาดจนกว่าจะ layout เสร็จรอบแรก
+    function hexToRgba(hex, alpha) {
+      const h = hex.replace('#', '');
+      const r = parseInt(h.substring(0, 2), 16), g = parseInt(h.substring(2, 4), 16), b = parseInt(h.substring(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    function lineAreaGradient(hex) {
+      return (context) => {
+        const { ctx, chartArea } = context.chart;
+        if (!chartArea) return hexToRgba(hex, 0.15);
+        const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+        gradient.addColorStop(0, hexToRgba(hex, 0.22));
+        gradient.addColorStop(1, hexToRgba(hex, 0));
+        return gradient;
+      };
+    }
+    // เส้นบางๆ ไล่ตามเมาส์ไปที่จุดข้อมูลที่ tooltip กำลังชี้อยู่ (crosshair) ช่วยให้กวาดสายตาลงไปที่แกน X
+    // (เดือน) ได้ตรงจุดง่ายขึ้นเวลาชี้ดูกราฟระหว่างประชุม
+    const crosshairPlugin = {
+      id: 'crosshair',
+      afterDraw(chart) {
+        const active = chart.tooltip && chart.tooltip._active;
+        if (!active || !active.length) return;
+        const { ctx, chartArea } = chart;
+        const x = active[0].element.x;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x, chartArea.top);
+        ctx.lineTo(x, chartArea.bottom);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
+        ctx.stroke();
+        ctx.restore();
+      }
+    };
+    // Label ค่าล่าสุด (เดือนปัจจุบัน) ไว้ที่ปลายเส้นเสมอ ให้เห็นตัวเลขเด่นๆ ได้ทันทีโดยไม่ต้อง hover -
+    // ตาม anti-pattern ห้ามใส่ label ทุกจุด (รก อ่านยาก) จึงใส่แค่จุดสุดท้ายพอ ส่วนจุดอื่นดูผ่าน tooltip
+    const lineEndLabelPlugin = {
+      id: 'lineEndLabel',
+      afterDatasetsDraw(chart) {
+        if (chart.config.type !== 'line') return;
+        const { ctx } = chart;
+        chart.data.datasets.forEach((dataset, i) => {
+          const meta = chart.getDatasetMeta(i);
+          if (meta.hidden || !meta.data.length) return;
+          const lastIndex = dataset.data.length - 1;
+          const point = meta.data[lastIndex];
+          const val = dataset.data[lastIndex];
+          if (!point || val === undefined || val === null) return;
+          ctx.save();
+          ctx.font = '700 12px Inter, sans-serif';
+          ctx.fillStyle = dataset.borderColor;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(Number(val).toLocaleString('th-TH'), point.x + 10, point.y);
+          ctx.restore();
+        });
+      }
+    };
+
     const datalabelsPlugin = {
       id: 'datalabels',
       afterDatasetsDraw(chart, args, options) {
@@ -1494,8 +1556,26 @@
       const commonOpts = { maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } }, layout: { padding: { top: 25, bottom: 15, left: 20, right: 20 } } };
       charts.sales = new Chart(document.getElementById('chart-sales'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] }, options: { ...commonOpts, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
       charts.retNew = new Chart(document.getElementById('chart-ret-new-stacked'), { type: 'bar', data: { labels: [], datasets: [{ label: 'Retained', data: [], backgroundColor: '#006E99' }, { label: 'New', data: [], backgroundColor: '#d95f1d' }] }, options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
-      charts.newCust = new Chart(document.getElementById('chart-new'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#e86c31', borderRadius: 6 }] }, options: { ...commonOpts, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
-      charts.retCust = new Chart(document.getElementById('chart-ret'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#006E99', borderRadius: 6 }] }, options: { ...commonOpts, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
+      const lineOpts = () => ({
+        ...commonOpts,
+        layout: { padding: { top: 25, bottom: 15, left: 20, right: 50 } },
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, grid: { color: '#f5f5f5' }, ticks: { precision: 0 } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1e293b', titleColor: '#fff', bodyColor: '#fff',
+            padding: 10, cornerRadius: 8, displayColors: false, titleFont: { weight: '600' },
+            bodyFont: { weight: '700' },
+            callbacks: { label: (item) => Number(item.parsed.y).toLocaleString('th-TH') + ' คน' }
+          }
+        }
+      });
+      charts.newCust = new Chart(document.getElementById('chart-new'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#e86c31', backgroundColor: lineAreaGradient('#e86c31'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#e86c31', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(), plugins: [crosshairPlugin, lineEndLabelPlugin] });
+      charts.retCust = new Chart(document.getElementById('chart-ret'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#006E99', backgroundColor: lineAreaGradient('#006E99'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#006E99', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(), plugins: [crosshairPlugin, lineEndLabelPlugin] });
       charts.channel = new Chart(document.getElementById('chart-channel'), { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: ['#d95f1d', '#73d18e', '#006E99', '#ccc', '#888'] }] }, options: { ...commonOpts, plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } } }, plugins: [datalabelsPlugin] });
       charts.admin = new Chart(document.getElementById('chart-admin'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] }, options: { ...commonOpts, indexAxis: 'y', scales: { x: { beginAtZero: true, grid: { color: '#f5f5f5' } }, y: { grid: { display: false } } } }, plugins: [datalabelsPlugin] });
     }
