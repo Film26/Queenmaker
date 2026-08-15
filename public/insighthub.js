@@ -18,10 +18,7 @@ if (!window.insightHubState) {
     excelSearchTerms: {},
     activeDropdown: null,
     selectedCustomerPhone: null,
-    allCustomers: [],
-    // 'feed' (ค่าเริ่มต้น) = การ์ด Insight อัตโนมัติ, 'table' = ตารางลูกค้าแบบเดิม, 'profile' คุมแยกผ่าน
-    // selectedCustomerPhone (มี priority สูงสุดเสมอ ไม่ว่า activeView จะเป็นอะไร - ดู renderInsightHub)
-    activeView: 'feed'
+    allCustomers: []
   };
 }
 
@@ -83,41 +80,8 @@ function getRefillWindow(prodStr) {
   return maxDays;
 }
 
-// สร้างยอดขายรายเดือน แยกตาม Channel/Admin/Product ใช้สำหรับการ์ด Insight Feed ที่ต้องเทียบ
-// เดือนนี้กับเดือนก่อน (Channel Movers, Top Admin, Product Movers) - ใช้ getNormalized* ตัวเดียวกับที่
-// หน้า Overview ใช้ (ไม่ใช่ CHANNEL_MAP ของไฟล์นี้เอง) เพื่อให้ตัวเลขตรงกับหน้า Overview/Executive เสมอ
-// รับ rawSaleOrders ที่กรอง isSaleOrder มาแล้วจาก renderInsightHub (แถวเดียวกับที่ใช้คำนวณ customers)
-// ไม่ใช่ rawData ดิบ ไม่งั้นยอดจะไม่ตรงกับคอลัมน์ Total Revenue ในตาราง
-function getHubMonthlyDims(rawSaleOrders) {
-  const byChannel = {}, byAdmin = {}, byProduct = {};
-  const monthsSet = new Set();
-  (rawSaleOrders || []).forEach(row => {
-    const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-    const d = window.parseDate ? window.parseDate(dateStr) : null;
-    if (!d) return;
-    const mStr = d.str || `${d.y}-${String(d.m).padStart(2, '0')}`;
-    monthsSet.add(mStr);
-    const revStr = window.getRowValue(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-    const revenue = parseFloat(revStr.toString().replace(/,/g, '').trim()) || 0;
-
-    const channel = window.getNormalizedChannel ? window.getNormalizedChannel(window.getRowValue(row, ['ช่องทาง', 'Channel']), row) : 'Other';
-    const admin = window.getNormalizedAdmin ? window.getNormalizedAdmin(row) : 'Unknown';
-    const rawProductName = window.getRowValue(row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']);
-    const product = window.getNormalizedProduct ? window.getNormalizedProduct(rawProductName) : 'Unknown';
-
-    if (!byChannel[mStr]) byChannel[mStr] = {};
-    byChannel[mStr][channel] = (byChannel[mStr][channel] || 0) + revenue;
-    if (!byAdmin[mStr]) byAdmin[mStr] = {};
-    byAdmin[mStr][admin] = (byAdmin[mStr][admin] || 0) + revenue;
-    if (!byProduct[mStr]) byProduct[mStr] = {};
-    byProduct[mStr][product] = (byProduct[mStr][product] || 0) + revenue;
-  });
-  return { months: Array.from(monthsSet).sort(), byChannel, byAdmin, byProduct };
-}
-
-// LTV tier ตาม totalRevenue สะสม - แยกเป็นฟังก์ชันเพื่อให้การ์ด "ลูกค้า VIP ใหม่" ใน Insight Feed
-// เรียกซ้ำได้ (เทียบ tier ก่อน/หลังออเดอร์ล่าสุด เพื่อดูว่าเพิ่งข้าม tier ในช่วงนี้หรือเปล่า)
-// ต้องเป็นค่าเดียวกับที่ใช้กำหนด ltvTier ของลูกค้าแต่ละคนด้านล่างเป๊ะๆ ห้ามมีสูตรสองชุด
+// LTV tier ตาม totalRevenue สะสม - แยกเป็นฟังก์ชันเพื่อให้เรียกซ้ำได้ (เทียบ tier ก่อน/หลังออเดอร์ล่าสุด)
+// ต้องเป็นค่าเดียวกับที่ใช้กำหนด ltvTier ของลูกค้าแต่ละคนใน buildInsightCustomers เป๊ะๆ ห้ามมีสูตรสองชุด
 function getLtvTierFor(totalRevenue) {
   if (totalRevenue >= 25000) return "💎 1. VVIP Whale (>25k)";
   if (totalRevenue >= 12000) return "🐳 2. VIP Dolphin (>12k)";
@@ -148,6 +112,12 @@ function formatDateDisplay(dObj) {
   const mm = String(dObj.getMonth() + 1).padStart(2, '0');
   const yyyy = dObj.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
+}
+
+function escapeHtml(str) {
+  return (str || '').toString()
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // Cleansing: ใช้เบอร์โทรศัพท์เป็นคีย์หลักของลูกค้า ต้อง normalize ก่อนเทียบ/รวมข้อมูล
@@ -376,6 +346,289 @@ function getHubUniqueValues(colId) {
 // [PERF] จำกัดจำนวนตัวเลือกที่ render ใน dropdown ต่อครั้ง (บางคอลัมน์มี unique เป็นหมื่นค่า
 // การยัดเป็น <li> ทั้งหมดทำให้ DOM บวมและหน่วง) พิมพ์ค้นหาเพื่อกรองตัวเลือกได้ตามปกติ
 const HUB_OPTION_RENDER_LIMIT = 500;
+
+// สร้างรายชื่อลูกค้าจาก rawData - แยกออกมาจาก renderInsightHub เป็นฟังก์ชันเดี่ยว เพื่อให้หน้าอื่น
+// (เช่น Dashboard/Overview ใน dashboard.html) เรียกใช้ร่วมกันได้ ได้ตัวเลขลูกค้า/Tier/Segment ตรงกับ
+// ตาราง Customer InsightHub เป๊ะๆ เสมอ (คำนวณจุดเดียว ใช้ร่วมกันหลายหน้า)
+// [PERF] แคชผลการยุบข้อมูล: raw ~56k แถว -> ลูกค้า ~21k ราย เป็นงานหนักที่สุดของหน้านี้ คำนวณครั้งเดียวต่อ
+// ชุดข้อมูล (คีย์ด้วย reference/length ของ rawData เอง) เรียกซ้ำจากหน้าไหนก็ได้ผลเดิมโดยไม่คำนวณซ้ำ
+function buildInsightCustomers(rawData) {
+  if (!window.__hubCache) window.__hubCache = { rawRef: null, rawLen: -1, customers: null, years: null, today: null, uniq: {} };
+  const hubCache = window.__hubCache;
+
+  if (hubCache.rawRef === rawData && hubCache.rawLen === rawData.length && hubCache.customers) {
+    return { customers: hubCache.customers, availableYears: hubCache.years, today: hubCache.today };
+  }
+
+  // [RAW2021] กันพังกรณี window.isSaleOrder ไม่ถูกโหลด -> ถือว่าทุกแถวเป็น SALE
+  const isSaleRow = (row) => (typeof window.isSaleOrder === 'function' ? window.isSaleOrder(row) : true);
+
+  // [RAW2021] ตรวจรูปแบบไฟล์: RAW 2021 เป็น export รายการขายล้วน (มีคอลัมน์ Net Sales
+  // แต่ไม่มีคอลัมน์ประเภทเอกสาร/สถานะ) ถ้าปล่อยผ่าน isSaleOrder ของรูปแบบเดิม
+  // มันอาจกรองแถวทิ้งเพราะหาคอลัมน์ที่ใช้ตรวจไม่เจอ ทำให้ยอดขาย/จำนวนออเดอร์ "มาไม่ครบ"
+  // -> ไฟล์รูปแบบนี้ให้นับทุกแถวเป็นรายการขาย ส่วนไฟล์รูปแบบเดิมยังผ่าน isSaleOrder ตามปกติทุกอย่าง
+  const sampleRows = rawData.slice(0, 50);
+  const hasNetSalesCol = sampleRows.some(r => (window.getRowValue(r, ['Net Sales']) || '').toString().trim() !== '');
+  const hasDocTypeCol = sampleRows.some(r => (window.getRowValue(r, ['Order type', 'OrderType', 'ประเภทเอกสาร', 'ประเภท', 'สถานะ', 'DocType', 'Document Type', 'Status', 'Type']) || '').toString().trim() !== '');
+  const isRaw2021Format = hasNetSalesCol && !hasDocTypeCol;
+  const rawSaleOrders = isRaw2021Format ? rawData.slice() : rawData.filter(row => isSaleRow(row));
+
+  let maxTime = 0;
+  const availableYearsSet = new Set();
+
+  rawSaleOrders.forEach(row => {
+    const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+    const d = parseToDateObj(dateStr);
+    if (d) {
+      if (d.getTime() > maxTime) maxTime = d.getTime();
+      availableYearsSet.add(d.getFullYear());
+    }
+  });
+
+  const today = maxTime > 0 ? new Date(maxTime) : new Date();
+  const availableYears = Array.from(availableYearsSet).sort((a, b) => a - b);
+
+  const customerHistoryMap = {};
+
+  rawSaleOrders.forEach(row => {
+    const key = getCustomerKey(row); // [RAW2021] เดิมใช้ normalizePhone
+    if (!key) return;
+    if (!customerHistoryMap[key]) {
+      customerHistoryMap[key] = [];
+    }
+    customerHistoryMap[key].push(row);
+  });
+
+  // ประวัติออเดอร์ "ทุกประเภท" (ไม่กรองเฉพาะ SALE) ต่อลูกค้า ใช้คำนวณ FirstChannel/LastChannel
+  // ให้ตรงกับสูตรเดิมใน Google Sheets ที่ค้นหาจากชีต 'All Order_Inputs' ทั้งหมด
+  const allOrdersHistoryMap = {};
+  rawData.forEach(row => {
+    const key = getCustomerKey(row); // [RAW2021]
+    if (!key) return;
+    if (!allOrdersHistoryMap[key]) {
+      allOrdersHistoryMap[key] = [];
+    }
+    allOrdersHistoryMap[key].push(row);
+  });
+
+  const filteredCustomerKeys = new Set();
+  rawData.forEach(row => {
+    const key = getCustomerKey(row); // [RAW2021]
+    if (key) filteredCustomerKeys.add(key);
+  });
+
+  const customers = Array.from(filteredCustomerKeys).map(custKey => {
+    const historyRows = customerHistoryMap[custKey] || [];
+    const sortedHistory = historyRows.map(row => {
+      const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+      return { row: row, dateObj: parseToDateObj(dateStr) };
+    }).filter(item => item.dateObj !== null).sort((a, b) => a.dateObj - b.dateObj);
+
+    if (sortedHistory.length === 0) return null;
+
+    const firstOrder = sortedHistory[0];
+    const lastOrder = sortedHistory[sortedHistory.length - 1];
+
+    const firstPurchaseDate = firstOrder.dateObj;
+    const lastPurchaseDate = lastOrder.dateObj;
+    const totalOrders = sortedHistory.length;
+
+    let totalRevenue = 0;
+    sortedHistory.forEach(o => {
+      const revStr = window.getRowValue(o.row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+      const rev = parseFloat(revStr.replace(/,/g, ''));
+      if (!isNaN(rev)) totalRevenue += rev;
+    });
+
+    // ยอดเฉพาะออเดอร์ล่าสุด (ไม่รวมสะสม) - ใช้เทียบ LTV tier ก่อน/หลังออเดอร์นี้
+    const lastOrderRevStr = window.getRowValue(lastOrder.row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+    const lastOrderRevenueParsed = parseFloat(lastOrderRevStr.replace(/,/g, ''));
+    const lastOrderRevenue = isNaN(lastOrderRevenueParsed) ? 0 : lastOrderRevenueParsed;
+
+    const aov = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    const diffTime = today - lastPurchaseDate;
+    const daysSinceLast = Math.max(0, diffTime / (1000 * 60 * 60 * 24));
+
+    const lastProductStr = window.getRowValue(lastOrder.row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']) || "-";
+    const refillWindow = getRefillWindow(lastProductStr);
+    const nextPurchaseDateObj = new Date(lastPurchaseDate.getTime() + refillWindow * 24 * 60 * 60 * 1000);
+
+    const ltvTier = getLtvTierFor(totalRevenue);
+
+    const tenureDays = Math.max(0, (lastPurchaseDate - firstPurchaseDate) / (1000 * 60 * 60 * 24));
+    let loyaltyTier = "🌱 Seedling";
+    if (tenureDays > 365) loyaltyTier = "🏅 Legendary (1Y+)";
+    else if (tenureDays > 180) loyaltyTier = "🥈 Veteran (6M+)";
+    else if (tenureDays > 45) loyaltyTier = "🥉 Regular";
+
+    const entryProduct = window.getRowValue(firstOrder.row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']) || "-";
+
+    const prodCounts = {};
+    sortedHistory.forEach(o => {
+      const p = window.getRowValue(o.row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']);
+      if (p) prodCounts[p] = (prodCounts[p] || 0) + 1;
+    });
+    let currentFavorite = "-";
+    let maxC = 0;
+    for (const p in prodCounts) {
+      if (prodCounts[p] > maxC) {
+        maxC = prodCounts[p];
+        currentFavorite = p;
+      }
+    }
+
+    let segment1 = "CHURN";
+    if (daysSinceLast <= 30) segment1 = "NEW";
+    else if (daysSinceLast <= 90) segment1 = "ACTIVE";
+    else if (daysSinceLast <= 120) segment1 = "RISK";
+
+    let segment2 = "CHURN";
+    if (daysSinceLast <= 7) segment2 = "NEW";
+    else if (daysSinceLast <= refillWindow - 8) segment2 = "ACTIVE";
+    else if (daysSinceLast <= refillWindow + 3) segment2 = "REFILL";
+    else if (daysSinceLast <= refillWindow + 59) segment2 = "RISK";
+
+    let adminPriority = "4. 🔴 Win-back (กู้สถานะ)";
+    if (segment2 === "REFILL") {
+      adminPriority = "1. 🟢 High (ยอดขาย)";
+    } else if (segment1 === "NEW" || segment2 === "NEW" || (segment1 === "RISK" && segment2 === "RISK")) {
+      adminPriority = "2. 🟡 Medium (สร้างใจ)";
+    } else if (
+      (segment1 === "ACTIVE" && segment2 === "ACTIVE") ||
+      ((segment1 === "RISK" || segment1 === "CHURN") && segment2 === "ACTIVE") ||
+      (segment1 === "ACTIVE" && segment2 === "RISK")
+    ) {
+      adminPriority = "3. 🟠 Low (ดูแลสัมพันธ์)";
+    }
+
+    let actionStrategy = "✅ Healthy Care: ดูแลตามปกติ";
+    if (segment1 === "ACTIVE" && segment2 === "REFILL") actionStrategy = "🎯 Golden Period: ทักปิดยอดด่วน!";
+    else if (segment1 === "RISK" && segment2 === "REFILL") actionStrategy = "⚡ Urgent Opportunity: ทักดึงกลับด้วยโปร";
+    else if (segment1 === "CHURN" && segment2 === "REFILL") actionStrategy = "🕒 Legacy Refill: ทักกระตุ้นรอบใหม่";
+    else if ((segment1 === "RISK" || segment1 === "CHURN") && segment2 === "ACTIVE") actionStrategy = "💎 High LTV: ลูกค้าเซ็ตใหญ่ (ห้ามตื๊อ)";
+    else if (segment1 === "RISK" && segment2 === "RISK") actionStrategy = "🟠 Risk Alert: ทักเสนอโปรดึงกลับ";
+    else if (segment1 === "NEW" && segment2 === "RISK") actionStrategy = "🟠 Risk Alert: ถามวิธีทาน/กระตุ้น/ความพอใจ";
+    else if (segment1 === "ACTIVE" && segment2 === "RISK") actionStrategy = "⚠️ Slow User: ทักถามวิธีทาน/กระตุ้น";
+    else if (segment1 === "ACTIVE" && segment2 === "CHURN") actionStrategy = "🚨 Speed Churn: ทักถามความพึงพอใจ";
+    else if (segment1 === "NEW" && segment2 === "NEW") actionStrategy = "💖 Welcome: ติดตามผล/สอนวิธีใช้";
+    else if ((segment1 === "RISK" || segment1 === "CHURN") && segment2 === "CHURN") actionStrategy = "😴 Dead Churn: ส่งโปรแรงดึงกลับ";
+
+    // FirstChannel = ช่องทางของออเดอร์แรกสุด (ทุกประเภท) ตามลำดับเวลา
+    // LastChannel = ช่องทางล่าสุดที่ "ไม่ว่าง" (ทุกประเภท)
+    // [RAW2021] เปลี่ยนจากอ่านคอลัมน์ ช่องทาง/Channel ตรงๆ เป็น getChannelRaw() ที่ fallback ไปแกะจาก Remark
+    const allOrdersSorted = (allOrdersHistoryMap[custKey] || []).map(row => {
+      const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+      return { row, dateObj: parseToDateObj(dateStr) };
+    }).filter(item => item.dateObj !== null).sort((a, b) => a.dateObj - b.dateObj);
+
+    let firstChannel = "-";
+    if (allOrdersSorted.length > 0) {
+      const stdFirst = getRowChannelStd(allOrdersSorted[0].row);
+      firstChannel = stdFirst.mainChannel || "-";
+    }
+
+    let lastChannel = "-";
+    for (let i = allOrdersSorted.length - 1; i >= 0; i--) {
+      const stdRow = getRowChannelStd(allOrdersSorted[i].row);
+      if (stdRow.subChannel || stdRow.mainChannel) { lastChannel = stdRow.subChannel || stdRow.mainChannel; break; }
+    }
+
+    let lastAdmin = "-";
+    if (window.getNormalizedAdmin) {
+      lastAdmin = window.getNormalizedAdmin(lastOrder.row);
+    } else {
+      lastAdmin = window.getRowValue(lastOrder.row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']) || "-";
+    }
+    // ไม่มีชื่อแอดมิน (getNormalizedAdmin คืน 'Unknown' เป็นค่า default) -> แสดง "-" แทน
+    if (!lastAdmin || lastAdmin === 'Unknown') lastAdmin = "-";
+
+    // คำนวณยอดเงินสะสมจริงแยกรายปี + จำนวนออร์เดอร์ต่อปี (ใช้แสดงในโปรไฟล์ลูกค้า)
+    // [RAW2021] เพิ่ม 'Net Sales' ในลิสต์คอลัมน์ยอดขาย (เดิมมีแค่ ยอดขาย/ยอดโอน ทำให้ RAW 2021 ได้ 0 หมด)
+    const annualSpending = {};
+    const annualOrders = {};
+    availableYears.forEach(y => { annualSpending[y] = 0; annualOrders[y] = 0; });
+    sortedHistory.forEach(o => {
+      const year = o.dateObj.getFullYear();
+      if (annualSpending[year] !== undefined) {
+        const revStr = window.getRowValue(o.row, ['ยอดขาย', 'ยอดโอน', 'Net Sales', 'ราคาสินค้ายังไม่รวมภาษี', 'Revenue', 'Amount']) || '0';
+        const rev = parseFloat(revStr.replace(/,/g, ''));
+        if (!isNaN(rev)) annualSpending[year] += rev;
+        annualOrders[year] += 1;
+      }
+    });
+
+    // [RAW2021] เบอร์สำหรับ "แสดงผล" ในคอลัมน์ CustomerKey (Phone)
+    // - ไฟล์เดิม: custKey คือเบอร์อยู่แล้ว -> โชว์เหมือนเดิมเป๊ะ
+    // - RAW 2021: custKey เป็นรหัสลูกค้า (ใช้จับกลุ่มเบื้องหลัง) แต่หน้าจอโชว์เบอร์มาสก์ตามไฟล์ เช่น xxxxxxx429
+    const rawPhoneVal = (window.getRowValue(lastOrder.row, ['Phone', 'เบอร์โทร', 'เบอร์โทรศัพท์']) || '').toString().trim();
+    const normPhone = normalizePhone(rawPhoneVal);
+    const displayPhone = (custKey === normPhone) ? custKey : (normPhone || rawPhoneVal || custKey);
+
+    const customerObj = {
+      phone: custKey, // [RAW2021] property ชื่อเดิม ค่าคือคีย์จาก getCustomerKey (ไฟล์เดิม = เบอร์โทรเหมือนเดิม)
+      displayPhone,
+      name: window.getRowValue(lastOrder.row, ['CustomerName', 'ชื่อผู้ส่ง', 'Customer ID', 'รหัสลูกค้า']) || custKey,
+      firstPurchaseDate,
+      lastPurchaseDate,
+      totalOrders,
+      totalRevenue,
+      lastOrderRevenue,
+      aov,
+      daysSinceLast,
+      lastProductStr,
+      nextPurchaseDateObj,
+      ltvTier,
+      loyaltyTier,
+      entryProduct,
+      currentFavorite,
+      adminPriority,
+      segment1,
+      segment2,
+      actionStrategy,
+      firstChannel,
+      lastChannel,
+      lastAdmin,
+      annualSpending,
+      annualOrders,
+      firstPurchaseStr: formatDateDisplay(firstPurchaseDate),
+      lastPurchaseStr: formatDateDisplay(lastPurchaseDate),
+      nextPurchaseStr: formatDateDisplay(nextPurchaseDateObj),
+      totalOrdersStr: String(totalOrders),
+      totalRevenueStr: "฿" + totalRevenue.toLocaleString(undefined, {maximumFractionDigits:0}),
+      aovStr: "฿" + aov.toLocaleString(undefined, {maximumFractionDigits:0}),
+      daysSinceLastStr: daysSinceLast.toFixed(1)
+    };
+
+    customerObj.trendVisual = computeTrendVisual(customerObj, availableYears, today);
+
+    // ตั้งค่าแสดงผลบนตารางหน้าหลักเป็น ยอดเงินบาท
+    availableYears.forEach(y => {
+      const amt = annualSpending[y] || 0;
+      customerObj['tier' + y] = amt > 0 ? "฿" + amt.toLocaleString(undefined, {maximumFractionDigits:0}) : "-";
+    });
+
+    return customerObj;
+  }).filter(c => c !== null);
+
+  // [PERF] เก็บผลลงแคช + log ตัวเลขไว้ตรวจสอบ (เปิด Console ดูได้ว่าแถว/ยอดหายที่ขั้นไหน)
+  hubCache.rawRef = rawData;
+  hubCache.rawLen = rawData.length;
+  hubCache.customers = customers;
+  hubCache.years = availableYears;
+  // today = วันที่ล่าสุดที่เจอในข้อมูลจริง (ไม่ใช่ new Date() ตามเวลาเครื่อง) ใช้เป็นค่า "วันนี้" อ้างอิงเดียวกัน
+  // ทั้ง segment1/segment2/refill window และ Trend Visual (ดู computeTrendVisual)
+  hubCache.today = today;
+  hubCache.uniq = {};
+  console.info('[InsightHub] rows:', rawData.length,
+    '| sale rows:', rawSaleOrders.length,
+    '| isRaw2021Format:', isRaw2021Format,
+    '| customers:', customers.length,
+    '| total revenue:', customers.reduce((s, c) => s + c.totalRevenue, 0).toLocaleString());
+
+  return { customers, availableYears, today };
+}
+// เปิดให้หน้าอื่น (เช่น Dashboard/Overview ใน dashboard.html) เรียกใช้ร่วมกันได้ ดูคอมเมนต์ต้นฟังก์ชัน
+window.buildInsightCustomers = buildInsightCustomers;
 
 function renderInsightHub(filteredData, rawData) {
   const container = document.getElementById('view-insighthub');
@@ -735,20 +988,41 @@ function renderInsightHub(filteredData, rawData) {
       .profile-detail-card h3 { font-size: 16px; font-weight: 700; color: #1e293b; margin: 0 0 15px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; }
       .profile-detail-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f8fafc; }
       .profile-detail-row:last-child { border-bottom: none; }
+
+      .note-status-btn {
+        width: 100%; display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff;
+        cursor: pointer; font-size: 13px; color: #334155; text-align: left;
+      }
+      .note-status-btn:hover { border-color: #d95f1d; }
+      .note-status-panel {
+        display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+        background: #fff; border: 1px solid #ccc; border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15); padding: 8px; z-index: 20;
+        max-height: 220px; overflow-y: auto;
+      }
+      .note-status-panel.show { display: block; }
+      .note-status-option {
+        display: flex; align-items: center; gap: 8px; padding: 7px 6px;
+        font-size: 13px; color: #334155; cursor: pointer; border-radius: 5px;
+      }
+      .note-status-option:hover { background: #f5f5f5; }
     `;
     document.head.appendChild(style);
 
     document.addEventListener('click', function(e) {
-      const state = window.insightHubState;
       let changed = false;
       if (!e.target.closest('.th-container') && !e.target.closest('.excel-dropdown-menu')) {
-        if (state.activeDropdown) { state.activeDropdown = null; changed = true; }
-        // .hub-subscribe-panel มีคลาส .excel-dropdown-menu ร่วมด้วย เช็คแค่ปุ่ม trigger เพราะปุ่มมันเอง
-        // กัน propagation ไว้แล้ว (onclick="event.stopPropagation()") ส่วนคลิกนอกทั้งปุ่มและ panel ให้ปิด
-        if (state.hubSubscribePanelOpen) { state.hubSubscribePanelOpen = false; changed = true; }
+        if (window.insightHubState.activeDropdown) {
+          window.insightHubState.activeDropdown = null;
+          changed = true;
+        }
       }
-      if (state.hubOpenNoteEditor && !e.target.closest('.hub-feed-note-box') && !e.target.closest('.hub-feed-note-icon')) {
-        state.hubOpenNoteEditor = null; changed = true;
+      if (!e.target.closest('.note-status-btn') && !e.target.closest('.note-status-panel')) {
+        if (window.insightHubState.noteEditor && window.insightHubState.noteEditor.dropdownOpen) {
+          window.insightHubState.noteEditor.dropdownOpen = false;
+          changed = true;
+        }
       }
       if (changed && window.applyFilters) window.applyFilters();
     });
@@ -756,304 +1030,23 @@ function renderInsightHub(filteredData, rawData) {
 
   const state = window.insightHubState;
 
-  // [PERF] แคชผลการยุบข้อมูล: raw ~56k แถว -> ลูกค้า ~21k ราย เป็นงานหนักที่สุดของหน้านี้
-  // เดิมถูกคำนวณใหม่ทุก interaction (เปิด dropdown, sort, เปลี่ยนหน้า ล้วนเรียก render ใหม่) ทำให้หน่วง
-  // -> คำนวณครั้งเดียวต่อชุดข้อมูล ส่วน sort/filter/แบ่งหน้าใช้ผลจากแคช (ข้อมูลใหม่/import ใหม่จะคำนวณใหม่เอง)
-  if (!window.__hubCache) window.__hubCache = { rawRef: null, rawLen: -1, customers: null, years: null, uniq: {} };
-  const hubCache = window.__hubCache;
-
-  let customers, availableYears;
-  if (hubCache.rawRef === rawData && hubCache.rawLen === rawData.length && hubCache.customers) {
-    customers = hubCache.customers;
-    availableYears = hubCache.years;
-    window.insightHubState.availableYears = availableYears;
-  } else {
-
-  // [RAW2021] กันพังกรณี window.isSaleOrder ไม่ถูกโหลด -> ถือว่าทุกแถวเป็น SALE
-  const isSaleRow = (row) => (typeof window.isSaleOrder === 'function' ? window.isSaleOrder(row) : true);
-
-  // [RAW2021] ตรวจรูปแบบไฟล์: RAW 2021 เป็น export รายการขายล้วน (มีคอลัมน์ Net Sales
-  // แต่ไม่มีคอลัมน์ประเภทเอกสาร/สถานะ) ถ้าปล่อยผ่าน isSaleOrder ของรูปแบบเดิม
-  // มันอาจกรองแถวทิ้งเพราะหาคอลัมน์ที่ใช้ตรวจไม่เจอ ทำให้ยอดขาย/จำนวนออเดอร์ "มาไม่ครบ"
-  // -> ไฟล์รูปแบบนี้ให้นับทุกแถวเป็นรายการขาย ส่วนไฟล์รูปแบบเดิมยังผ่าน isSaleOrder ตามปกติทุกอย่าง
-  const sampleRows = rawData.slice(0, 50);
-  const hasNetSalesCol = sampleRows.some(r => (window.getRowValue(r, ['Net Sales']) || '').toString().trim() !== '');
-  const hasDocTypeCol = sampleRows.some(r => (window.getRowValue(r, ['Order type', 'OrderType', 'ประเภทเอกสาร', 'ประเภท', 'สถานะ', 'DocType', 'Document Type', 'Status', 'Type']) || '').toString().trim() !== '');
-  const isRaw2021Format = hasNetSalesCol && !hasDocTypeCol;
-  const rawSaleOrders = isRaw2021Format ? rawData.slice() : rawData.filter(row => isSaleRow(row));
-  
-  let maxTime = 0;
-  const availableYearsSet = new Set();
-  
-  rawSaleOrders.forEach(row => {
-    const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-    const d = parseToDateObj(dateStr);
-    if (d) {
-      if (d.getTime() > maxTime) maxTime = d.getTime();
-      availableYearsSet.add(d.getFullYear());
-    }
-  });
-  
-  const today = maxTime > 0 ? new Date(maxTime) : new Date();
-  availableYears = Array.from(availableYearsSet).sort((a, b) => a - b);
+  const { customers, availableYears } = buildInsightCustomers(rawData);
   window.insightHubState.availableYears = availableYears;
+  window.insightHubState.allCustomers = customers;
 
-  const customerHistoryMap = {};
-
-  rawSaleOrders.forEach(row => {
-    const key = getCustomerKey(row); // [RAW2021] เดิมใช้ normalizePhone
-    if (!key) return;
-    if (!customerHistoryMap[key]) {
-      customerHistoryMap[key] = [];
-    }
-    customerHistoryMap[key].push(row);
+  // ทับ Sales Note/สถานะการติดต่อล่าสุดลงในลูกค้าแต่ละคน - รันทุก render (ไม่ใช่แค่ตอน cache miss)
+  // เพื่อให้บันทึกโน้ตที่หน้าโปรไฟล์แล้วเห็นผลในตารางทันทีโดยไม่ต้องคำนวณ customers ใหม่ทั้งชุด
+  const notesByKey = (window.AppData && window.AppData.notesByKey) || {};
+  customers.forEach(c => {
+    const n = notesByKey[c.phone];
+    c.latestNote = n && n.note ? n.note : "-";
+    c.latestStatuses = n && n.statuses && n.statuses.length ? n.statuses.join(", ") : "-";
   });
 
-  // ประวัติออเดอร์ "ทุกประเภท" (ไม่กรองเฉพาะ SALE) ต่อลูกค้า ใช้คำนวณ FirstChannel/LastChannel
-  // ให้ตรงกับสูตรเดิมใน Google Sheets ที่ค้นหาจากชีต 'All Order_Inputs' ทั้งหมด
-  const allOrdersHistoryMap = {};
-  rawData.forEach(row => {
-    const key = getCustomerKey(row); // [RAW2021]
-    if (!key) return;
-    if (!allOrdersHistoryMap[key]) {
-      allOrdersHistoryMap[key] = [];
-    }
-    allOrdersHistoryMap[key].push(row);
-  });
-
-  const filteredCustomerKeys = new Set();
-  rawData.forEach(row => {
-    const key = getCustomerKey(row); // [RAW2021]
-    if (key) filteredCustomerKeys.add(key);
-  });
-
-  if (filteredCustomerKeys.size === 0) {
+  if (customers.length === 0) {
     container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">No customers found matching the filters.</div>';
     return;
   }
-
-  customers = Array.from(filteredCustomerKeys).map(custKey => {
-    const historyRows = customerHistoryMap[custKey] || [];
-    const sortedHistory = historyRows.map(row => {
-      const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-      return { row: row, dateObj: parseToDateObj(dateStr) };
-    }).filter(item => item.dateObj !== null).sort((a, b) => a.dateObj - b.dateObj);
-
-    if (sortedHistory.length === 0) return null;
-
-    const firstOrder = sortedHistory[0];
-    const lastOrder = sortedHistory[sortedHistory.length - 1];
-    
-    const firstPurchaseDate = firstOrder.dateObj;
-    const lastPurchaseDate = lastOrder.dateObj;
-    const totalOrders = sortedHistory.length;
-    
-    let totalRevenue = 0;
-    sortedHistory.forEach(o => {
-      const revStr = window.getRowValue(o.row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-      const rev = parseFloat(revStr.replace(/,/g, ''));
-      if (!isNaN(rev)) totalRevenue += rev;
-    });
-
-    // ยอดเฉพาะออเดอร์ล่าสุด (ไม่รวมสะสม) - ใช้เทียบ LTV tier ก่อน/หลังออเดอร์นี้ สำหรับการ์ด
-    // "ลูกค้า VIP ใหม่" ใน Insight Feed (ดู getLtvTierFor)
-    const lastOrderRevStr = window.getRowValue(lastOrder.row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-    const lastOrderRevenueParsed = parseFloat(lastOrderRevStr.replace(/,/g, ''));
-    const lastOrderRevenue = isNaN(lastOrderRevenueParsed) ? 0 : lastOrderRevenueParsed;
-
-    const aov = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-    const diffTime = today - lastPurchaseDate;
-    const daysSinceLast = Math.max(0, diffTime / (1000 * 60 * 60 * 24));
-
-    const lastProductStr = window.getRowValue(lastOrder.row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']) || "-";
-    const refillWindow = getRefillWindow(lastProductStr);
-    const nextPurchaseDateObj = new Date(lastPurchaseDate.getTime() + refillWindow * 24 * 60 * 60 * 1000);
-
-    const ltvTier = getLtvTierFor(totalRevenue);
-
-    const tenureDays = Math.max(0, (lastPurchaseDate - firstPurchaseDate) / (1000 * 60 * 60 * 24));
-    let loyaltyTier = "🌱 Seedling";
-    if (tenureDays > 365) loyaltyTier = "🏅 Legendary (1Y+)";
-    else if (tenureDays > 180) loyaltyTier = "🥈 Veteran (6M+)";
-    else if (tenureDays > 45) loyaltyTier = "🥉 Regular";
-
-    const entryProduct = window.getRowValue(firstOrder.row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']) || "-";
-    
-    const prodCounts = {};
-    sortedHistory.forEach(o => {
-      const p = window.getRowValue(o.row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']);
-      if (p) prodCounts[p] = (prodCounts[p] || 0) + 1;
-    });
-    let currentFavorite = "-";
-    let maxC = 0;
-    for (const p in prodCounts) {
-      if (prodCounts[p] > maxC) {
-        maxC = prodCounts[p];
-        currentFavorite = p;
-      }
-    }
-
-    let segment1 = "CHURN";
-    if (daysSinceLast <= 30) segment1 = "NEW";
-    else if (daysSinceLast <= 90) segment1 = "ACTIVE";
-    else if (daysSinceLast <= 120) segment1 = "RISK";
-
-    let segment2 = "CHURN";
-    if (daysSinceLast <= 7) segment2 = "NEW";
-    else if (daysSinceLast <= refillWindow - 8) segment2 = "ACTIVE";
-    else if (daysSinceLast <= refillWindow + 3) segment2 = "REFILL";
-    else if (daysSinceLast <= refillWindow + 59) segment2 = "RISK";
-
-    let adminPriority = "4. 🔴 Win-back (กู้สถานะ)";
-    if (segment2 === "REFILL") {
-      adminPriority = "1. 🟢 High (ยอดขาย)";
-    } else if (segment1 === "NEW" || segment2 === "NEW" || (segment1 === "RISK" && segment2 === "RISK")) {
-      adminPriority = "2. 🟡 Medium (สร้างใจ)";
-    } else if (
-      (segment1 === "ACTIVE" && segment2 === "ACTIVE") ||
-      ((segment1 === "RISK" || segment1 === "CHURN") && segment2 === "ACTIVE") ||
-      (segment1 === "ACTIVE" && segment2 === "RISK")
-    ) {
-      adminPriority = "3. 🟠 Low (ดูแลสัมพันธ์)";
-    }
-
-    let actionStrategy = "✅ Healthy Care: ดูแลตามปกติ";
-    if (segment1 === "ACTIVE" && segment2 === "REFILL") actionStrategy = "🎯 Golden Period: ทักปิดยอดด่วน!";
-    else if (segment1 === "RISK" && segment2 === "REFILL") actionStrategy = "⚡ Urgent Opportunity: ทักดึงกลับด้วยโปร";
-    else if (segment1 === "CHURN" && segment2 === "REFILL") actionStrategy = "🕒 Legacy Refill: ทักกระตุ้นรอบใหม่";
-    else if ((segment1 === "RISK" || segment1 === "CHURN") && segment2 === "ACTIVE") actionStrategy = "💎 High LTV: ลูกค้าเซ็ตใหญ่ (ห้ามตื๊อ)";
-    else if (segment1 === "RISK" && segment2 === "RISK") actionStrategy = "🟠 Risk Alert: ทักเสนอโปรดึงกลับ";
-    else if (segment1 === "NEW" && segment2 === "RISK") actionStrategy = "🟠 Risk Alert: ถามวิธีทาน/กระตุ้น/ความพอใจ";
-    else if (segment1 === "ACTIVE" && segment2 === "RISK") actionStrategy = "⚠️ Slow User: ทักถามวิธีทาน/กระตุ้น";
-    else if (segment1 === "ACTIVE" && segment2 === "CHURN") actionStrategy = "🚨 Speed Churn: ทักถามความพึงพอใจ";
-    else if (segment1 === "NEW" && segment2 === "NEW") actionStrategy = "💖 Welcome: ติดตามผล/สอนวิธีใช้";
-    else if ((segment1 === "RISK" || segment1 === "CHURN") && segment2 === "CHURN") actionStrategy = "😴 Dead Churn: ส่งโปรแรงดึงกลับ";
-
-    // FirstChannel = ช่องทางของออเดอร์แรกสุด (ทุกประเภท) ตามลำดับเวลา
-    // LastChannel = ช่องทางล่าสุดที่ "ไม่ว่าง" (ทุกประเภท)
-    // [RAW2021] เปลี่ยนจากอ่านคอลัมน์ ช่องทาง/Channel ตรงๆ เป็น getChannelRaw() ที่ fallback ไปแกะจาก Remark
-    const allOrdersSorted = (allOrdersHistoryMap[custKey] || []).map(row => {
-      const dateStr = window.getRowValue(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-      return { row, dateObj: parseToDateObj(dateStr) };
-    }).filter(item => item.dateObj !== null).sort((a, b) => a.dateObj - b.dateObj);
-
-    let firstChannel = "-";
-    if (allOrdersSorted.length > 0) {
-      const stdFirst = getRowChannelStd(allOrdersSorted[0].row);
-      firstChannel = stdFirst.mainChannel || "-";
-    }
-
-    let lastChannel = "-";
-    for (let i = allOrdersSorted.length - 1; i >= 0; i--) {
-      const stdRow = getRowChannelStd(allOrdersSorted[i].row);
-      if (stdRow.subChannel || stdRow.mainChannel) { lastChannel = stdRow.subChannel || stdRow.mainChannel; break; }
-    }
-    
-    let lastAdmin = "-";
-    if (window.getNormalizedAdmin) {
-      lastAdmin = window.getNormalizedAdmin(lastOrder.row);
-    } else {
-      lastAdmin = window.getRowValue(lastOrder.row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']) || "-";
-    }
-    // ไม่มีชื่อแอดมิน (getNormalizedAdmin คืน 'Unknown' เป็นค่า default) -> แสดง "-" แทน
-    if (!lastAdmin || lastAdmin === 'Unknown') lastAdmin = "-";
-
-    // lastChannel ด้านบน (ใช้แสดงในตาราง/โปรไฟล์) เป็นค่า sub-channel ก่อน (เช่น 'FB','LINE' ตัวพิมพ์ใหญ่)
-    // จาก getRowChannelStd ของไฟล์นี้เอง - คนละระบบ/คนละรูปแบบตัวพิมพ์กับ getNormalizedChannel ที่การ์ด
-    // Channel Movers ใน Insight Feed ใช้ (เช่น 'Line' ตัวพิมพ์เล็กผสมใหญ่) เทียบกันตรงๆ จะไม่ match เลย
-    // -> เก็บอีกค่าที่มาจากระบบเดียวกับ getHubMonthlyDims ไว้แยกต่างหาก ใช้เฉพาะ deep-link จากการ์ด Movers
-    const lastMainChannel = window.getNormalizedChannel
-      ? window.getNormalizedChannel(window.getRowValue(lastOrder.row, ['ช่องทาง', 'Channel']), lastOrder.row)
-      : lastChannel;
-
-    // คำนวณยอดเงินสะสมจริงแยกรายปี + จำนวนออร์เดอร์ต่อปี (ใช้แสดงในโปรไฟล์ลูกค้า)
-    // [RAW2021] เพิ่ม 'Net Sales' ในลิสต์คอลัมน์ยอดขาย (เดิมมีแค่ ยอดขาย/ยอดโอน ทำให้ RAW 2021 ได้ 0 หมด)
-    const annualSpending = {};
-    const annualOrders = {};
-    availableYears.forEach(y => { annualSpending[y] = 0; annualOrders[y] = 0; });
-    sortedHistory.forEach(o => {
-      const year = o.dateObj.getFullYear();
-      if (annualSpending[year] !== undefined) {
-        const revStr = window.getRowValue(o.row, ['ยอดขาย', 'ยอดโอน', 'Net Sales', 'ราคาสินค้ายังไม่รวมภาษี', 'Revenue', 'Amount']) || '0';
-        const rev = parseFloat(revStr.replace(/,/g, ''));
-        if (!isNaN(rev)) annualSpending[year] += rev;
-        annualOrders[year] += 1;
-      }
-    });
-
-    // [RAW2021] เบอร์สำหรับ "แสดงผล" ในคอลัมน์ CustomerKey (Phone)
-    // - ไฟล์เดิม: custKey คือเบอร์อยู่แล้ว -> โชว์เหมือนเดิมเป๊ะ
-    // - RAW 2021: custKey เป็นรหัสลูกค้า (ใช้จับกลุ่มเบื้องหลัง) แต่หน้าจอโชว์เบอร์มาสก์ตามไฟล์ เช่น xxxxxxx429
-    const rawPhoneVal = (window.getRowValue(lastOrder.row, ['Phone', 'เบอร์โทร', 'เบอร์โทรศัพท์']) || '').toString().trim();
-    const normPhone = normalizePhone(rawPhoneVal);
-    const displayPhone = (custKey === normPhone) ? custKey : (normPhone || rawPhoneVal || custKey);
-
-    const customerObj = {
-      phone: custKey, // [RAW2021] property ชื่อเดิม ค่าคือคีย์จาก getCustomerKey (ไฟล์เดิม = เบอร์โทรเหมือนเดิม)
-      displayPhone,
-      name: window.getRowValue(lastOrder.row, ['CustomerName', 'ชื่อผู้ส่ง', 'Customer ID', 'รหัสลูกค้า']) || custKey,
-      firstPurchaseDate,
-      lastPurchaseDate,
-      totalOrders,
-      totalRevenue,
-      lastOrderRevenue,
-      aov,
-      daysSinceLast,
-      lastProductStr,
-      nextPurchaseDateObj,
-      ltvTier,
-      loyaltyTier,
-      entryProduct,
-      currentFavorite,
-      adminPriority,
-      segment1,
-      segment2,
-      actionStrategy,
-      firstChannel,
-      lastChannel,
-      lastMainChannel,
-      lastAdmin,
-      annualSpending,
-      annualOrders,
-      firstPurchaseStr: formatDateDisplay(firstPurchaseDate),
-      lastPurchaseStr: formatDateDisplay(lastPurchaseDate),
-      nextPurchaseStr: formatDateDisplay(nextPurchaseDateObj),
-      totalOrdersStr: String(totalOrders),
-      totalRevenueStr: "฿" + totalRevenue.toLocaleString(undefined, {maximumFractionDigits:0}),
-      aovStr: "฿" + aov.toLocaleString(undefined, {maximumFractionDigits:0}),
-      daysSinceLastStr: daysSinceLast.toFixed(1)
-    };
-    
-    // ตั้งค่าแสดงผลบนตารางหน้าหลักเป็น ยอดเงินบาท
-    availableYears.forEach(y => {
-      const amt = annualSpending[y] || 0;
-      customerObj['tier' + y] = amt > 0 ? "฿" + amt.toLocaleString(undefined, {maximumFractionDigits:0}) : "-";
-    });
-    
-    return customerObj;
-  }).filter(c => c !== null);
-
-  // [PERF] เก็บผลลงแคช + log ตัวเลขไว้ตรวจสอบ (เปิด Console ดูได้ว่าแถว/ยอดหายที่ขั้นไหน)
-  hubCache.rawRef = rawData;
-  hubCache.rawLen = rawData.length;
-  hubCache.customers = customers;
-  hubCache.years = availableYears;
-  // today = วันที่ล่าสุดที่เจอในข้อมูลจริง (ไม่ใช่ new Date() ตามเวลาเครื่อง) ใช้เป็นค่า "วันนี้" อ้างอิงเดียวกัน
-  // ทั้ง segment1/segment2/refill window (คำนวณไปแล้วด้านบน) และการ์ดใน Insight Feed (ดู renderHubFeed)
-  hubCache.today = today;
-  // ยอดขายรายเดือนแยก Channel/Admin/Product - ใช้เฉพาะการ์ด Movers ใน Insight Feed คำนวณครั้งเดียวพร้อม
-  // customers ตรงนี้เลย (แคชอายุเท่ากัน invalidate พร้อมกัน) ไม่ต้องวน rawSaleOrders ซ้ำอีกรอบตอน render feed
-  hubCache.monthlyDims = getHubMonthlyDims(rawSaleOrders);
-  hubCache.uniq = {};
-  console.info('[InsightHub] rows:', rawData.length,
-    '| sale rows:', rawSaleOrders.length,
-    '| isRaw2021Format:', isRaw2021Format,
-    '| customers:', customers.length,
-    '| total revenue:', customers.reduce((s, c) => s + c.totalRevenue, 0).toLocaleString());
-
-  } // end: cache miss (คำนวณใหม่)
-
-  window.insightHubState.allCustomers = customers;
 
   if (state.selectedCustomerPhone) {
     const customer = customers.find(c => c.phone === state.selectedCustomerPhone);
@@ -1063,13 +1056,7 @@ function renderInsightHub(filteredData, rawData) {
     }
   }
 
-  // 'table' = ตารางลูกค้าแบบเดิม (Excel-style filter/sort/pagination/export ทุกอย่างเหมือนเดิมเป๊ะ
-  // ดู renderHubTable) / อย่างอื่นทั้งหมด (ค่าเริ่มต้น 'feed') = การ์ด Insight Feed ใหม่ (ดู renderHubFeed)
-  if (state.activeView === 'table') {
-    renderHubTable(customers, container);
-    return;
-  }
-  renderHubFeed(customers, container);
+  renderHubTable(customers, container);
   return;
 
   } finally {
@@ -1082,10 +1069,8 @@ function renderInsightHub(filteredData, rawData) {
   }
 }
 
-// แยกออกมาจาก renderInsightHub เดิม (cut-paste ตรงๆ ไม่แก้ logic) ตอน renderInsightHub ยังโชว์แต่ตารางเสมอ
-// ตอนนี้เป็น "classic view" ที่เข้าถึงได้ผ่านปุ่ม "ดูตารางลูกค้าทั้งหมด" ใน Insight Feed (hubSetView('table'))
-// filter/sort/pagination/export (exportInsightHubExcel อ่าน state.displayedCustomers ที่ตั้งค่าไว้ท้ายฟังก์ชันนี้)
-// ต้องทำงานเหมือนเดิมทุกประการ - ห้ามแก้ logic ใดๆ ในนี้นอกจากจำเป็นต้องปรับให้เป็นฟังก์ชันแยก
+// ตาราง Customer InsightHub หลัก - filter/sort/pagination/export (exportInsightHubExcel อ่าน
+// state.displayedCustomers ที่ตั้งค่าไว้ท้ายฟังก์ชันนี้)
 function renderHubTable(customers, container) {
   const state = window.insightHubState;
   let countWhale = 0, countDolphin = 0, countMinnow = 0, countGeneral = 0;
@@ -1214,22 +1199,10 @@ function renderHubTable(customers, container) {
   let html = `
     <div class="hub-header" style="display: flex; align-items: center; justify-content: space-between;">
       <h2>Customer Insight Hub</h2>
-      <div style="display: flex; gap: 10px;">
-        <button class="pag-btn" onclick="hubSetView('feed')">
-          <i class="fas fa-stream"></i> กลับไปหน้า Feed
-        </button>
-        <button class="pag-btn" style="background: #15803d; color: white; border-color: #15803d; font-weight: 600;" onclick="exportInsightHubExcel()">
-          <i class="fas fa-file-excel"></i> Export Excel
-        </button>
-      </div>
+      <button class="pag-btn" style="background: #15803d; color: white; border-color: #15803d; font-weight: 600;" onclick="exportInsightHubExcel()">
+        <i class="fas fa-file-excel"></i> Export Excel
+      </button>
     </div>
-
-    ${state.hubJumpLabel ? `
-      <div class="hub-jump-banner">
-        <span><i class="fas fa-filter"></i> กรองมาจาก Insight Feed: <strong>${escapeHtml(state.hubJumpLabel)}</strong></span>
-        <button onclick="hubClearJumpLabel()" title="ล้างข้อความนี้"><i class="fas fa-xmark"></i></button>
-      </div>
-    ` : ''}
 
     <div class="hub-summary-sections">
       <div class="summary-section-box">
@@ -1313,8 +1286,11 @@ function renderHubTable(customers, container) {
               ${makeExcelHeaderTh('firstChannel', 'FirstChannel (Main)', 'th-action')}
               ${makeExcelHeaderTh('lastChannel', 'LastChannel (Main)', 'th-action')}
               ${makeExcelHeaderTh('lastAdmin', 'Last Admin', 'th-action')}
-              
+              <th class="th-action" style="text-align:center;"><span class="th-label">Trend Visual</span></th>
+
               ${state.availableYears.map(y => makeExcelHeaderTh('tier' + y, `ยอดซื้อปี ${y}`, 'th-tiers')).join('')}
+              ${makeExcelHeaderTh('latestStatuses', 'สถานะล่าสุด (Contact)', 'th-action')}
+              <th class="th-action"><span class="th-label" onclick="setHubSort('latestNote')">Sales Note ล่าสุด ${getSortIcon('latestNote')}</span></th>
             </tr>
           </thead>
           <tbody>
@@ -1343,8 +1319,13 @@ function renderHubTable(customers, container) {
                 <td>${c.firstChannel}</td>
                 <td>${c.lastChannel}</td>
                 <td>${c.lastAdmin}</td>
-                
+                <td style="text-align: center;" title="${c.trendVisual ? c.trendVisual.label : 'ไม่มีข้อมูลปีก่อนหน้าให้เทียบ'}">
+                  ${c.trendVisual ? `<span style="display:inline-block; width:14px; height:14px; border-radius:50%; background:${c.trendVisual.color};"></span>` : '<span style="color:#ccc;">-</span>'}
+                </td>
+
                 ${state.availableYears.map(y => '<td style="text-align: right; font-weight: 500;">' + c['tier' + y] + '</td>').join('')}
+                <td>${escapeHtml(c.latestStatuses)}</td>
+                <td style="max-width: 220px; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(c.latestNote)}">${escapeHtml(c.latestNote)}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -1369,428 +1350,6 @@ function renderHubTable(customers, container) {
       </div>
     </div>
   `;
-
-  container.innerHTML = html;
-}
-
-// ==========================================================================
-// Insight Feed (Phase 1: Feed + Annotation + Subscribe) - ดูแผนที่ตกลงกันไว้
-// เนื้อหาการ์ดคำนวณจากข้อมูล CRM ของเราเอง (ไม่ใช่ข่าวภายนอกแบบเว็บต้นแบบ) หัวข้อคงที่ 6 หัวข้อ v1
-// ==========================================================================
-
-function getHubPeriodKey(today) {
-  return today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
-}
-
-function escapeHtml(str) {
-  return (str || '').toString()
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-const HUB_ALL_TOPIC_IDS = ['churn-risk', 'refill-due', 'new-vip', 'channel-movers', 'admin-performance', 'product-movers'];
-
-function getHubSubscriptions() {
-  try {
-    const raw = localStorage.getItem('qm_hub_subscriptions_v1');
-    if (!raw) return HUB_ALL_TOPIC_IDS.slice();
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : HUB_ALL_TOPIC_IDS.slice();
-  } catch (e) { return HUB_ALL_TOPIC_IDS.slice(); }
-}
-
-window.hubToggleSubscription = function(topicId) {
-  const subs = getHubSubscriptions();
-  const idx = subs.indexOf(topicId);
-  if (idx === -1) subs.push(topicId); else subs.splice(idx, 1);
-  localStorage.setItem('qm_hub_subscriptions_v1', JSON.stringify(subs));
-  if (window.applyFilters) window.applyFilters();
-};
-
-window.hubOpenSubscribePanel = function() {
-  window.insightHubState.hubSubscribePanelOpen = true;
-  if (window.applyFilters) window.applyFilters();
-};
-window.hubCloseSubscribePanel = function() {
-  window.insightHubState.hubSubscribePanelOpen = false;
-  if (window.applyFilters) window.applyFilters();
-};
-
-function getHubNotes() {
-  try { return JSON.parse(localStorage.getItem('qm_hub_notes_v1') || '{}'); } catch (e) { return {}; }
-}
-
-window.hubSaveNote = function(topicId, periodKey, text) {
-  const notes = getHubNotes();
-  const key = topicId + ':' + periodKey;
-  const trimmed = (text || '').trim();
-  if (trimmed) notes[key] = trimmed; else delete notes[key];
-  localStorage.setItem('qm_hub_notes_v1', JSON.stringify(notes));
-  window.insightHubState.hubOpenNoteEditor = null;
-  if (window.applyFilters) window.applyFilters();
-};
-
-window.hubToggleNoteEditor = function(topicId) {
-  const state = window.insightHubState;
-  state.hubOpenNoteEditor = (state.hubOpenNoteEditor === topicId) ? null : topicId;
-  if (window.applyFilters) window.applyFilters();
-};
-
-// เก็บ matchedCustomers/label ของแต่ละการ์ดไว้ที่ window (ไม่ใช่ฝังลง onclick attribute โดยตรง) เพราะชื่อ
-// ลูกค้าเป็นข้อมูลดิบจากไฟล์ CSV อาจมีเครื่องหมายคำพูดปนอยู่ ถ้าฝังลง HTML attribute ตรงๆ จะพัง/เสี่ยง
-// ต่อการหลุด attribute ได้ - onclick จึงส่งแค่ topicId (ค่าคงที่ปลอดภัย) แล้วมาค้นจาก object นี้แทน
-window.__hubFeedMatches = {};
-window.__hubFeedLabels = {};
-
-window.hubJumpToTable = function(topicId) {
-  const matches = window.__hubFeedMatches[topicId] || [];
-  const state = window.insightHubState;
-  state.excelFilters = { displayPhone: Array.from(new Set(matches.map(c => c.displayPhone))) };
-  state.excelSearchTerms = {};
-  state.searchTerm = '';
-  state.currentPage = 1;
-  state.activeView = 'table';
-  state.hubJumpLabel = window.__hubFeedLabels[topicId] || '';
-  if (window.applyFilters) window.applyFilters();
-};
-
-window.hubClearJumpLabel = function() {
-  window.insightHubState.hubJumpLabel = '';
-  if (window.applyFilters) window.applyFilters();
-};
-
-window.hubSetView = function(view) {
-  window.insightHubState.activeView = view;
-  if (window.applyFilters) window.applyFilters();
-};
-
-// หา "ตัวเด่น" ของแต่ละมิติ (Channel/Admin/Product) เทียบเดือนล่าสุดกับเดือนก่อนหน้าใน monthlyDims -
-// ใช้ร่วมกันทั้ง 3 การ์ด Movers ไม่แยกเขียนซ้ำ ต้องมีข้อมูลอย่างน้อย 2 เดือนถึงจะเทียบ MoM ได้
-function getHubMoverStats(dimMap, months) {
-  if (!months || months.length < 2) return null;
-  const currMonth = months[months.length - 1];
-  const prevMonth = months[months.length - 2];
-  const currData = dimMap[currMonth] || {};
-  const prevData = dimMap[prevMonth] || {};
-  const keys = new Set(Object.keys(currData).concat(Object.keys(prevData)));
-  const rows = Array.from(keys).map(key => {
-    const curr = currData[key] || 0;
-    const prev = prevData[key] || 0;
-    const pct = prev > 0 ? ((curr - prev) / prev) * 100 : (curr > 0 ? Infinity : 0);
-    return { key, curr, prev, pct };
-  }).filter(r => r.curr > 0 || r.prev > 0);
-  if (rows.length === 0) return null;
-  const grower = rows.slice().sort((a, b) => b.pct - a.pct)[0];
-  const decliner = rows.slice().sort((a, b) => a.pct - b.pct)[0];
-  // เลือกตัวที่ "เคลื่อนไหวเด่นที่สุด" ตัวเดียว (ขึ้นแรงสุด หรือ ลงแรงสุด) ไม่ใส่ทั้งคู่พร้อมกัน กันการ์ดรก
-  const gMag = grower ? (grower.pct === Infinity ? Number.MAX_SAFE_INTEGER : Math.abs(grower.pct)) : -1;
-  const dMag = decliner ? (decliner.pct === Infinity ? Number.MAX_SAFE_INTEGER : Math.abs(decliner.pct)) : -1;
-  const standout = gMag >= dMag ? grower : decliner;
-  return { currMonth, prevMonth, standout };
-}
-
-function formatHubPct(pct) {
-  if (pct === Infinity) return 'ใหม่ในเดือนนี้';
-  return (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
-}
-
-function getHubTopicCatalog() {
-  return [
-    {
-      id: 'churn-risk', title: 'ลูกค้าเสี่ยงหาย', icon: 'fa-triangle-exclamation',
-      compute(customers) {
-        const matched = customers.filter(c => ['RISK', 'CHURN'].includes(c.segment1) || ['RISK', 'CHURN'].includes(c.segment2));
-        if (matched.length === 0) return null;
-        const pct = customers.length > 0 ? (matched.length / customers.length) * 100 : 0;
-        const sorted = matched.slice().sort((a, b) => b.daysSinceLast - a.daysSinceLast);
-        return {
-          headline: matched.length.toLocaleString(),
-          headlineSub: 'คน',
-          subLabel: pct.toFixed(0) + '% ของลูกค้าทั้งหมด',
-          sentence: `มีลูกค้า <strong>${matched.length.toLocaleString()} คน</strong> ที่เข้าข่ายเสี่ยงหาย (ไม่ได้ซื้อนานเกินคาด) ควรทักติดตามด่วน`,
-          examples: sorted.slice(0, 5).map(c => c.name),
-          matchedCustomers: matched
-        };
-      }
-    },
-    {
-      id: 'refill-due', title: 'ถึงรอบซื้อซ้ำเร็วๆ นี้', icon: 'fa-rotate',
-      compute(customers, monthlyDims, today) {
-        const in7d = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const matched = customers.filter(c => c.nextPurchaseDateObj && c.nextPurchaseDateObj >= today && c.nextPurchaseDateObj <= in7d);
-        if (matched.length === 0) return null;
-        const sorted = matched.slice().sort((a, b) => a.nextPurchaseDateObj - b.nextPurchaseDateObj);
-        return {
-          headline: matched.length.toLocaleString(),
-          headlineSub: 'คน',
-          subLabel: 'ภายใน 7 วันนี้',
-          sentence: `มีลูกค้า <strong>${matched.length.toLocaleString()} คน</strong> ที่คาดว่าจะถึงรอบซื้อซ้ำภายใน 7 วันนี้ ทักก่อนใครเพิ่มโอกาสปิดยอด`,
-          examples: sorted.slice(0, 5).map(c => c.name + ' (' + c.nextPurchaseStr + ')'),
-          matchedCustomers: matched
-        };
-      }
-    },
-    {
-      id: 'new-vip', title: 'ลูกค้า VIP ใหม่', icon: 'fa-crown',
-      compute(customers, monthlyDims, today) {
-        const periodKey = getHubPeriodKey(today);
-        const matched = customers.filter(c => {
-          if (!c.lastPurchaseDate) return false;
-          const lastKey = c.lastPurchaseDate.getFullYear() + '-' + String(c.lastPurchaseDate.getMonth() + 1).padStart(2, '0');
-          if (lastKey !== periodKey) return false;
-          if (!c.ltvTier.includes('Whale') && !c.ltvTier.includes('Dolphin')) return false;
-          const prevTier = getLtvTierFor(c.totalRevenue - (c.lastOrderRevenue || 0));
-          return prevTier !== c.ltvTier;
-        });
-        if (matched.length === 0) return null;
-        const sorted = matched.slice().sort((a, b) => b.totalRevenue - a.totalRevenue);
-        return {
-          headline: matched.length.toLocaleString(),
-          headlineSub: 'คน',
-          subLabel: 'เดือนนี้',
-          sentence: `มีลูกค้า <strong>${matched.length.toLocaleString()} คน</strong> เพิ่งข้ามขึ้นเป็นระดับ VIP (Dolphin/Whale) จากการซื้อครั้งล่าสุดในเดือนนี้`,
-          examples: sorted.slice(0, 5).map(c => c.name),
-          matchedCustomers: matched
-        };
-      }
-    },
-    {
-      id: 'channel-movers', title: 'ช่องทางที่เคลื่อนไหวเด่น', icon: 'fa-share-nodes',
-      compute(customers, monthlyDims) {
-        const stats = getHubMoverStats(monthlyDims.byChannel, monthlyDims.months);
-        if (!stats || !stats.standout) return null;
-        const s = stats.standout;
-        const dir = (s.pct === Infinity || s.pct > 0) ? 'up' : (s.pct < 0 ? 'down' : 'flat');
-        return {
-          headline: s.key,
-          trend: { dir, label: formatHubPct(s.pct) },
-          sentence: `ช่องทาง <strong>${escapeHtml(s.key)}</strong> ยอดขายเดือนนี้ ฿${s.curr.toLocaleString(undefined, {maximumFractionDigits: 0})} เทียบเดือนก่อน (฿${s.prev.toLocaleString(undefined, {maximumFractionDigits: 0})}) ${formatHubPct(s.pct)}`,
-          examples: [],
-          matchedCustomers: customers.filter(c => c.lastMainChannel === s.key)
-        };
-      }
-    },
-    {
-      id: 'admin-performance', title: 'แอดมินทำยอดเด่น', icon: 'fa-user-tie',
-      compute(customers, monthlyDims) {
-        const stats = getHubMoverStats(monthlyDims.byAdmin, monthlyDims.months);
-        if (!stats || !stats.standout) return null;
-        const s = stats.standout;
-        const dir = (s.pct === Infinity || s.pct > 0) ? 'up' : (s.pct < 0 ? 'down' : 'flat');
-        return {
-          headline: s.key,
-          trend: { dir, label: formatHubPct(s.pct) },
-          sentence: `แอดมิน <strong>${escapeHtml(s.key)}</strong> ทำยอดเดือนนี้ ฿${s.curr.toLocaleString(undefined, {maximumFractionDigits: 0})} เทียบเดือนก่อน (฿${s.prev.toLocaleString(undefined, {maximumFractionDigits: 0})}) ${formatHubPct(s.pct)}`,
-          examples: [],
-          matchedCustomers: customers.filter(c => c.lastAdmin === s.key)
-        };
-      }
-    },
-    {
-      id: 'product-movers', title: 'สินค้าที่เคลื่อนไหวเด่น', icon: 'fa-box',
-      compute(customers, monthlyDims) {
-        const stats = getHubMoverStats(monthlyDims.byProduct, monthlyDims.months);
-        if (!stats || !stats.standout) return null;
-        const s = stats.standout;
-        const dir = (s.pct === Infinity || s.pct > 0) ? 'up' : (s.pct < 0 ? 'down' : 'flat');
-        return {
-          headline: s.key,
-          trend: { dir, label: formatHubPct(s.pct) },
-          sentence: `สินค้า <strong>${escapeHtml(s.key)}</strong> ยอดขายเดือนนี้ ฿${s.curr.toLocaleString(undefined, {maximumFractionDigits: 0})} เทียบเดือนก่อน (฿${s.prev.toLocaleString(undefined, {maximumFractionDigits: 0})}) ${formatHubPct(s.pct)}`,
-          examples: [],
-          matchedCustomers: customers.filter(c => (c.currentFavorite || '').includes(s.key))
-        };
-      }
-    }
-  ];
-}
-
-function renderHubSubscribePanel(subscribedSet) {
-  const catalog = getHubTopicCatalog();
-  return `
-    <div class="hub-subscribe-panel excel-dropdown-menu show">
-      <div style="font-weight:700; font-size:12px; color:#7a665e; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">หัวข้อที่ติดตาม</div>
-      <ul class="excel-options-list">
-        ${catalog.map(t => `
-          <li onclick="hubToggleSubscription('${t.id}')">
-            <input type="checkbox" ${subscribedSet.has(t.id) ? 'checked' : ''} readonly style="pointer-events:none;">
-            <i class="fas ${t.icon}"></i> ${t.title}
-          </li>
-        `).join('')}
-      </ul>
-      <div class="excel-dropdown-actions">
-        <button class="excel-btn-sm confirm" onclick="hubCloseSubscribePanel()">ปิด</button>
-      </div>
-    </div>
-  `;
-}
-
-function renderHubFeedCard(topic, result, noteText, noteEditorOpen, periodKey) {
-  const trendHtml = result.trend
-    ? `<span class="hub-feed-trend-${result.trend.dir}"><i class="fas fa-arrow-${result.trend.dir === 'up' ? 'up' : result.trend.dir === 'down' ? 'down' : 'right'}"></i> ${escapeHtml(result.trend.label)}</span>`
-    : (result.subLabel ? `<span class="hub-feed-trend-flat">${escapeHtml(result.subLabel)}</span>` : '');
-
-  const examplesHtml = (result.examples && result.examples.length)
-    ? `<div class="hub-feed-examples">${result.examples.slice(0, 5).map(name => `<span class="badge-span ltv-general">${escapeHtml(name)}</span>`).join(' ')}${result.examples.length > 5 ? ` <span style="font-size:11px;color:#7a665e;">+${result.examples.length - 5} อื่นๆ</span>` : ''}</div>`
-    : '';
-
-  const ctaHtml = (result.matchedCustomers && result.matchedCustomers.length)
-    ? `<button class="hub-feed-cta-btn" onclick="hubJumpToTable('${topic.id}')">ดูรายชื่อลูกค้า (${result.matchedCustomers.length}) <i class="fas fa-arrow-right"></i></button>`
-    : '';
-
-  const noteEditorHtml = noteEditorOpen ? `
-    <div class="hub-feed-note-box">
-      <textarea id="hub-note-input-${topic.id}" placeholder="จดโน้ตเกี่ยวกับ Insight นี้...">${escapeHtml(noteText)}</textarea>
-      <div style="display:flex; gap:6px; margin-top:6px;">
-        <button class="excel-btn-sm confirm" onclick="hubSaveNote('${topic.id}', '${periodKey}', document.getElementById('hub-note-input-${topic.id}').value)">บันทึก</button>
-        <button class="excel-btn-sm" onclick="hubToggleNoteEditor('${topic.id}')">ยกเลิก</button>
-      </div>
-    </div>
-  ` : (noteText ? `<div class="hub-feed-note-preview" onclick="hubToggleNoteEditor('${topic.id}')" title="แก้ไขโน้ต"><i class="fas fa-note-sticky"></i> ${escapeHtml(noteText)}</div>` : '');
-
-  return `
-    <div class="hub-feed-card">
-      <div class="hub-feed-card-head">
-        <span class="hub-feed-icon"><i class="fas ${topic.icon}"></i></span>
-        <span class="hub-feed-title">${topic.title}</span>
-        <button class="hub-feed-note-icon" title="จดโน้ต" onclick="hubToggleNoteEditor('${topic.id}')"><i class="fas fa-pen"></i></button>
-      </div>
-      <div class="hub-feed-metric">${result.headline}<span class="hub-feed-metric-sub">${result.headlineSub || ''}</span></div>
-      ${trendHtml}
-      <div class="hub-feed-sentence">${result.sentence}</div>
-      ${examplesHtml}
-      ${noteEditorHtml}
-      ${ctaHtml}
-    </div>
-  `;
-}
-
-function renderHubFeed(customers, container) {
-  if (!document.getElementById('insighthub-feed-styles')) {
-    const style = document.createElement('style');
-    style.id = 'insighthub-feed-styles';
-    style.innerHTML = `
-      .hub-feed-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-        gap: 20px;
-      }
-      .hub-feed-card {
-        background: #fff;
-        border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-        border: 1px solid #f0e6df;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      .hub-feed-card-head {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-      .hub-feed-icon {
-        width: 32px; height: 32px; border-radius: 8px;
-        background: #fdf1e6; color: #d95f1d;
-        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      }
-      .hub-feed-title { font-weight: 700; font-size: 14px; color: #2d1e1a; flex-grow: 1; }
-      .hub-feed-note-icon {
-        background: none; border: none; color: #bbb; cursor: pointer; padding: 4px 6px; border-radius: 4px;
-      }
-      .hub-feed-note-icon:hover { color: #1e293b; background: #f0e6df; }
-      .hub-feed-metric { font-size: 26px; font-weight: 700; color: #0f172a; line-height: 1.1; }
-      .hub-feed-metric-sub { font-size: 13px; font-weight: 500; color: #7a665e; margin-left: 6px; }
-      .hub-feed-trend-up { color: #198754; font-size: 12px; font-weight: 700; }
-      .hub-feed-trend-down { color: #dc3545; font-size: 12px; font-weight: 700; }
-      .hub-feed-trend-flat { color: #6c757d; font-size: 12px; font-weight: 600; }
-      .hub-feed-sentence { font-size: 13px; color: #444; line-height: 1.5; }
-      .hub-feed-examples { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-      .hub-feed-cta-btn {
-        align-self: flex-start; margin-top: 4px;
-        background: #1e293b; color: #fff; border: none; border-radius: 8px;
-        padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
-      }
-      .hub-feed-cta-btn:hover { background: #0f172a; }
-      .hub-feed-note-box textarea {
-        width: 100%; min-height: 60px; box-sizing: border-box; padding: 8px 10px;
-        font-size: 12px; font-family: 'Inter', sans-serif; border: 1px solid #ddd; border-radius: 8px;
-        resize: vertical; outline: none;
-      }
-      .hub-feed-note-box textarea:focus { border-color: #1e293b; }
-      .hub-feed-note-preview {
-        background: #fdf8f0; border: 1px solid #f5e6d0; border-radius: 8px; padding: 8px 10px;
-        font-size: 12px; color: #7a5a2e; cursor: pointer;
-      }
-      .hub-feed-note-preview:hover { background: #fbf1de; }
-      .hub-jump-banner {
-        display: flex; align-items: center; justify-content: space-between; gap: 10px;
-        background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af;
-        border-radius: 10px; padding: 10px 16px; margin-bottom: 16px; font-size: 13px;
-      }
-      .hub-jump-banner button { background: none; border: none; color: #1e40af; cursor: pointer; font-size: 14px; }
-    `;
-    document.head.appendChild(style);
-  }
-
-  const state = window.insightHubState;
-  const hubCache = window.__hubCache || {};
-  const today = hubCache.today || new Date();
-  const monthlyDims = hubCache.monthlyDims || { months: [], byChannel: {}, byAdmin: {}, byProduct: {} };
-  const periodKey = getHubPeriodKey(today);
-  const subscribedIds = getHubSubscriptions();
-  const subscribedSet = new Set(subscribedIds);
-  const notes = getHubNotes();
-  const catalog = getHubTopicCatalog();
-
-  window.__hubFeedMatches = {};
-  window.__hubFeedLabels = {};
-
-  const cards = catalog
-    .filter(topic => subscribedSet.has(topic.id))
-    .map(topic => {
-      let result = null;
-      try { result = topic.compute(customers, monthlyDims, today); } catch (e) { console.error('[InsightHub] topic compute failed:', topic.id, e); }
-      if (result) {
-        window.__hubFeedMatches[topic.id] = result.matchedCustomers || [];
-        window.__hubFeedLabels[topic.id] = topic.title;
-      }
-      return result ? { topic, result } : null;
-    })
-    .filter(x => x !== null);
-
-  let html = `
-    <div class="hub-header" style="display:flex; align-items:center; justify-content:space-between;">
-      <h2><i class="fas fa-bolt"></i> Insight Feed</h2>
-      <div style="display:flex; gap:10px; position:relative;">
-        <button class="pag-btn" onclick="event.stopPropagation(); hubOpenSubscribePanel();">
-          <i class="fas fa-list-check"></i> จัดการหัวข้อที่ติดตาม
-        </button>
-        ${state.hubSubscribePanelOpen ? renderHubSubscribePanel(subscribedSet) : ''}
-        <button class="pag-btn" onclick="hubSetView('table')">
-          <i class="fas fa-table"></i> ดูตารางลูกค้าทั้งหมด
-        </button>
-      </div>
-    </div>
-  `;
-
-  if (cards.length === 0) {
-    html += `
-      <div class="summary-section-box" style="text-align:center; padding:50px; color:#7a665e;">
-        ${subscribedSet.size === 0
-          ? 'ยังไม่ได้ติดตามหัวข้อไหนเลย กด "จัดการหัวข้อที่ติดตาม" เพื่อเลือกหัวข้อที่สนใจ'
-          : 'ยังไม่มี Insight ใหม่ในช่วงนี้'}
-      </div>
-    `;
-  } else {
-    html += `<div class="hub-feed-grid">`;
-    cards.forEach(({ topic, result }) => {
-      const noteText = notes[topic.id + ':' + periodKey];
-      html += renderHubFeedCard(topic, result, noteText, state.hubOpenNoteEditor === topic.id, periodKey);
-    });
-    html += `</div>`;
-  }
 
   container.innerHTML = html;
 }
@@ -1883,8 +1442,7 @@ window.resetHubFilters = function() {
     excelSearchTerms: {},
     activeDropdown: null,
     selectedCustomerPhone: null,
-    allCustomers: window.insightHubState.allCustomers,
-    activeView: window.insightHubState.activeView || 'feed'
+    allCustomers: window.insightHubState.allCustomers
   };
   if (window.applyFilters) window.applyFilters();
 };
@@ -1925,9 +1483,12 @@ window.exportInsightHubExcel = function() {
       'Action Strategy Guideline': c.actionStrategy,
       'FirstChannel (Main)': c.firstChannel,
       'LastChannel (Main)': c.lastChannel,
-      'Last Admin': c.lastAdmin
+      'Last Admin': c.lastAdmin,
+      'Trend Visual': c.trendVisual ? c.trendVisual.label : '-'
     };
     years.forEach(y => { row[`ยอดซื้อปี ${y}`] = c['tier' + y]; });
+    row['สถานะล่าสุด (Contact)'] = c.latestStatuses;
+    row['Sales Note ล่าสุด'] = c.latestNote;
     return row;
   });
 
@@ -1981,6 +1542,47 @@ function getCustomerTierClass(tier) {
   if (tier === "Gold") return "ctier-gold";
   if (tier === "Silver") return "ctier-silver";
   return "ctier-junior";
+}
+
+const TIER_RANK = { Junior: 1, Silver: 2, Gold: 3, Platinum: 4, Diamond: 5 };
+
+// จุดสีบอกเทรนด์ลูกค้าเทียบปีล่าสุด vs ปีก่อนหน้า (ยอดซื้อขึ้น/ลง x Tier รายปีขึ้น/ลง) - ปีล่าสุดถ้าเป็น
+// ปีปัจจุบันจริง (ยังไม่จบปี) จะ interpolate ยอดเป็น full-year-equivalent ก่อนเทียบ ไม่งั้นปีที่ยังไม่จบ
+// จะโชว์เป็น "ลดลง" เทียบกับปีก่อนที่จบเต็มปีเสมอ ค่าเริ่มต้น (ยังไม่มี Settings ปรับได้) ตรงกับเว็บต้นแบบ:
+// neutralBandPercent 0, interpolateCurrentYear true - คอมโบที่ไม่เข้าเงื่อนไข 5 สี (เช่น ไม่มีปีก่อนให้เทียบ)
+// คืนค่า null แสดงเป็นขีดกลาง
+function computeTrendVisual(c, availableYears, todayRef) {
+  if (!availableYears || availableYears.length < 2) return null;
+  const cfg = { neutralBandPercent: 0, interpolateCurrentYear: true };
+  const lastYear = availableYears[availableYears.length - 1];
+  const prevYear = availableYears[availableYears.length - 2];
+  const prevAmt = (c.annualSpending && c.annualSpending[prevYear]) || 0;
+  let lastAmt = (c.annualSpending && c.annualSpending[lastYear]) || 0;
+  if (prevAmt <= 0) return null;
+
+  if (cfg.interpolateCurrentYear && todayRef && lastYear === todayRef.getFullYear()) {
+    const startOfYear = new Date(todayRef.getFullYear(), 0, 1);
+    const dayOfYear = Math.ceil((todayRef - startOfYear) / (1000 * 60 * 60 * 24)) + 1;
+    if (dayOfYear > 0 && dayOfYear < 365) {
+      lastAmt = lastAmt / (dayOfYear / 365);
+    }
+  }
+
+  const prevTier = getAnnualTier(prevAmt);
+  const lastTier = getAnnualTier(lastAmt);
+  const prevRank = prevTier ? TIER_RANK[prevTier] : 0;
+  const lastRank = lastTier ? TIER_RANK[lastTier] : 0;
+
+  const band = (Math.max(0, cfg.neutralBandPercent || 0) / 100) * prevAmt;
+  const amountDir = lastAmt > prevAmt + band ? "up" : (lastAmt < prevAmt - band ? "down" : "same");
+  const tierDir = lastRank > prevRank ? "up" : (lastRank < prevRank ? "down" : "same");
+
+  if (amountDir === "down" && tierDir === "down") return { color: "#dc2626", label: "ยอดซื้อและ Tier ลดลง" };
+  if (amountDir === "up" && tierDir === "down") return { color: "#f97316", label: "ยอดซื้อเพิ่มขึ้น แต่ Tier ลดลง" };
+  if (amountDir === "down" && tierDir === "same") return { color: "#eab308", label: "ยอดซื้อลดลง Tier เท่าเดิม" };
+  if (amountDir === "up" && tierDir === "same") return { color: "#0ea5e9", label: "ยอดซื้อเพิ่มขึ้น Tier เท่าเดิม" };
+  if (amountDir === "up" && tierDir === "up") return { color: "#16a34a", label: "ยอดซื้อและ Tier เพิ่มขึ้น" };
+  return null;
 }
 
 function getLtvClass(tier) {
@@ -2073,7 +1675,138 @@ function generateAiSummary(c) {
     '</div>';
 }
 
+function formatDateTimeDisplay(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+}
+
+// Sales Note card: multi-select contact status + free-text note, shown under AI Summary.
+// Draft edits live in state.noteEditor (keyed to the customer being viewed, initialized in
+// renderCustomerProfileView) so a checkbox toggle can re-render the page without wiping
+// whatever the admin has already typed/selected. บันทึกแล้วเป็น "ค่าปัจจุบัน" ของลูกค้าคนนั้น
+// (ทับค่าเดิม ไม่ใช่ log ประวัติ) และเห็นได้ทุกคนที่ล็อกอิน (ผ่าน /api/notes ไม่ใช่ localStorage)
+function renderSalesNoteCard(c) {
+  const state = window.insightHubState;
+  const editor = state.noteEditor;
+  const statusOptions = (window.AppData && window.AppData.statusOptions && window.AppData.statusOptions.length)
+    ? window.AppData.statusOptions
+    : [];
+  const saved = (window.AppData && window.AppData.notesByKey && window.AppData.notesByKey[c.phone]) || null;
+  const updatedInfo = saved && saved.updatedAt
+    ? `<span style="font-size:11.5px; color:#94a3b8;">อัปเดตล่าสุดโดย <strong>${escapeHtml(saved.updatedBy || '-')}</strong> เมื่อ ${formatDateTimeDisplay(saved.updatedAt)}</span>`
+    : '';
+
+  return `
+    <div class="profile-detail-card" style="background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); margin-bottom: 25px;">
+      <h3><i class="fas fa-note-sticky" style="margin-right: 8px; color: #d95f1d;"></i>Sales Note</h3>
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="position: relative;">
+          <label style="font-size: 12px; font-weight: 600; color: #64748b; display: block; margin-bottom: 6px;">สถานะการติดต่อ (เลือกได้มากกว่า 1)</label>
+          <button type="button" class="note-status-btn" onclick="event.stopPropagation(); toggleNoteStatusDropdown()">
+            <span>${editor.statuses.length ? escapeHtml(editor.statuses.join(', ')) : 'เลือกสถานะ...'}</span>
+            <i class="fas fa-chevron-down" style="font-size: 11px; color: #999;"></i>
+          </button>
+          <div class="note-status-panel ${editor.dropdownOpen ? 'show' : ''}" onclick="event.stopPropagation();">
+            ${statusOptions.length === 0
+              ? `<div style="padding: 10px; color: #999; font-size: 12px;">ยังไม่มีสถานะให้เลือก ไปที่ Settings เพื่อเพิ่ม</div>`
+              : statusOptions.map(opt => {
+                  const checked = editor.statuses.includes(opt);
+                  const safeId = 'note-status-' + opt.replace(/[^a-zA-Z0-9ก-๙]/g, '_');
+                  return `
+                    <label class="note-status-option" for="${safeId}">
+                      <input type="checkbox" id="${safeId}" ${checked ? 'checked' : ''} onchange="toggleNoteStatusCheck('${opt.replace(/'/g, "\\'")}', this.checked)">
+                      <span>${escapeHtml(opt)}</span>
+                    </label>
+                  `;
+                }).join('')
+            }
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size: 12px; font-weight: 600; color: #64748b; display: block; margin-bottom: 6px;">โน้ตการขาย</label>
+          <textarea id="sales-note-textarea" oninput="updateNoteDraftText(this.value)" placeholder="พิมพ์บันทึกการติดต่อลูกค้า..." style="width: 100%; min-height: 90px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; font-size: 13px; font-family: inherit; resize: vertical; box-sizing: border-box;">${escapeHtml(editor.text)}</textarea>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+          ${updatedInfo || '<span></span>'}
+          <button class="btn btn-primary" onclick="saveCustomerNote()" style="padding: 8px 22px; background:#1e293b; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600;"><i class="fas fa-save"></i> บันทึก</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+window.toggleNoteStatusDropdown = function() {
+  const state = window.insightHubState;
+  if (!state.noteEditor) return;
+  state.noteEditor.dropdownOpen = !state.noteEditor.dropdownOpen;
+  if (window.applyFilters) window.applyFilters();
+};
+
+window.toggleNoteStatusCheck = function(label, checked) {
+  const state = window.insightHubState;
+  if (!state.noteEditor) return;
+  const idx = state.noteEditor.statuses.indexOf(label);
+  if (checked && idx === -1) state.noteEditor.statuses.push(label);
+  if (!checked && idx !== -1) state.noteEditor.statuses.splice(idx, 1);
+  if (window.applyFilters) window.applyFilters();
+};
+
+// ไม่ re-render ทุกครั้งที่พิมพ์ (จะทำให้ textarea เสีย focus/ตำแหน่ง cursor) - เก็บไว้ใน state เฉยๆ จนกว่าจะกด Save
+window.updateNoteDraftText = function(value) {
+  const state = window.insightHubState;
+  if (!state.noteEditor) return;
+  state.noteEditor.text = value;
+};
+
+window.saveCustomerNote = async function() {
+  const state = window.insightHubState;
+  const editor = state.noteEditor;
+  if (!editor) return;
+  const customer = (state.allCustomers || []).find(c => c.phone === editor.forPhone);
+  if (!customer) return;
+
+  try {
+    await window.CrmApi.upsertNote({
+      customerKey: customer.phone,
+      customerName: customer.name,
+      note: editor.text,
+      statuses: editor.statuses.join('|')
+    });
+    if (typeof stgToast === 'function') stgToast('บันทึก Sales Note แล้ว', 'success');
+    editor.dropdownOpen = false;
+    if (window.loadNotesAndStatusOptions) {
+      await window.loadNotesAndStatusOptions(); // โหลดใหม่ + re-render (ตาราง + โปรไฟล์นี้) ให้เอง
+    } else if (window.applyFilters) {
+      window.applyFilters();
+    }
+  } catch (err) {
+    if (typeof stgToast === 'function') stgToast('บันทึกไม่สำเร็จ: ' + err.message, 'error');
+  }
+};
+
 function renderCustomerProfileView(c, container, filteredData, rawData) {
+  const state = window.insightHubState;
+  // เก็บ draft ของ Sales Note ไว้ใน state.noteEditor แยกจาก c (ข้อมูลลูกค้า) เอง เพื่อให้ toggle checkbox
+  // แล้ว re-render ไม่ทำให้ข้อความที่พิมพ์ค้างอยู่หาย - สร้างใหม่เฉพาะตอนเปลี่ยนไปดูลูกค้าคนอื่น
+  if (!state.noteEditor || state.noteEditor.forPhone !== c.phone) {
+    const saved = (window.AppData && window.AppData.notesByKey && window.AppData.notesByKey[c.phone]) || null;
+    state.noteEditor = {
+      forPhone: c.phone,
+      statuses: (saved && Array.isArray(saved.statuses)) ? saved.statuses.slice() : [],
+      text: saved ? saved.note : '',
+      dropdownOpen: false
+    };
+  }
+
   const html = `
     <div style="margin-bottom: 20px;">
       <button class="pag-btn" onclick="closeCustomerProfile()" style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer;">
@@ -2113,6 +1846,8 @@ function renderCustomerProfileView(c, container, filteredData, rawData) {
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; margin-bottom: 25px; line-height: 1.6; font-size: 14px; color: #334155;">
       ${generateAiSummary(c)}
     </div>
+
+    ${renderSalesNoteCard(c)}
 
     <div class="profile-kpi-grid-4">
       <div class="profile-kpi-card">
