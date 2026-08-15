@@ -992,7 +992,14 @@
     // 'Kides original' จากอีกแถว) ซึ่งรวมกันแล้วอาจไม่เคยเกิดร่วมกันจริงในแถวเดียวเลย -> กรองแบบ AND ทั้ง 5
     // มิติพร้อมกันใน computeFilteredData แล้วไม่เหลือข้อมูลสักแถว ทั้งที่ปีนั้นมีข้อมูลขายจริงอยู่
     // (ดู renderExecutive1: filteredData.length === 0 -> "No data available")
+    // สำคัญ: มิติที่ต้องหา default ให้ (typesNeedingDefault) ต้องเช็คว่าค่าของแถวนั้น "อยู่ใน options
+    // ที่เลือกได้จริง" (Settings config/fallback) ตั้งแต่ตอนหาแถวเลย ไม่ใช่หาแถวมาก่อนแล้วค่อยเช็คทีหลัง -
+    // เพราะถ้าไปเช็คทีหลัง แล้วมิติใดมิติหนึ่ง (เช่น Admin) ดันไม่อยู่ใน options จะต้อง fallback ไปเลือก
+    // options[0] เฉพาะมิตินั้นแยกออกจากแถวเดิม ซึ่งพังกลับไปเป็นปัญหาเดิม (แต่ละมิติมาจากคนละแถว ไม่เคย
+    // เกิดร่วมกันจริง) ต้องบังคับทั้ง "เป็น option ที่เลือกได้" และ "มาจากแถวเดียวกัน" พร้อมกันในเงื่อนไขเดียว
     function findExecDefaultRow(typesNeedingDefault) {
+      const optionSets = {};
+      typesNeedingDefault.forEach(t => { optionSets[t] = new Set(getConfigOptionList(t)); });
       for (const row of rawData) {
         if (!isSaleOrder(row)) continue;
         // ต้องเช็ค isProductActive ด้วยเหมือน computeFilteredData ไม่งั้นอาจได้แถวตัวอย่างที่ Product
@@ -1002,11 +1009,12 @@
         const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
         const d = dateStr ? parseDate(dateStr) : null;
         if (execFilters.Year && (!d || d.y.toString() !== execFilters.Year)) continue;
-        const matchesFixed = EXEC_OPTION_FILTER_TYPES.every(t => {
-          if (typesNeedingDefault.indexOf(t) !== -1) return true;
-          return EXEC_TYPE_GETTERS[t](row) === execFilters[t];
+        const matches = EXEC_OPTION_FILTER_TYPES.every(t => {
+          const val = EXEC_TYPE_GETTERS[t](row);
+          if (typesNeedingDefault.indexOf(t) !== -1) return optionSets[t].has(val);
+          return val === execFilters[t];
         });
-        if (matchesFixed) return row;
+        if (matches) return row;
       }
       return null;
     }
@@ -1020,8 +1028,11 @@
         const defaultRow = findExecDefaultRow(typesNeedingDefault);
         typesNeedingDefault.forEach(type => {
           const options = getConfigOptionList(type);
+          // defaultRow ที่หาเจอ (ถ้ามี) รับประกันแล้วว่าค่าทุกมิติอยู่ใน options และมาจากแถวเดียวกันจริง
+          // (ดู findExecDefaultRow) ถ้าหาไม่เจอเลย (ไม่มีแถวไหนที่ทุกมิติที่ต้องหา default พร้อมกันตรงกับ
+          // option ที่เลือกได้จริง) ค่อย fallback ไป options[0] เป็นทางเลือกสุดท้าย
           const fromRow = defaultRow ? EXEC_TYPE_GETTERS[type](defaultRow) : null;
-          execFilters[type] = (fromRow && options.indexOf(fromRow) !== -1) ? fromRow : (options[0] || '');
+          execFilters[type] = fromRow || (options[0] || '');
         });
       }
       EXEC_OPTION_FILTER_TYPES.forEach(type => {
