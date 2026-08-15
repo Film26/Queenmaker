@@ -164,8 +164,8 @@
           <button id="clearFiltersBtn" class="clear-filters-btn" onclick="clearFilters()">Clear Filters</button>
         </div>
         <!-- Filter ของหน้า Executive แยกต่างหากจาก .filters-bar ด้านบนโดยสิ้นเชิง (คนละ state คนละ element)
-             ไม่มีตัวเลือก "All" - ต้องเลือกค่าจริงทั้ง 7 ตัวเสมอ (Year/Month/Channel/SubChannel/Product/SubProduct/Admin)
-             ดู execFilters/setExecFilter ในสคริปต์ด้านล่าง -->
+             Year/Month ต้องเลือกค่าจริงเสมอ (ตาราง CRM Report เป็นรายเดือนของปีเดียว) ส่วน Channel/SubChannel/
+             Product/SubProduct/Admin มีตัวเลือก "All" ดู execFilters/setExecFilter ในสคริปต์ด้านล่าง -->
         <div class="filters-bar" id="execFiltersBar" style="display:none;">
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Exec-Year" onclick="toggleFilter('menu-Exec-Year')">Year: <span id="lbl-Exec-Year">-</span> <i class="fas fa-caret-down"></i></button>
@@ -925,15 +925,18 @@
 
     // ==========================================================================
     // หน้า Executive: Filter ชุดแยกต่างหาก (execFilters) - คนละ state คนละ dropdown กับ filters ด้านบน
-    // ที่ใช้ร่วมกันในหน้า Overview/Cohort/Migration/Retention โดยสิ้นเชิง ไม่มีตัวเลือก "All" เลย
-    // ต้องเลือกค่าจริงครบทั้ง 7 ตัว (Year/Month/Channel/SubChannel/Product/SubProduct/Admin) เสมอ
-    // ถ้ายังไม่เคยเลือก จะตั้งค่าเริ่มต้นเป็นตัวเลือกล่าสุด/ตัวแรกที่มีให้อัตโนมัติ
+    // ที่ใช้ร่วมกันในหน้า Overview/Cohort/Migration/Retention โดยสิ้นเชิง
+    // Year/Month ต้องเลือกค่าจริงเสมอ (ตาราง CRM Report เป็นรายเดือนของปีเดียว รวมหลายปีในตารางเดียวไม่ได้)
+    // ส่วน Channel/SubChannel/Product/SubProduct/Admin มีตัวเลือก "All" ให้เหมือนกับ Filter บนสุด (ดีฟอลต์
+    // ตอนเปิดหน้าครั้งแรก/ยังไม่เคยเลือก) - เดิมเคยลองตัดตัวเลือก "All" ออกแล้วบังคับให้ auto-select ค่าจริง
+    // ทั้ง 5 มิติมาแทน แต่การเดา default ที่ต้องตรงกันทั้ง 5 มิติพร้อมกัน (AND) เปราะบางเกินไป - ถ้า config ใน
+    // Settings ไม่ตรงกับข้อมูลที่ import จริงแม้แค่มิติเดียว จะกลายเป็นไม่มีข้อมูลแสดงเลย จึงเอา "All" กลับมา
     //
     // execFiltersTouched: แยกจาก execFilters เอง - ใช้ตามว่าผู้ใช้ "กดเลือกเอง" (ผ่าน setExecFilter) แล้วหรือยัง
     // ต่างจากค่าที่ auto-select ให้ตอนเปิดหน้าครั้งแรก ใช้คุมว่าแถว 13-15 (Migration group) ในตาราง CRM Report
     // จะโชว์ข้อมูลจริงเมื่อไหร่ (ต่อเมื่อกดเลือก Year/Channel/SubChannel/Admin เองครบแล้วเท่านั้น) ดู renderExecutive1 ใน executive.js
     // ==========================================================================
-    let execFilters = { Year: '', Month: '', Channel: '', SubChannel: '', Product: '', SubProduct: '', Admin: '' };
+    let execFilters = { Year: '', Month: '', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All' };
     window.execFilters = execFilters;
     const EXEC_OPTION_FILTER_TYPES = ['Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'];
     // หมายเหตุ: มีทุกคีย์ของ execFilters ยกเว้น Month (Month reset ตาม Year เสมออยู่แล้วโดยไม่ต้องพึ่ง touched
@@ -979,64 +982,12 @@
       if (lbl) lbl.textContent = execFilters.Month || '-';
     }
 
-    const EXEC_TYPE_GETTERS = {
-      Channel: (row) => getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row),
-      SubChannel: (row) => getNormalizedSubChannel(row),
-      Product: (row) => getNormalizedProduct(getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set'])),
-      SubProduct: (row) => getNormalizedSubProduct(getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set'])),
-      Admin: (row) => getNormalizedAdmin(row)
-    };
-    // หาแถวข้อมูลจริง 1 แถวที่ตรงกับ Year และตรงกับทุกมิติที่ "มีค่าแน่นอนอยู่แล้ว" (ไม่ได้อยู่ใน
-    // typesNeedingDefault) แล้วดึงค่ามิติที่เหลือจากแถวเดียวกันนี้พร้อมกันทีเดียว (ดู refreshExecOptionDropdowns)
-    // เดิมเคยเลือก default ทีละมิติแยกอิสระจากกัน (เช่น Product ได้ 'Plus' จากแถวหนึ่ง, SubProduct ได้
-    // 'Kides original' จากอีกแถว) ซึ่งรวมกันแล้วอาจไม่เคยเกิดร่วมกันจริงในแถวเดียวเลย -> กรองแบบ AND ทั้ง 5
-    // มิติพร้อมกันใน computeFilteredData แล้วไม่เหลือข้อมูลสักแถว ทั้งที่ปีนั้นมีข้อมูลขายจริงอยู่
-    // (ดู renderExecutive1: filteredData.length === 0 -> "No data available")
-    // สำคัญ: มิติที่ต้องหา default ให้ (typesNeedingDefault) ต้องเช็คว่าค่าของแถวนั้น "อยู่ใน options
-    // ที่เลือกได้จริง" (Settings config/fallback) ตั้งแต่ตอนหาแถวเลย ไม่ใช่หาแถวมาก่อนแล้วค่อยเช็คทีหลัง -
-    // เพราะถ้าไปเช็คทีหลัง แล้วมิติใดมิติหนึ่ง (เช่น Admin) ดันไม่อยู่ใน options จะต้อง fallback ไปเลือก
-    // options[0] เฉพาะมิตินั้นแยกออกจากแถวเดิม ซึ่งพังกลับไปเป็นปัญหาเดิม (แต่ละมิติมาจากคนละแถว ไม่เคย
-    // เกิดร่วมกันจริง) ต้องบังคับทั้ง "เป็น option ที่เลือกได้" และ "มาจากแถวเดียวกัน" พร้อมกันในเงื่อนไขเดียว
-    function findExecDefaultRow(typesNeedingDefault) {
-      const optionSets = {};
-      typesNeedingDefault.forEach(t => { optionSets[t] = new Set(getConfigOptionList(t)); });
-      for (const row of rawData) {
-        if (!isSaleOrder(row)) continue;
-        // ต้องเช็ค isProductActive ด้วยเหมือน computeFilteredData ไม่งั้นอาจได้แถวตัวอย่างที่ Product
-        // ถูกปิดใช้งานใน Settings มาเป็น default -> พอเอาไปกรองจริงจะโดน isProductActive คัดออกจนไม่เหลือข้อมูล
-        const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
-        if (!isProductActive(getNormalizedProduct(rawProductName))) continue;
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-        const d = dateStr ? parseDate(dateStr) : null;
-        if (execFilters.Year && (!d || d.y.toString() !== execFilters.Year)) continue;
-        const matches = EXEC_OPTION_FILTER_TYPES.every(t => {
-          const val = EXEC_TYPE_GETTERS[t](row);
-          if (typesNeedingDefault.indexOf(t) !== -1) return optionSets[t].has(val);
-          return val === execFilters[t];
-        });
-        if (matches) return row;
-      }
-      return null;
-    }
-
     function refreshExecOptionDropdowns() {
-      const typesNeedingDefault = EXEC_OPTION_FILTER_TYPES.filter(type => {
-        const options = getConfigOptionList(type);
-        return !execFilters[type] || options.indexOf(execFilters[type]) === -1;
-      });
-      if (typesNeedingDefault.length > 0) {
-        const defaultRow = findExecDefaultRow(typesNeedingDefault);
-        typesNeedingDefault.forEach(type => {
-          const options = getConfigOptionList(type);
-          // defaultRow ที่หาเจอ (ถ้ามี) รับประกันแล้วว่าค่าทุกมิติอยู่ใน options และมาจากแถวเดียวกันจริง
-          // (ดู findExecDefaultRow) ถ้าหาไม่เจอเลย (ไม่มีแถวไหนที่ทุกมิติที่ต้องหา default พร้อมกันตรงกับ
-          // option ที่เลือกได้จริง) ค่อย fallback ไป options[0] เป็นทางเลือกสุดท้าย
-          const fromRow = defaultRow ? EXEC_TYPE_GETTERS[type](defaultRow) : null;
-          execFilters[type] = fromRow || (options[0] || '');
-        });
-      }
       EXEC_OPTION_FILTER_TYPES.forEach(type => {
-        const options = getConfigOptionList(type);
+        const options = ['All'].concat(getConfigOptionList(type));
+        if (!execFilters[type] || options.indexOf(execFilters[type]) === -1) {
+          execFilters[type] = 'All';
+        }
         const menu = document.getElementById('menu-Exec-' + type);
         if (menu) menu.innerHTML = options.map(val => `<div onclick="setExecFilter('${type}', '${val}')">${val}</div>`).join('');
         const lbl = document.getElementById('lbl-Exec-' + type);
