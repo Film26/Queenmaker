@@ -13,12 +13,14 @@ const SETTINGS_CATEGORIES = [
 const SETTINGS_ROLES = ['Super Admin', 'Manager', 'Sales Admin'];
 
 // หน้าที่ (สิทธิ์การเข้าถึง) ของแต่ละ Role — อิงตามสิทธิ์จริงที่ระบบบังคับใช้อยู่ตอนนี้:
-// มีเพียงเมนู Settings เท่านั้นที่ถูกจำกัดให้ Super Admin เห็น/เข้าถึงได้ (ดู checkSessionOrRedirect ใน dashboard.html)
-// ส่วนหน้าอื่น ๆ (Overview, Executive, Retention, Cohort ฯลฯ) ทุก Role เข้าถึงได้เหมือนกัน
+// เมนู Settings ถูกจำกัดให้ Super Admin เห็น/เข้าถึงได้เท่านั้น (ดู checkSessionOrRedirect ใน dashboard.html)
+// ส่วน Sales Admin จะเห็นข้อมูล (Overview/Executive/Retention/Cohort ฯลฯ) เฉพาะของตัวเองเท่านั้น กรองด้วย
+// ชื่อแอดมิน (adminName) ที่ตั้งไว้ตอนสร้าง/แก้ไขผู้ใช้งาน (ดู scopeRowsForCurrentUser ใน dashboard.html) -
+// Super Admin/Manager เห็นข้อมูลทั้งหมดเหมือนเดิม
 const SETTINGS_ROLE_PERMISSIONS = {
   'Super Admin': 'เข้าถึงข้อมูลทั้งหมด และจัดการระบบ (Settings)',
   'Manager': 'เข้าถึงข้อมูลทั้งหมด ยกเว้นหน้า Settings',
-  'Sales Admin': 'เข้าถึงข้อมูลทั้งหมด ยกเว้นหน้า Settings'
+  'Sales Admin': 'เข้าถึงเฉพาะข้อมูลของตัวเอง (ตามชื่อแอดมิน) ยกเว้นหน้า Settings'
 };
 
 function stgRolePermission(role) {
@@ -203,10 +205,13 @@ function stgRenderAll(container) {
       <button class="stg-maintab-btn ${__settingsUi.mainTab === 'users' ? 'active' : ''}" onclick="stgSwitchMainTab('users')">
         <i class="fas fa-users-gear"></i> จัดการผู้ใช้งานระบบ
       </button>
+      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'status' ? 'active' : ''}" onclick="stgSwitchMainTab('status')">
+        <i class="fas fa-note-sticky"></i> จัดการสถานะการติดต่อ (Sales Note)
+      </button>
     </div>
 
     <div id="stg-maintab-body">
-      ${__settingsUi.mainTab === 'config' ? stgBuildConfigSection() : stgBuildUsersSection()}
+      ${stgBuildMainTabBody(__settingsUi.mainTab)}
     </div>
 
     <div id="stg-modal-overlay" class="stg-modal-overlay" style="display:none;" onclick="if(event.target===this) stgCloseModal()">
@@ -225,14 +230,18 @@ function stgRenderAll(container) {
   `;
 }
 
+function stgBuildMainTabBody(tab) {
+  if (tab === 'users') return stgBuildUsersSection();
+  if (tab === 'status') return stgBuildStatusSection();
+  return stgBuildConfigSection();
+}
+
 window.stgSwitchMainTab = function(tab) {
   __settingsUi.mainTab = tab;
   const body = document.getElementById('stg-maintab-body');
-  document.querySelectorAll('.stg-maintab-btn').forEach(b => b.classList.remove('active'));
-  const idx = tab === 'config' ? 0 : 1;
-  const btns = document.querySelectorAll('.stg-maintab-btn');
-  if (btns[idx]) btns[idx].classList.add('active');
-  if (body) body.innerHTML = tab === 'config' ? stgBuildConfigSection() : stgBuildUsersSection();
+  const tabOrder = ['config', 'users', 'status'];
+  document.querySelectorAll('.stg-maintab-btn').forEach((b, i) => b.classList.toggle('active', tabOrder[i] === tab));
+  if (body) body.innerHTML = stgBuildMainTabBody(tab);
 };
 
 // =====================================================
@@ -472,6 +481,15 @@ window.stgOpenUserModal = function(userId) {
         ${SETTINGS_ROLES.map(r => `<option value="${r}" ${user && user.role === r ? 'selected' : ''}>${r}</option>`).join('')}
       </select>
     </div>
+    <div class="stg-form-group" id="stg-user-adminname-group" style="display:none;">
+      <label>ชื่อแอดมิน (Admin Name)</label>
+      <select id="stg-user-adminname" class="stg-input">
+        <option value="">-- เลือกชื่อแอดมิน --</option>
+        ${(window.AppData.config.Admin || []).filter(a => a.active).map(a =>
+          `<option value="${stgEscapeHtml(a.name)}" ${user && user.adminName === a.name ? 'selected' : ''}>${stgEscapeHtml(a.name)}</option>`
+        ).join('')}
+      </select>
+    </div>
     <div class="stg-form-group">
       <label>หน้าที่ (สิทธิ์การเข้าถึง)</label>
       <textarea id="stg-user-permission" class="stg-input" rows="3" placeholder="เช่น เข้าถึงข้อมูลทั้งหมด ยกเว้นหน้า Settings">${stgEscapeHtml(user && user.permission ? user.permission : stgRolePermission(user ? user.role : SETTINGS_ROLES[0]))}</textarea>
@@ -486,9 +504,14 @@ window.stgOpenUserModal = function(userId) {
   `;
 
   const roleSelect = document.getElementById('stg-user-role');
+  // ตั้งค่า visibility เริ่มต้นของช่องชื่อแอดมินแยกจาก onchange ด้านล่าง เพราะ onchange ยังรีเซ็ต
+  // ช่องหน้าที่/สิทธิ์กลับเป็นค่า default ของ Role ด้วย ถ้าเรียกตอนเปิด modal จะทับข้อความที่เคย custom ไว้
+  const adminNameGroup = document.getElementById('stg-user-adminname-group');
+  if (adminNameGroup) adminNameGroup.style.display = roleSelect.value === 'Sales Admin' ? '' : 'none';
   roleSelect.onchange = () => {
     const permField = document.getElementById('stg-user-permission');
     if (permField) permField.value = stgRolePermission(roleSelect.value);
+    if (adminNameGroup) adminNameGroup.style.display = roleSelect.value === 'Sales Admin' ? '' : 'none';
   };
 
   const saveBtn = document.getElementById('stg-modal-save-btn');
@@ -502,19 +525,22 @@ function stgSaveUserModal(userId) {
   const password = document.getElementById('stg-user-password').value;
   const name = document.getElementById('stg-user-name').value.trim();
   const role = document.getElementById('stg-user-role').value;
+  const adminNameRaw = document.getElementById('stg-user-adminname')?.value.trim() || '';
+  const adminName = role === 'Sales Admin' ? adminNameRaw : null;
   const permission = document.getElementById('stg-user-permission').value.trim();
   const active = document.getElementById('stg-user-active').value === '1';
 
   if (!isEdit && !username) { stgToast('กรุณากรอก Username', 'error'); return; }
   if (!name) { stgToast('กรุณากรอกชื่อผู้ใช้งาน', 'error'); return; }
   if (!isEdit && !password) { stgToast('กรุณาตั้งรหัสผ่าน', 'error'); return; }
+  if (role === 'Sales Admin' && !adminName) { stgToast('กรุณาเลือกชื่อแอดมิน (Admin Name) สำหรับ Sales Admin', 'error'); return; }
 
   const users = (window.AppData.users || []).slice();
 
   if (isEdit) {
     const idx = users.findIndex(x => x.id === userId);
     if (idx < 0) return;
-    const updated = Object.assign({}, users[idx], { name, role, permission, active });
+    const updated = Object.assign({}, users[idx], { name, role, adminName, permission, active });
     if (password) updated.password = password;
     users[idx] = updated;
   } else {
@@ -522,7 +548,7 @@ function stgSaveUserModal(userId) {
       stgToast('Username นี้ถูกใช้งานแล้ว', 'error');
       return;
     }
-    users.push({ id: stgUid(), username, password, name, role, permission, active, createdAt: new Date().toISOString() });
+    users.push({ id: stgUid(), username, password, name, role, adminName, permission, active, createdAt: new Date().toISOString() });
   }
 
   settingsApiSaveUsers(users).then(() => {
@@ -580,6 +606,76 @@ function stgOpenModal() {
 window.stgCloseModal = function() {
   const overlay = document.getElementById('stg-modal-overlay');
   if (overlay) overlay.style.display = 'none';
+};
+
+// =====================================================
+// หมวดที่ 3: Sales Note - จัดการรายการสถานะการติดต่อ (Config_Status ในเว็บต้นแบบ)
+// เห็นได้ทุก Role แต่แก้ไข/บันทึกได้เฉพาะ Super Admin/Manager (บังคับจริงฝั่ง Server ที่
+// api/notes/status-options.js ด้วย - ฝั่งนี้แค่ซ่อนปุ่มแก้ไขให้ ไม่ใช่ตัวบังคับสิทธิ์จริง)
+// =====================================================
+let __stgStatusDraft = null;
+
+function stgBuildStatusSection() {
+  const canEdit = !!(window.currentUser && (window.currentUser.role === 'Super Admin' || window.currentUser.role === 'Manager'));
+  if (!__stgStatusDraft) {
+    __stgStatusDraft = (window.AppData.statusOptions && window.AppData.statusOptions.length) ? window.AppData.statusOptions.slice() : [];
+  }
+  return `
+    <div class="stg-card">
+      <div class="stg-card-header">
+        <h3><i class="fas fa-note-sticky"></i> จัดการสถานะการติดต่อ (Sales Note)</h3>
+        <p style="font-size:12px; color:#7a665e; margin:4px 0 0 0;">รายการสถานะที่แอดมินเลือกได้ตอนบันทึก Sales Note ในหน้าโปรไฟล์ลูกค้า (เลือกได้มากกว่า 1 รายการต่อครั้ง)</p>
+      </div>
+      <div style="margin-top:16px;">
+        ${__stgStatusDraft.length === 0 ? '<p style="color:#94a3b8; font-size:13px;">ยังไม่มีสถานะ</p>' : __stgStatusDraft.map((opt, i) => `
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+            <input type="text" class="stg-input" value="${stgEscapeHtml(opt)}" oninput="stgUpdateStatusDraft(${i}, this.value)" ${canEdit ? '' : 'disabled'}>
+            ${canEdit ? `<button class="stg-icon-btn" onclick="stgRemoveStatusRow(${i})" title="ลบ"><i class="fas fa-trash"></i></button>` : ''}
+          </div>
+        `).join('')}
+      </div>
+      ${canEdit ? `
+        <div style="margin-top:8px; display:flex; gap:8px;">
+          <button class="stg-btn stg-btn-ghost" onclick="stgAddStatusRow()"><i class="fas fa-plus"></i> เพิ่มสถานะ</button>
+          <button class="stg-btn stg-btn-primary" onclick="stgSaveStatusOptions()"><i class="fas fa-save"></i> บันทึก</button>
+        </div>
+      ` : '<p style="color:#94a3b8; font-size:12px; margin-top:8px;">เฉพาะ Super Admin/Manager เท่านั้นที่แก้ไขได้</p>'}
+    </div>
+  `;
+}
+
+window.stgUpdateStatusDraft = function(idx, value) {
+  if (!__stgStatusDraft) return;
+  __stgStatusDraft[idx] = value;
+};
+
+window.stgAddStatusRow = function() {
+  if (!__stgStatusDraft) __stgStatusDraft = [];
+  __stgStatusDraft.push('');
+  const body = document.getElementById('stg-maintab-body');
+  if (body) body.innerHTML = stgBuildStatusSection();
+};
+
+window.stgRemoveStatusRow = function(idx) {
+  if (!__stgStatusDraft) return;
+  __stgStatusDraft.splice(idx, 1);
+  const body = document.getElementById('stg-maintab-body');
+  if (body) body.innerHTML = stgBuildStatusSection();
+};
+
+window.stgSaveStatusOptions = function() {
+  const values = (__stgStatusDraft || []).map(s => (s || '').trim()).filter(Boolean);
+  if (values.length === 0) { stgToast('กรุณาใส่อย่างน้อย 1 สถานะ', 'error'); return; }
+  window.CrmApi.saveStatusOptions(values).then((saved) => {
+    window.AppData.statusOptions = saved;
+    __stgStatusDraft = saved.slice();
+    stgToast('บันทึกสถานะการติดต่อสำเร็จ', 'success');
+    const body = document.getElementById('stg-maintab-body');
+    if (body) body.innerHTML = stgBuildStatusSection();
+  }).catch(err => {
+    console.error('[Settings] บันทึกสถานะการติดต่อไม่สำเร็จ', err);
+    stgToast('บันทึกไม่สำเร็จ: ' + err.message, 'error');
+  });
 };
 
 // --- Styles (injected once, mirrors kpisetting.js pattern) ---
