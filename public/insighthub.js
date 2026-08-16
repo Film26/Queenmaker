@@ -1,11 +1,49 @@
 // public/insighthub.js
 
-window.addEventListener('appDataChanged', function(e) {
-  if (!e || !e.detail || e.detail.type !== 'config') return;
-  if (window.__hubCache && window.__hubCache.uniq) {
-    window.__hubCache.uniq = {};
+if (!window.showToast) {
+  window.showToast = function (msg, type) {
+    if (typeof stgToast === 'function') stgToast(msg, type);
+  };
+}
+
+// Reloads Sales Notes + contact-status options from the InsightHub Apps Script backend into
+// window.AppData.notesByKey / window.AppData.statusOptions (same shape Queenmaker's own
+// loadNotesAndStatusOptions() builds for its Redis-backed system, dashboard.html), then
+// re-renders. Called on initial InsightHub load and after every Sales Note save.
+window.loadInsightHubNotesAndStatusOptions = async function () {
+  if (!window.InsightHubApi) return;
+  try {
+    const notesResult = await window.InsightHubApi.getNotes();
+    const rows = (notesResult && notesResult.rows) || [];
+    const notesByKey = {};
+    rows.forEach(row => {
+      const key = (row.CustomerKey || '').toString().trim();
+      if (!key) return;
+      const statusesRaw = (row.Statuses || '').toString();
+      notesByKey[key] = {
+        note: (row.Note || '').toString(),
+        statuses: statusesRaw ? statusesRaw.split('|').map(s => s.trim()).filter(Boolean) : [],
+        updatedAt: row.UpdatedAt || '',
+        updatedBy: row.UpdatedBy || ''
+      };
+    });
+    window.AppData = window.AppData || {};
+    window.AppData.notesByKey = notesByKey;
+  } catch (err) {
+    console.warn('[InsightHub] โหลด Sales Note ไม่สำเร็จ:', err.message);
   }
-});
+
+  try {
+    const statusResult = await window.InsightHubApi.getStatusOptions();
+    if (statusResult && Array.isArray(statusResult.options) && statusResult.options.length) {
+      window.AppData.statusOptions = statusResult.options;
+    }
+  } catch (err) {
+    console.warn('[InsightHub] โหลดสถานะการติดต่อไม่สำเร็จ:', err.message);
+  }
+
+  if (typeof window.refreshInsightHub === 'function') window.refreshInsightHub();
+};
 
 if (!window.insightHubState) {
   window.insightHubState = {
@@ -14,13 +52,24 @@ if (!window.insightHubState) {
     searchTerm: "",
     sortColumn: "totalRevenue",
     sortAsc: false,
-    excelFilters: {},
-    excelSearchTerms: {},
-    activeDropdown: null,
+    excelFilters: {}, 
+    excelSearchTerms: {}, 
+    activeDropdown: null, 
     selectedCustomerPhone: null,
     allCustomers: []
   };
 }
+
+// Full display strings for each Admin Priority level (Config_App >
+// adminPriorityMatrix picks the level per segment1|segment2 combo; this maps
+// that level to the wording shown in the UI). Keep the English keyword intact
+// — getAdminPriClass() and the Excel export match on it via .includes().
+const ADMIN_PRIORITY_LABELS = {
+  High: "1. 🟢 High (โอกาสสร้างยอดขาย)",
+  Medium: "2. 🟡 Medium (สร้างความสัมพันธ์)",
+  Low: "3. 🟠 Low (ดูแลสัมพันธ์)",
+  "Win-back": "4. 🔴 Win-back (โอกาสดึงลูกค้ากลับ)",
+};
 
 // Product Refill Window Day lookup from Config_Product_Refill sheet
 const productConfig = {
@@ -67,8 +116,17 @@ function getProductDays(prodName) {
   return productConfig[key] !== undefined ? productConfig[key] : 30;
 }
 
+// Config_App > refillBuffer (default 1.1, editable in Settings): multiplies
+// the raw product refill-cycle days to add slack before flagging a customer
+// as due for a refill nudge.
+function getRefillBuffer() {
+  const cfg = window.AppData && window.AppData.appConfig;
+  const buffer = cfg && cfg.refillBuffer;
+  return (typeof buffer === 'number' && buffer > 0) ? buffer : 1.1;
+}
+
 function getRefillWindow(prodStr) {
-  if (!prodStr) return 30;
+  if (!prodStr) return Math.round(30 * getRefillBuffer());
   const parts = prodStr.split('|');
   let maxDays = 30;
   parts.forEach(p => {
@@ -77,16 +135,7 @@ function getRefillWindow(prodStr) {
       maxDays = d;
     }
   });
-  return maxDays;
-}
-
-// LTV tier ตาม totalRevenue สะสม - แยกเป็นฟังก์ชันเพื่อให้เรียกซ้ำได้ (เทียบ tier ก่อน/หลังออเดอร์ล่าสุด)
-// ต้องเป็นค่าเดียวกับที่ใช้กำหนด ltvTier ของลูกค้าแต่ละคนใน buildInsightCustomers เป๊ะๆ ห้ามมีสูตรสองชุด
-function getLtvTierFor(totalRevenue) {
-  if (totalRevenue >= 25000) return "💎 1. VVIP Whale (>25k)";
-  if (totalRevenue >= 12000) return "🐳 2. VIP Dolphin (>12k)";
-  if (totalRevenue >= 4500) return "🐟 3. Regular Minnow (>4.5k)";
-  return "🐚 4. General";
+  return Math.round(maxDays * getRefillBuffer());
 }
 
 function parseToDateObj(dateStr) {
@@ -106,18 +155,26 @@ function parseToDateObj(dateStr) {
   return null;
 }
 
+// Sales Note text is typed directly into a <textarea> in this app and later
+// rendered back as HTML for every admin viewing the list/profile — unlike
+// the other columns (which come from imported sheet data), this one needs
+// escaping to avoid a stored-XSS round trip through Google Sheets.
+function escapeHtml(str) {
+  return String(str == null ? "" : str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+window.escapeHtml = escapeHtml; // reused by js/settings.js for the status-options editor
+
 function formatDateDisplay(dObj) {
   if (!dObj) return "-";
   const dd = String(dObj.getDate()).padStart(2, '0');
   const mm = String(dObj.getMonth() + 1).padStart(2, '0');
   const yyyy = dObj.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
-}
-
-function escapeHtml(str) {
-  return (str || '').toString()
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // Cleansing: ใช้เบอร์โทรศัพท์เป็นคีย์หลักของลูกค้า ต้อง normalize ก่อนเทียบ/รวมข้อมูล
@@ -347,12 +404,15 @@ function getHubUniqueValues(colId) {
 // การยัดเป็น <li> ทั้งหมดทำให้ DOM บวมและหน่วง) พิมพ์ค้นหาเพื่อกรองตัวเลือกได้ตามปกติ
 const HUB_OPTION_RENDER_LIMIT = 500;
 
-// สร้างรายชื่อลูกค้าจาก rawData - แยกออกมาจาก renderInsightHub เป็นฟังก์ชันเดี่ยว เพื่อให้หน้าอื่น
-// (เช่น Dashboard/Overview ใน dashboard.html) เรียกใช้ร่วมกันได้ ได้ตัวเลขลูกค้า/Tier/Segment ตรงกับ
-// ตาราง Customer InsightHub เป๊ะๆ เสมอ (คำนวณจุดเดียว ใช้ร่วมกันหลายหน้า)
-// [PERF] แคชผลการยุบข้อมูล: raw ~56k แถว -> ลูกค้า ~21k ราย เป็นงานหนักที่สุดของหน้านี้ คำนวณครั้งเดียวต่อ
-// ชุดข้อมูล (คีย์ด้วย reference/length ของ rawData เอง) เรียกซ้ำจากหน้าไหนก็ได้ผลเดิมโดยไม่คำนวณซ้ำ
+// Builds (and caches) the customer-level aggregate array + available years from
+// raw order rows — collapses ~56k order rows into ~21k customers with LTV tier,
+// segment1/segment2, adminPriority, etc. Shared by the Customer InsightHub page
+// and the Dashboard page (js/dashboard.js) so both read identical numbers from
+// one computation.
 function buildInsightCustomers(rawData) {
+  // [PERF] แคชผลการยุบข้อมูล: raw ~56k แถว -> ลูกค้า ~21k ราย เป็นงานหนักที่สุดของหน้านี้
+  // เดิมถูกคำนวณใหม่ทุก interaction (เปิด dropdown, sort, เปลี่ยนหน้า ล้วนเรียก render ใหม่) ทำให้หน่วง
+  // -> คำนวณครั้งเดียวต่อชุดข้อมูล ส่วน sort/filter/แบ่งหน้าใช้ผลจากแคช (ข้อมูลใหม่/import ใหม่จะคำนวณใหม่เอง)
   if (!window.__hubCache) window.__hubCache = { rawRef: null, rawLen: -1, customers: null, years: null, today: null, uniq: {} };
   const hubCache = window.__hubCache;
 
@@ -417,6 +477,14 @@ function buildInsightCustomers(rawData) {
     if (key) filteredCustomerKeys.add(key);
   });
 
+  if (filteredCustomerKeys.size === 0) {
+    return { customers: [], availableYears, today };
+  }
+
+  const appConfig = (window.AppData && window.AppData.appConfig) || window.DEFAULT_APP_CONFIG || {};
+  const loyaltyCfg = appConfig.loyaltyIndex || { seedlingMaxDays: 45, regularMaxDays: 180, veteranMaxDays: 365 };
+  const priorityMatrix = appConfig.adminPriorityMatrix || {};
+
   const customers = Array.from(filteredCustomerKeys).map(custKey => {
     const historyRows = customerHistoryMap[custKey] || [];
     const sortedHistory = historyRows.map(row => {
@@ -440,11 +508,6 @@ function buildInsightCustomers(rawData) {
       if (!isNaN(rev)) totalRevenue += rev;
     });
 
-    // ยอดเฉพาะออเดอร์ล่าสุด (ไม่รวมสะสม) - ใช้เทียบ LTV tier ก่อน/หลังออเดอร์นี้
-    const lastOrderRevStr = window.getRowValue(lastOrder.row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-    const lastOrderRevenueParsed = parseFloat(lastOrderRevStr.replace(/,/g, ''));
-    const lastOrderRevenue = isNaN(lastOrderRevenueParsed) ? 0 : lastOrderRevenueParsed;
-
     const aov = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     const diffTime = today - lastPurchaseDate;
     const daysSinceLast = Math.max(0, diffTime / (1000 * 60 * 60 * 24));
@@ -453,13 +516,16 @@ function buildInsightCustomers(rawData) {
     const refillWindow = getRefillWindow(lastProductStr);
     const nextPurchaseDateObj = new Date(lastPurchaseDate.getTime() + refillWindow * 24 * 60 * 60 * 1000);
 
-    const ltvTier = getLtvTierFor(totalRevenue);
+    let ltvTier = "🐚 4. General";
+    if (totalRevenue >= 25000) ltvTier = "💎 1. VVIP Whale (>25k)";
+    else if (totalRevenue >= 12000) ltvTier = "🐳 2. VIP Dolphin (>12k)";
+    else if (totalRevenue >= 4500) ltvTier = "🐟 3. Regular Minnow (>4.5k)";
 
     const tenureDays = Math.max(0, (lastPurchaseDate - firstPurchaseDate) / (1000 * 60 * 60 * 24));
     let loyaltyTier = "🌱 Seedling";
-    if (tenureDays > 365) loyaltyTier = "🏅 Legendary (1Y+)";
-    else if (tenureDays > 180) loyaltyTier = "🥈 Veteran (6M+)";
-    else if (tenureDays > 45) loyaltyTier = "🥉 Regular";
+    if (tenureDays > loyaltyCfg.veteranMaxDays) loyaltyTier = "🏅 Legendary (1Y+)";
+    else if (tenureDays > loyaltyCfg.regularMaxDays) loyaltyTier = "🥈 Veteran (6M+)";
+    else if (tenureDays > loyaltyCfg.seedlingMaxDays) loyaltyTier = "🥉 Regular";
 
     const entryProduct = window.getRowValue(firstOrder.row, ['Product Set', 'ชื่อสินค้า', 'Product', 'รายการขาย']) || "-";
 
@@ -488,18 +554,11 @@ function buildInsightCustomers(rawData) {
     else if (daysSinceLast <= refillWindow + 3) segment2 = "REFILL";
     else if (daysSinceLast <= refillWindow + 59) segment2 = "RISK";
 
-    let adminPriority = "4. 🔴 Win-back (กู้สถานะ)";
-    if (segment2 === "REFILL") {
-      adminPriority = "1. 🟢 High (ยอดขาย)";
-    } else if (segment1 === "NEW" || segment2 === "NEW" || (segment1 === "RISK" && segment2 === "RISK")) {
-      adminPriority = "2. 🟡 Medium (สร้างใจ)";
-    } else if (
-      (segment1 === "ACTIVE" && segment2 === "ACTIVE") ||
-      ((segment1 === "RISK" || segment1 === "CHURN") && segment2 === "ACTIVE") ||
-      (segment1 === "ACTIVE" && segment2 === "RISK")
-    ) {
-      adminPriority = "3. 🟠 Low (ดูแลสัมพันธ์)";
-    }
+    // Priority level per (segment1, segment2) comes from Config_App >
+    // adminPriorityMatrix (editable in Settings) — falls back to Win-back if
+    // the matrix is missing this combo (e.g. a sheet edited down to fewer rows).
+    const priorityLevel = priorityMatrix[segment1 + "|" + segment2] || "Win-back";
+    const adminPriority = ADMIN_PRIORITY_LABELS[priorityLevel] || ADMIN_PRIORITY_LABELS["Win-back"];
 
     let actionStrategy = "✅ Healthy Care: ดูแลตามปกติ";
     if (segment1 === "ACTIVE" && segment2 === "REFILL") actionStrategy = "🎯 Golden Period: ทักปิดยอดด่วน!";
@@ -572,7 +631,6 @@ function buildInsightCustomers(rawData) {
       lastPurchaseDate,
       totalOrders,
       totalRevenue,
-      lastOrderRevenue,
       aov,
       daysSinceLast,
       lastProductStr,
@@ -596,10 +654,8 @@ function buildInsightCustomers(rawData) {
       totalOrdersStr: String(totalOrders),
       totalRevenueStr: "฿" + totalRevenue.toLocaleString(undefined, {maximumFractionDigits:0}),
       aovStr: "฿" + aov.toLocaleString(undefined, {maximumFractionDigits:0}),
-      daysSinceLastStr: daysSinceLast.toFixed(1)
+      daysSinceLastStr: String(Math.round(daysSinceLast))
     };
-
-    customerObj.trendVisual = computeTrendVisual(customerObj, availableYears, today);
 
     // ตั้งค่าแสดงผลบนตารางหน้าหลักเป็น ยอดเงินบาท
     availableYears.forEach(y => {
@@ -615,8 +671,6 @@ function buildInsightCustomers(rawData) {
   hubCache.rawLen = rawData.length;
   hubCache.customers = customers;
   hubCache.years = availableYears;
-  // today = วันที่ล่าสุดที่เจอในข้อมูลจริง (ไม่ใช่ new Date() ตามเวลาเครื่อง) ใช้เป็นค่า "วันนี้" อ้างอิงเดียวกัน
-  // ทั้ง segment1/segment2/refill window และ Trend Visual (ดู computeTrendVisual)
   hubCache.today = today;
   hubCache.uniq = {};
   console.info('[InsightHub] rows:', rawData.length,
@@ -627,8 +681,10 @@ function buildInsightCustomers(rawData) {
 
   return { customers, availableYears, today };
 }
-// เปิดให้หน้าอื่น (เช่น Dashboard/Overview ใน dashboard.html) เรียกใช้ร่วมกันได้ ดูคอมเมนต์ต้นฟังก์ชัน
 window.buildInsightCustomers = buildInsightCustomers;
+window.getAnnualTier = getAnnualTier; // exposed for js/dashboard.js's Customer Tier Distribution donut
+window.getRowChannelStd = getRowChannelStd; // exposed for js/dashboard.js's SubChannel breakdown
+window.computeTrendVisual = computeTrendVisual; // exposed for js/dashboard.js's Trend Visual count cards
 
 function renderInsightHub(filteredData, rawData) {
   const container = document.getElementById('view-insighthub');
@@ -643,7 +699,13 @@ function renderInsightHub(filteredData, rawData) {
   try {
 
   if (!rawData || rawData.length === 0) {
-    container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">No data loaded. Please import or load sample data.</div>';
+    container.innerHTML = `
+      <div style="text-align:center; padding:50px; color:#999;">
+        ยังไม่มีข้อมูล กรุณาไปที่ Settings เพื่อเชื่อมต่อ Google Sheets ก่อน แล้วกด Refresh<br><br>
+        <button class="pag-btn" onclick="window.loadInsightHubDataFromAppsScript && window.loadInsightHubDataFromAppsScript()">
+          <i class="fas fa-rotate"></i> Refresh
+        </button>
+      </div>`;
     return;
   }
 
@@ -664,41 +726,45 @@ function renderInsightHub(filteredData, rawData) {
       .hub-summary-sections {
         display: grid;
         grid-template-columns: 1.5fr 1fr;
-        gap: 20px;
-        margin-bottom: 25px;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      @media (max-width: 900px) {
+        .hub-summary-sections { grid-template-columns: 1fr; }
       }
       .summary-section-box {
         background: #fff;
         border-radius: 16px;
-        padding: 20px;
+        padding: 14px 16px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.02);
         border: 1px solid #f0e6df;
       }
       .summary-section-box h3 {
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 700;
         color: #7a665e;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         border-bottom: 1px solid #eee;
-        padding-bottom: 8px;
+        padding-bottom: 6px;
       }
-      
+
       .kpi-cards-row {
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;
+        gap: 10px;
       }
       .mini-kpi-card {
         flex: 1;
-        min-width: 110px;
+        min-width: 92px;
         background: #faf8f5;
         border: 1px solid #eee0d5;
         border-radius: 12px;
-        padding: 12px;
+        padding: 10px 8px;
         text-align: center;
         transition: transform 0.2s;
+        overflow-wrap: anywhere;
       }
       .mini-kpi-card:hover {
         transform: translateY(-2px);
@@ -708,16 +774,18 @@ function renderInsightHub(filteredData, rawData) {
         border-color: #f68843;
       }
       .kpi-card-val {
-        font-size: 20px;
+        font-size: 17px;
         font-weight: 700;
         color: #2d1e1a;
         margin-bottom: 2px;
+        line-height: 1.25;
       }
       .kpi-card-lbl {
-        font-size: 11px;
+        font-size: 10.5px;
         font-weight: 600;
         color: #7a665e;
         margin-bottom: 4px;
+        line-height: 1.3;
       }
       .kpi-card-pct {
         font-size: 10px;
@@ -737,7 +805,7 @@ function renderInsightHub(filteredData, rawData) {
       .table-wrapper {
         overflow-x: auto;
         overflow-y: auto;
-        max-height: 70vh;
+        max-height: 78vh;
         max-width: 100%;
         scrollbar-width: thin;
       }
@@ -756,8 +824,7 @@ function renderInsightHub(filteredData, rawData) {
         background-color: #fafafa;
         color: #444;
         user-select: none;
-        position: sticky;
-        top: 0;
+        /* [ปิดชั่วคราว] position: sticky; top: 0; ทำให้หัวตาราง (รวมปุ่มตัวกรอง) เลื่อนตามตอนสกอลล์ แต่ยังมีบัคอยู่ */
         z-index: 3;
       }
       .customer-table td {
@@ -768,6 +835,59 @@ function renderInsightHub(filteredData, rawData) {
       }
       .customer-table tr:hover td {
         background-color: #fafafa;
+      }
+
+            /* Freeze panes: header row (already sticky top above) + first two columns */
+      .customer-table th:nth-child(1),
+      .customer-table th:nth-child(2) {
+        z-index: 4;
+        /* หัวคอลัมน์ไม่บังคับ max-width/overflow:hidden เหมือน td ด้านล่าง
+           เพราะทำให้ปุ่มตัวกรอง (excel-filter-btn) ที่อยู่ท้ายป้ายชื่อคอลัมน์ถูกตัด/ซ่อนไปเวลาชื่อคอลัมน์ยาว */
+        white-space: nowrap;
+      }
+      .customer-table td:nth-child(1) {
+        /* [ปิดชั่วคราว] position: sticky; left: 0; ทำให้คอลัมน์ CustomerKey (Phone) เลื่อนตามตอนสกอลล์แนวนอน แต่ยังมีบัคอยู่ */
+        width: 130px;
+        max-width: 130px;
+      }
+      .customer-table td:nth-child(2) {
+        /* [ปิดชั่วคราว] position: sticky; left: 130px; (freeze คู่กับคอลัมน์ที่ 1 ด้านบน — ปิดพร้อมกันกันภาพซ้อนเพี้ยน) */
+        width: 170px;
+        max-width: 170px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        box-shadow: 2px 0 4px -2px rgba(0,0,0,0.15);
+        }
+      .customer-table td:nth-child(1),
+      .customer-table td:nth-child(2) {
+        z-index: 2;
+        background-color: #fff;
+      }
+      .customer-table tr:hover td:nth-child(1),
+      .customer-table tr:hover td:nth-child(2) {
+        background-color: #fafafa;
+      }
+      .hub-status-select, .hub-note-input {
+        font-family: inherit;
+        font-size: 12px;
+        padding: 5px 8px;
+        border: 1px solid #dfe3e8;
+        border-radius: 6px;
+        background: #fff;
+        color: #333;
+        box-sizing: border-box;
+      }
+      .hub-status-select {
+        min-width: 140px;
+        cursor: pointer;
+      }
+      .hub-note-input {
+        min-width: 180px;
+        width: 100%;
+      }
+      .hub-status-select:focus, .hub-note-input:focus {
+        outline: none;
+        border-color: #d95f1d;
       }
       
       .th-container {
@@ -791,14 +911,14 @@ function renderInsightHub(filteredData, rawData) {
         transition: all 0.15s;
       }
       .excel-filter-btn:hover, .excel-filter-btn.active-filter {
-        color: #1e293b;
+        color: #d95f1d;
         background: #f0e6df;
       }
       
       .excel-dropdown-menu {
-        position: absolute;
-        top: 100%;
-        right: 0;
+        /* position: fixed (ตั้งค่า top/left จริงด้วย JS ใน positionExcelDropdown) กันไม่ให้
+           .table-wrapper ที่มี overflow:auto ตัดขอบ dropdown จนโผล่ไม่ครบ/หายไปเวลาเลื่อนตาราง */
+        position: fixed;
         background: white;
         border: 1px solid #ccc;
         box-shadow: 0 4px 15px rgba(0,0,0,0.15);
@@ -825,7 +945,7 @@ function renderInsightHub(filteredData, rawData) {
         outline: none;
       }
       .excel-search-input:focus {
-        border-color: #1e293b;
+        border-color: #d95f1d;
       }
       .excel-options-list {
         max-height: 160px;
@@ -862,9 +982,9 @@ function renderInsightHub(filteredData, rawData) {
         cursor: pointer;
       }
       .excel-btn-sm.confirm {
-        background: #1e293b;
+        background: #d95f1d;
         color: white;
-        border-color: #1e293b;
+        border-color: #d95f1d;
         font-weight: 600;
       }
       
@@ -944,14 +1064,14 @@ function renderInsightHub(filteredData, rawData) {
         transition: all 0.2s;
       }
       .pag-btn:hover:not(:disabled) {
-        background: #eef2f7;
-        color: #1e293b;
-        border-color: #94a3b8;
+        background: #fdf1e6;
+        color: #d95f1d;
+        border-color: #f68843;
       }
       .pag-btn.active {
-        background: #1e293b;
+        background: #d95f1d;
         color: white;
-        border-color: #1e293b;
+        border-color: #d95f1d;
       }
       .pag-btn:disabled {
         opacity: 0.5;
@@ -1024,29 +1144,61 @@ function renderInsightHub(filteredData, rawData) {
           changed = true;
         }
       }
-      if (changed && window.applyFilters) window.applyFilters();
+      if (changed && window.refreshInsightHub) window.refreshInsightHub();
+    });
+
+    // dropdown ใช้ position:fixed ผูกพิกัดหน้าจอไว้ตอนเปิด -> ถ้าเลื่อน .table-wrapper (แนวนอน/แนวตั้ง)
+    // หรือ resize หน้าต่างระหว่างเปิดอยู่ ต้องคำนวณตำแหน่งใหม่ให้ตามปุ่มทัน ไม่งั้นจะหลุดตำแหน่ง
+    document.addEventListener('scroll', function(e) {
+      if (window.insightHubState.activeDropdown && e.target && e.target.classList && e.target.classList.contains('table-wrapper')) {
+        if (window.positionExcelDropdown) window.positionExcelDropdown(window.insightHubState.activeDropdown);
+      }
+    }, true);
+    window.addEventListener('resize', function() {
+      if (window.insightHubState.activeDropdown && window.positionExcelDropdown) {
+        window.positionExcelDropdown(window.insightHubState.activeDropdown);
+      }
     });
   }
 
   const state = window.insightHubState;
 
-  const { customers, availableYears } = buildInsightCustomers(rawData);
+  const { customers, availableYears, today } = window.buildInsightCustomers(rawData);
   window.insightHubState.availableYears = availableYears;
-  window.insightHubState.allCustomers = customers;
-
-  // ทับ Sales Note/สถานะการติดต่อล่าสุดลงในลูกค้าแต่ละคน - รันทุก render (ไม่ใช่แค่ตอน cache miss)
-  // เพื่อให้บันทึกโน้ตที่หน้าโปรไฟล์แล้วเห็นผลในตารางทันทีโดยไม่ต้องคำนวณ customers ใหม่ทั้งชุด
-  const notesByKey = (window.AppData && window.AppData.notesByKey) || {};
-  customers.forEach(c => {
-    const n = notesByKey[c.phone];
-    c.latestNote = n && n.note ? n.note : "-";
-    c.latestStatuses = n && n.statuses && n.statuses.length ? n.statuses.join(", ") : "-";
-  });
 
   if (customers.length === 0) {
     container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">No customers found matching the filters.</div>';
     return;
   }
+
+  // "ปี" filter (with an "All" option) picking which year counts as "current"
+  // for the Tier ปีปัจจุบัน column and the amount/Tier toggle — a single
+  // dedicated selector instead of the per-column Excel filter on a tier-year
+  // column, which has one near-unique value per customer and is unwieldy to
+  // open/use for this purpose.
+  if (!state.selectedTierYear) state.selectedTierYear = 'all';
+  if (state.showTierInsteadOfAmount === undefined) state.showTierInsteadOfAmount = false;
+  const latestAvailableYear = availableYears.length ? availableYears[availableYears.length - 1] : today.getFullYear();
+  const currentYear = (state.selectedTierYear !== 'all' && availableYears.includes(Number(state.selectedTierYear)))
+    ? Number(state.selectedTierYear)
+    : latestAvailableYear;
+
+  window.insightHubState.allCustomers = customers;
+
+  // Overlay Sales Note / contact-status onto each customer. Runs every render
+  // (not just on a cache miss) so a note saved on the profile page shows up
+  // in the list immediately without recomputing the whole customers array.
+  const notesByKey = (window.AppData && window.AppData.notesByKey) || {};
+  customers.forEach(c => {
+    const n = notesByKey[c.phone];
+    c.latestNote = n && n.note ? n.note : "-";
+    c.latestStatuses = n && n.statuses && n.statuses.length ? n.statuses.join(", ") : "-";
+
+    const currentYearAmount = (c.annualSpending && c.annualSpending[currentYear]) || 0;
+    c.currentYearAmount = currentYearAmount;
+    c.currentYearTier = getAnnualTier(currentYearAmount);
+    c.trendVisual = computeTrendVisual(c, availableYears, today);
+  });
 
   if (state.selectedCustomerPhone) {
     const customer = customers.find(c => c.phone === state.selectedCustomerPhone);
@@ -1056,23 +1208,6 @@ function renderInsightHub(filteredData, rawData) {
     }
   }
 
-  renderHubTable(customers, container);
-  return;
-
-  } finally {
-    __scrollBox.scrollTop = __savedScrollTop;
-    const __newTableWrapper = container.querySelector('.table-wrapper');
-    if (__newTableWrapper) {
-      __newTableWrapper.scrollTop = __savedTableScrollTop;
-      __newTableWrapper.scrollLeft = __oldTableScrollLeft;
-    }
-  }
-}
-
-// ตาราง Customer InsightHub หลัก - filter/sort/pagination/export (exportInsightHubExcel อ่าน
-// state.displayedCustomers ที่ตั้งค่าไว้ท้ายฟังก์ชันนี้)
-function renderHubTable(customers, container) {
-  const state = window.insightHubState;
   let countWhale = 0, countDolphin = 0, countMinnow = 0, countGeneral = 0;
   let countActive = 0, countRisk = 0, countChurn = 0;
   const totalCount = customers.length;
@@ -1159,11 +1294,11 @@ function renderHubTable(customers, container) {
       <th class="${extraClass}" style="position: relative;">
         <div class="th-container">
           <span class="th-label" onclick="setHubSort('${columnId}')">${displayTitle} ${getSortIcon(columnId)}</span>
-          <button class="excel-filter-btn ${hasActiveFilter ? 'active-filter' : ''}" onclick="event.stopPropagation(); toggleExcelDropdown('${columnId}')">
+          <button id="excel-btn-${columnId}" class="excel-filter-btn ${hasActiveFilter ? 'active-filter' : ''}" onclick="event.stopPropagation(); toggleExcelDropdown('${columnId}')">
             <i class="fas fa-filter"></i>
           </button>
-          
-          <div class="excel-dropdown-menu ${isOpen ? 'show' : ''}" onclick="event.stopPropagation();" style="width: 260px; position: absolute; background:#fff; border:1px solid #ccc; padding:10px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.15); z-index:9999;">
+
+          <div id="excel-dropdown-${columnId}" class="excel-dropdown-menu ${isOpen ? 'show' : ''}" onclick="event.stopPropagation();" style="width: 260px; position: fixed; background:#fff; border:1px solid #ccc; padding:10px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.15); z-index:9999;">
             <div style="font-size: 11px; margin-bottom: 8px; font-weight: normal; text-align: left;">
               <a href="javascript:void(0);" style="color: #2563eb; font-weight: bold; text-decoration: none;" onclick="excelSelectAllRows('${columnId}')">เลือกทั้งหมด</a>
               <span style="color: #ccc;"> | </span>
@@ -1197,11 +1332,26 @@ function renderHubTable(customers, container) {
   }
 
   let html = `
-    <div class="hub-header" style="display: flex; align-items: center; justify-content: space-between;">
+    <div class="hub-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
       <h2>Customer Insight Hub</h2>
-      <button class="pag-btn" style="background: #15803d; color: white; border-color: #15803d; font-weight: 600;" onclick="exportInsightHubExcel()">
-        <i class="fas fa-file-excel"></i> Export Excel
-      </button>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <button class="pag-btn" onclick="window.loadInsightHubDataFromAppsScript && window.loadInsightHubDataFromAppsScript()" title="ดึงข้อมูลล่าสุดจาก Google Sheet">
+          <i class="fas fa-rotate"></i> Refresh
+        </button>
+        <label style="font-size:12.5px; color:rgba(255,255,255,0.8); font-weight:600; display:flex; align-items:center; gap:6px;">
+          ปี:
+          <select id="hub-year-filter" onchange="setHubTierYear(this.value)" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.3); background:#fff; font-size:12.5px; color:#333;">
+            <option value="all" ${state.selectedTierYear === 'all' ? 'selected' : ''}>All</option>
+            ${availableYears.map(y => `<option value="${y}" ${String(y) === String(state.selectedTierYear) ? 'selected' : ''}>${y}</option>`).join('')}
+          </select>
+        </label>
+        <button class="pag-btn" onclick="toggleTierAmountView()" title="สลับมุมมองคอลัมน์ยอดซื้อรายปี: ตัวเลข / Tier">
+          <i class="fas fa-repeat"></i> ${state.showTierInsteadOfAmount ? 'แสดงเป็นตัวเลข' : 'แสดงเป็น Tier'}
+        </button>
+        <button class="pag-btn" style="background: #15803d; color: white; border-color: #15803d; font-weight: 600;" onclick="exportInsightHubExcel()">
+          <i class="fas fa-file-excel"></i> Export Excel
+        </button>
+      </div>
     </div>
 
     <div class="hub-summary-sections">
@@ -1274,7 +1424,7 @@ function renderHubTable(customers, container) {
               ${makeExcelHeaderTh('lastProductStr', 'Last Product')}
               ${makeExcelHeaderTh('nextPurchaseDateObj', 'Next Purchase Date')}
               
-              ${makeExcelHeaderTh('ltvTier', 'Life time value', 'th-insight')}
+              ${makeExcelHeaderTh('currentYearTier', `Tier ปีปัจจุบัน (${currentYear})`, 'th-insight')}
               ${makeExcelHeaderTh('loyaltyTier', 'Loyalty Index', 'th-insight')}
               ${makeExcelHeaderTh('entryProduct', 'Entry Product (สินค้าเปิดใจ)', 'th-insight')}
               ${makeExcelHeaderTh('currentFavorite', 'Current Favorite (สินค้าตัวโปรด)', 'th-insight')}
@@ -1286,18 +1436,34 @@ function renderHubTable(customers, container) {
               ${makeExcelHeaderTh('firstChannel', 'FirstChannel (Main)', 'th-action')}
               ${makeExcelHeaderTh('lastChannel', 'LastChannel (Main)', 'th-action')}
               ${makeExcelHeaderTh('lastAdmin', 'Last Admin', 'th-action')}
-              <th class="th-action" style="text-align:center;"><span class="th-label">Trend Visual</span></th>
-
-              ${state.availableYears.map(y => makeExcelHeaderTh('tier' + y, `ยอดซื้อปี ${y}`, 'th-tiers')).join('')}
+              
+              ${state.availableYears.map(y => makeExcelHeaderTh('tier' + y, (state.showTierInsteadOfAmount ? `Tier ปี ${y}` : `ยอดซื้อปี ${y}`), 'th-tiers')).join('')}
+              <th class="th-tiers">
+                <div class="th-container">
+                  <span class="th-label">Trend Visual</span>
+                </div>
+              </th>
               ${makeExcelHeaderTh('latestStatuses', 'สถานะล่าสุด (Contact)', 'th-action')}
-              <th class="th-action"><span class="th-label" onclick="setHubSort('latestNote')">Sales Note ล่าสุด ${getSortIcon('latestNote')}</span></th>
+              <th class="th-action">
+                <div class="th-container">
+                  <span class="th-label" onclick="setHubSort('latestNote')">Sales Note ล่าสุด ${getSortIcon('latestNote')}</span>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
-            ${pageEntries.map(c => `
+            ${(() => {
+              const inlineStatusOptions = (window.AppData && window.AppData.statusOptions && window.AppData.statusOptions.length)
+                ? window.AppData.statusOptions
+                : window.DEFAULT_STATUS_OPTIONS;
+              return pageEntries.map(c => {
+                const savedNote = notesByKey[c.phone] || null;
+                const currentStatus = (savedNote && savedNote.statuses && savedNote.statuses.length) ? savedNote.statuses[0] : "";
+                const currentNoteText = (savedNote && savedNote.note) ? savedNote.note : "";
+                return `
               <tr>
-                <td style="font-weight: 600; cursor: pointer; color: #1e293b; text-decoration: underline;" onclick="openCustomerProfile('${c.phone}')">${c.displayPhone}</td>
-                <td style="font-weight: 600; cursor: pointer; color: #1e293b; text-decoration: underline;" onclick="openCustomerProfile('${c.phone}')">${c.name}</td>
+                <td style="font-weight: 600; cursor: pointer; color: #d95f1d; text-decoration: underline;" onclick="openCustomerProfile('${c.phone}')">${c.displayPhone}</td>
+                <td style="font-weight: 600; cursor: pointer; color: #d95f1d; text-decoration: underline;" onclick="openCustomerProfile('${c.phone}')" title="${escapeHtml(c.name)}">${c.name}</td>
                 <td>${c.firstPurchaseStr}</td>
                 <td>${c.lastPurchaseStr}</td>
                 <td style="text-align: center;">${c.totalOrders}</td>
@@ -1307,7 +1473,7 @@ function renderHubTable(customers, container) {
                 <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis;" title="${c.lastProductStr}">${c.lastProductStr || "-"}</td>
                 <td style="font-weight: 600; color: #0269a1;">${c.nextPurchaseStr}</td>
                 
-                <td><span class="badge-span ${getLtvClass(c.ltvTier)}">${c.ltvTier}</span></td>
+                <td>${c.currentYearTier ? `<span class="badge-span ${getCustomerTierClass(c.currentYearTier)}">${c.currentYearTier}</span>` : '-'}</td>
                 <td><span class="badge-span ${getLoyaltyClass(c.loyaltyTier)}">${c.loyaltyTier}</span></td>
                 <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${c.entryProduct}">${c.entryProduct || "-"}</td>
                 <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${c.currentFavorite}">${c.currentFavorite || "-"}</td>
@@ -1319,15 +1485,30 @@ function renderHubTable(customers, container) {
                 <td>${c.firstChannel}</td>
                 <td>${c.lastChannel}</td>
                 <td>${c.lastAdmin}</td>
+                
+                ${state.availableYears.map(y => {
+                  if (!state.showTierInsteadOfAmount) {
+                    return '<td style="text-align: right; font-weight: 500;">' + c['tier' + y] + '</td>';
+                  }
+                  const yearTier = getAnnualTier((c.annualSpending && c.annualSpending[y]) || 0);
+                  return '<td style="text-align: center;">' + (yearTier ? `<span class="badge-span ${getCustomerTierClass(yearTier)}">${yearTier}</span>` : '-') + '</td>';
+                }).join('')}
                 <td style="text-align: center;" title="${c.trendVisual ? c.trendVisual.label : 'ไม่มีข้อมูลปีก่อนหน้าให้เทียบ'}">
                   ${c.trendVisual ? `<span style="display:inline-block; width:14px; height:14px; border-radius:50%; background:${c.trendVisual.color};"></span>` : '<span style="color:#ccc;">-</span>'}
                 </td>
-
-                ${state.availableYears.map(y => '<td style="text-align: right; font-weight: 500;">' + c['tier' + y] + '</td>').join('')}
-                <td>${escapeHtml(c.latestStatuses)}</td>
-                <td style="max-width: 220px; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(c.latestNote)}">${escapeHtml(c.latestNote)}</td>
+                <td>
+                  <select class="hub-status-select" onchange="window.updateInlineStatus('${c.phone}', this.value)">
+                    <option value="" ${currentStatus === "" ? 'selected' : ''}>— เลือกสถานะ —</option>
+                    ${inlineStatusOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentStatus === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('')}
+                  </select>
+                </td>
+                <td>
+                  <input type="text" class="hub-note-input" value="${escapeHtml(currentNoteText)}" placeholder="พิมพ์บันทึก..." onchange="window.updateInlineNote('${c.phone}', this.value)">
+                </td>
               </tr>
-            `).join('')}
+                `;
+              }).join('');
+            })()}
           </tbody>
         </table>
       </div>
@@ -1352,6 +1533,18 @@ function renderHubTable(customers, container) {
   `;
 
   container.innerHTML = html;
+
+  } finally {
+    __scrollBox.scrollTop = __savedScrollTop;
+    const __newTableWrapper = container.querySelector('.table-wrapper');
+    if (__newTableWrapper) {
+      __newTableWrapper.scrollTop = __savedTableScrollTop;
+      __newTableWrapper.scrollLeft = __oldTableScrollLeft;
+    }
+    if (window.insightHubState.activeDropdown && window.positionExcelDropdown) {
+      window.positionExcelDropdown(window.insightHubState.activeDropdown);
+    }
+  }
 }
 
 window.toggleExcelDropdown = function(colId) {
@@ -1360,7 +1553,34 @@ window.toggleExcelDropdown = function(colId) {
   } else {
     window.insightHubState.activeDropdown = colId;
   }
-  if (window.applyFilters) window.applyFilters();
+  if (window.refreshInsightHub) window.refreshInsightHub();
+};
+
+// [FIX] dropdown ตัวกรองเดิมใช้ position:absolute ผูกกับ th ที่อยู่ใน .table-wrapper
+// (overflow:auto ทั้งแนวตั้ง/แนวนอน) ทำให้ dropdown ถูกตัดขอบจนโผล่ไม่ครบ/หายไปเวลาคอลัมน์
+// อยู่ใกล้ขอบตาราง -> ย้ายไป position:fixed แล้วคำนวณตำแหน่งจริงเป็นพิกัดหน้าจอ พร้อม
+// เบียดตำแหน่งให้อยู่ในขอบจอเสมอ (ไม่ทะลุขวา/ล่าง) เรียกซ้ำได้ตอน scroll/resize เพื่อตามปุ่มให้ทัน
+window.positionExcelDropdown = function(colId) {
+  if (!colId) return;
+  const btn = document.getElementById('excel-btn-' + colId);
+  const menu = document.getElementById('excel-dropdown-' + colId);
+  if (!btn || !menu) return;
+
+  const margin = 8;
+  const btnRect = btn.getBoundingClientRect();
+  const menuWidth = menu.offsetWidth || 260;
+  const menuHeight = menu.offsetHeight || 300;
+
+  let left = btnRect.right - menuWidth;
+  left = Math.max(margin, Math.min(left, window.innerWidth - menuWidth - margin));
+
+  let top = btnRect.bottom + 4;
+  if (top + menuHeight > window.innerHeight - margin) {
+    top = Math.max(margin, btnRect.top - menuHeight - 4);
+  }
+
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
 };
 
 window.handleDropdownSearch = function(colId, value) {
@@ -1422,13 +1642,13 @@ window.clearExcelFilter = function(colId) {
   delete window.insightHubState.excelSearchTerms[colId];
   window.insightHubState.activeDropdown = null;
   window.insightHubState.currentPage = 1;
-  if (window.applyFilters) window.applyFilters();
+  if (window.refreshInsightHub) window.refreshInsightHub();
 };
 
 window.confirmExcelFilter = function() {
   window.insightHubState.activeDropdown = null;
   window.insightHubState.currentPage = 1;
-  if (window.applyFilters) window.applyFilters();
+  if (window.refreshInsightHub) window.refreshInsightHub();
 };
 
 window.resetHubFilters = function() {
@@ -1444,7 +1664,7 @@ window.resetHubFilters = function() {
     selectedCustomerPhone: null,
     allCustomers: window.insightHubState.allCustomers
   };
-  if (window.applyFilters) window.applyFilters();
+  if (window.refreshInsightHub) window.refreshInsightHub();
 };
 
 // Export ข้อมูลลูกค้าที่กรอง/เรียงลำดับอยู่ตอนนี้ (ไม่ใช่แค่หน้าที่แบ่งไว้) ออกเป็นไฟล์ Excel (.xlsx)
@@ -1473,7 +1693,7 @@ window.exportInsightHubExcel = function() {
       'DaysSinceLast': Number(c.daysSinceLastStr),
       'Last Product': c.lastProductStr || '-',
       'Next Purchase Date': c.nextPurchaseStr,
-      'Life time value': c.ltvTier,
+      'Tier ปีปัจจุบัน': c.currentYearTier || '-',
       'Loyalty Index': c.loyaltyTier,
       'Entry Product (สินค้าเปิดใจ)': c.entryProduct || '-',
       'Current Favorite (สินค้าตัวโปรด)': c.currentFavorite || '-',
@@ -1483,10 +1703,10 @@ window.exportInsightHubExcel = function() {
       'Action Strategy Guideline': c.actionStrategy,
       'FirstChannel (Main)': c.firstChannel,
       'LastChannel (Main)': c.lastChannel,
-      'Last Admin': c.lastAdmin,
-      'Trend Visual': c.trendVisual ? c.trendVisual.label : '-'
+      'Last Admin': c.lastAdmin
     };
     years.forEach(y => { row[`ยอดซื้อปี ${y}`] = c['tier' + y]; });
+    row['Trend Visual'] = c.trendVisual ? c.trendVisual.label : '-';
     row['สถานะล่าสุด (Contact)'] = c.latestStatuses;
     row['Sales Note ล่าสุด'] = c.latestNote;
     return row;
@@ -1496,16 +1716,7 @@ window.exportInsightHubExcel = function() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'InsightHub');
   const dateTag = new Date().toISOString().slice(0, 10);
-  const fileName = `InsightHub_Export_${dateTag}.xlsx`;
-  XLSX.writeFile(wb, fileName);
-
-  // Task 7: audit trail for exports of confidential customer data.
-  fetch('/api/audit/log', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'insighthub_export', detail: { fileName, rowCount: exportRows.length } })
-  }).catch(err => console.error('[InsightHub] Failed to record export audit log:', err));
+  XLSX.writeFile(wb, `InsightHub_Export_${dateTag}.xlsx`);
 };
 
 window.setHubSort = function(colName) {
@@ -1516,12 +1727,22 @@ window.setHubSort = function(colName) {
     state.sortColumn = colName;
     state.sortAsc = false;
   }
-  if (window.applyFilters) window.applyFilters();
+  if (window.refreshInsightHub) window.refreshInsightHub();
 };
 
 window.setHubPage = function(pageNumber) {
   window.insightHubState.currentPage = pageNumber;
-  if (window.applyFilters) window.applyFilters();
+  if (window.refreshInsightHub) window.refreshInsightHub();
+};
+
+window.setHubTierYear = function(value) {
+  window.insightHubState.selectedTierYear = value;
+  if (window.refreshInsightHub) window.refreshInsightHub();
+};
+
+window.toggleTierAmountView = function() {
+  window.insightHubState.showTierInsteadOfAmount = !window.insightHubState.showTierInsteadOfAmount;
+  if (window.refreshInsightHub) window.refreshInsightHub();
 };
 
 // Customer Tier รายปีในโปรไฟล์ลูกค้า: คำนวณจากยอดซื้อสะสมของปีนั้นๆ เท่านั้น
@@ -1546,14 +1767,16 @@ function getCustomerTierClass(tier) {
 
 const TIER_RANK = { Junior: 1, Silver: 2, Gold: 3, Platinum: 4, Diamond: 5 };
 
-// จุดสีบอกเทรนด์ลูกค้าเทียบปีล่าสุด vs ปีก่อนหน้า (ยอดซื้อขึ้น/ลง x Tier รายปีขึ้น/ลง) - ปีล่าสุดถ้าเป็น
-// ปีปัจจุบันจริง (ยังไม่จบปี) จะ interpolate ยอดเป็น full-year-equivalent ก่อนเทียบ ไม่งั้นปีที่ยังไม่จบ
-// จะโชว์เป็น "ลดลง" เทียบกับปีก่อนที่จบเต็มปีเสมอ ค่าเริ่มต้น (ยังไม่มี Settings ปรับได้) ตรงกับเว็บต้นแบบ:
-// neutralBandPercent 0, interpolateCurrentYear true - คอมโบที่ไม่เข้าเงื่อนไข 5 สี (เช่น ไม่มีปีก่อนให้เทียบ)
-// คืนค่า null แสดงเป็นขีดกลาง
+// Year-over-year trend indicator comparing the two most recent years a
+// customer has spending in. If the most recent year is the real current
+// calendar year and isn't over yet, its amount is interpolated to a
+// full-year-equivalent (amountSoFar / (dayOfYear / 365)) before comparing —
+// otherwise a partial year always reads as "down" against a full prior year.
+// Combos not in the 5-color spec (e.g. tier up + amount down, or no prior
+// year to compare against) return null — rendered as a neutral dash.
 function computeTrendVisual(c, availableYears, todayRef) {
   if (!availableYears || availableYears.length < 2) return null;
-  const cfg = { neutralBandPercent: 0, interpolateCurrentYear: true };
+  const cfg = (window.AppData && window.AppData.appConfig && window.AppData.appConfig.trendVisual) || { neutralBandPercent: 0, interpolateCurrentYear: true };
   const lastYear = availableYears[availableYears.length - 1];
   const prevYear = availableYears[availableYears.length - 2];
   const prevAmt = (c.annualSpending && c.annualSpending[prevYear]) || 0;
@@ -1573,6 +1796,8 @@ function computeTrendVisual(c, availableYears, todayRef) {
   const prevRank = prevTier ? TIER_RANK[prevTier] : 0;
   const lastRank = lastTier ? TIER_RANK[lastTier] : 0;
 
+  // Within the neutral band (± %), an amount change counts as "same" rather
+  // than up/down — keeps small noise from flipping the trend color.
   const band = (Math.max(0, cfg.neutralBandPercent || 0) / 100) * prevAmt;
   const amountDir = lastAmt > prevAmt + band ? "up" : (lastAmt < prevAmt - band ? "down" : "same");
   const tierDir = lastRank > prevRank ? "up" : (lastRank < prevRank ? "down" : "same");
@@ -1618,7 +1843,7 @@ function getSegClass(seg) {
 function getSortIcon(colName) {
   const state = window.insightHubState;
   if (state.sortColumn !== colName) return '<i class="fas fa-sort sorting-icon"></i>';
-  return state.sortAsc ? '<i class="fas fa-sort-up sorting-icon" style="color:#1e293b;"></i>' : '<i class="fas fa-sort-down sorting-icon" style="color:#1e293b;"></i>';
+  return state.sortAsc ? '<i class="fas fa-sort-up sorting-icon" style="color:#d95f1d;"></i>' : '<i class="fas fa-sort-down sorting-icon" style="color:#d95f1d;"></i>';
 }
 
 function getPageRange(current, total) {
@@ -1633,12 +1858,12 @@ function getPageRange(current, total) {
 
 window.openCustomerProfile = function(phone) {
   window.insightHubState.selectedCustomerPhone = phone;
-  if (window.applyFilters) window.applyFilters();
+  if (window.refreshInsightHub) window.refreshInsightHub();
 };
 
 window.closeCustomerProfile = function() {
   window.insightHubState.selectedCustomerPhone = null;
-  if (window.applyFilters) window.applyFilters();
+  if (window.refreshInsightHub) window.refreshInsightHub();
 };
 
 window.searchProfileKey = function() {
@@ -1653,7 +1878,7 @@ window.searchProfileKey = function() {
   );
   if (match) {
     window.insightHubState.selectedCustomerPhone = match.phone;
-    if (window.applyFilters) window.applyFilters();
+    if (window.refreshInsightHub) window.refreshInsightHub();
   } else {
     alert('ไม่พบข้อมูลลูกค้าสำหรับคีย์: ' + inputVal);
   }
@@ -1687,17 +1912,16 @@ function formatDateTimeDisplay(iso) {
   return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
 }
 
-// Sales Note card: multi-select contact status + free-text note, shown under AI Summary.
-// Draft edits live in state.noteEditor (keyed to the customer being viewed, initialized in
-// renderCustomerProfileView) so a checkbox toggle can re-render the page without wiping
-// whatever the admin has already typed/selected. บันทึกแล้วเป็น "ค่าปัจจุบัน" ของลูกค้าคนนั้น
-// (ทับค่าเดิม ไม่ใช่ log ประวัติ) และเห็นได้ทุกคนที่ล็อกอิน (ผ่าน /api/notes ไม่ใช่ localStorage)
+// Sales Note card: multi-select contact status + free-text note, shown under
+// AI Summary. Draft edits live in state.noteEditor (keyed to the customer
+// being viewed) so a checkbox toggle can re-render the page without wiping
+// whatever the admin has already typed/selected.
 function renderSalesNoteCard(c) {
   const state = window.insightHubState;
   const editor = state.noteEditor;
   const statusOptions = (window.AppData && window.AppData.statusOptions && window.AppData.statusOptions.length)
     ? window.AppData.statusOptions
-    : [];
+    : window.DEFAULT_STATUS_OPTIONS;
   const saved = (window.AppData && window.AppData.notesByKey && window.AppData.notesByKey[c.phone]) || null;
   const updatedInfo = saved && saved.updatedAt
     ? `<span style="font-size:11.5px; color:#94a3b8;">อัปเดตล่าสุดโดย <strong>${escapeHtml(saved.updatedBy || '-')}</strong> เมื่อ ${formatDateTimeDisplay(saved.updatedAt)}</span>`
@@ -1737,7 +1961,7 @@ function renderSalesNoteCard(c) {
 
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
           ${updatedInfo || '<span></span>'}
-          <button class="btn btn-primary" onclick="saveCustomerNote()" style="padding: 8px 22px; background:#1e293b; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600;"><i class="fas fa-save"></i> บันทึก</button>
+          <button class="btn btn-primary" onclick="saveCustomerNote()" style="padding: 8px 22px;"><i class="fas fa-save"></i> บันทึก</button>
         </div>
       </div>
     </div>
@@ -1748,7 +1972,7 @@ window.toggleNoteStatusDropdown = function() {
   const state = window.insightHubState;
   if (!state.noteEditor) return;
   state.noteEditor.dropdownOpen = !state.noteEditor.dropdownOpen;
-  if (window.applyFilters) window.applyFilters();
+  if (window.refreshInsightHub) window.refreshInsightHub();
 };
 
 window.toggleNoteStatusCheck = function(label, checked) {
@@ -1757,10 +1981,11 @@ window.toggleNoteStatusCheck = function(label, checked) {
   const idx = state.noteEditor.statuses.indexOf(label);
   if (checked && idx === -1) state.noteEditor.statuses.push(label);
   if (!checked && idx !== -1) state.noteEditor.statuses.splice(idx, 1);
-  if (window.applyFilters) window.applyFilters();
+  if (window.refreshInsightHub) window.refreshInsightHub();
 };
 
-// ไม่ re-render ทุกครั้งที่พิมพ์ (จะทำให้ textarea เสีย focus/ตำแหน่ง cursor) - เก็บไว้ใน state เฉยๆ จนกว่าจะกด Save
+// Not re-rendered on every keystroke (a full re-render would drop textarea
+// focus/cursor position while typing) — just tracked in state until Save.
 window.updateNoteDraftText = function(value) {
   const state = window.insightHubState;
   if (!state.noteEditor) return;
@@ -1773,37 +1998,80 @@ window.saveCustomerNote = async function() {
   if (!editor) return;
   const customer = (state.allCustomers || []).find(c => c.phone === editor.forPhone);
   if (!customer) return;
+  const session = window.currentUser || {};
 
   try {
-    await window.CrmApi.upsertNote({
+    await window.InsightHubApi.upsertNote({
       customerKey: customer.phone,
       customerName: customer.name,
       note: editor.text,
-      statuses: editor.statuses.join('|')
+      statuses: editor.statuses.join('|'),
+      requestUser: session.username || session.name || '',
     });
-    if (typeof stgToast === 'function') stgToast('บันทึก Sales Note แล้ว', 'success');
+    window.showToast('บันทึก Sales Note แล้ว', 'success');
     editor.dropdownOpen = false;
-    if (window.loadNotesAndStatusOptions) {
-      await window.loadNotesAndStatusOptions(); // โหลดใหม่ + re-render (ตาราง + โปรไฟล์นี้) ให้เอง
-    } else if (window.applyFilters) {
-      window.applyFilters();
-    }
+    await window.loadInsightHubNotesAndStatusOptions(); // also re-renders (list + this profile) on success
   } catch (err) {
-    if (typeof stgToast === 'function') stgToast('บันทึกไม่สำเร็จ: ' + err.message, 'error');
+    window.showToast('บันทึกไม่สำเร็จ: ' + err.message, 'error');
+  }
+};
+
+// Inline quick-edit for the Status/Note columns on the customer table (as
+// opposed to the multi-select Sales Note card on the profile page). Saves a
+// single status + the existing note text, or vice versa, on change/blur.
+window.updateInlineStatus = async function(phone, value) {
+  const state = window.insightHubState;
+  const customer = (state.allCustomers || []).find(cc => cc.phone === phone);
+  if (!customer) return;
+  const session = window.currentUser || {};
+  const saved = (window.AppData && window.AppData.notesByKey && window.AppData.notesByKey[phone]) || null;
+
+  try {
+    await window.InsightHubApi.upsertNote({
+      customerKey: phone,
+      customerName: customer.name,
+      note: saved ? saved.note : '',
+      statuses: value,
+      requestUser: session.username || session.name || '',
+    });
+    window.showToast('บันทึกสถานะแล้ว', 'success');
+    await window.loadInsightHubNotesAndStatusOptions();
+  } catch (err) {
+    window.showToast('บันทึกไม่สำเร็จ: ' + err.message, 'error');
+  }
+};
+
+window.updateInlineNote = async function(phone, value) {
+  const state = window.insightHubState;
+  const customer = (state.allCustomers || []).find(cc => cc.phone === phone);
+  if (!customer) return;
+  const session = window.currentUser || {};
+  const saved = (window.AppData && window.AppData.notesByKey && window.AppData.notesByKey[phone]) || null;
+
+  try {
+    await window.InsightHubApi.upsertNote({
+      customerKey: phone,
+      customerName: customer.name,
+      note: value,
+      statuses: (saved && saved.statuses) ? saved.statuses.join('|') : '',
+      requestUser: session.username || session.name || '',
+    });
+    window.showToast('บันทึกโน้ตแล้ว', 'success');
+    await window.loadInsightHubNotesAndStatusOptions();
+  } catch (err) {
+    window.showToast('บันทึกไม่สำเร็จ: ' + err.message, 'error');
   }
 };
 
 function renderCustomerProfileView(c, container, filteredData, rawData) {
   const state = window.insightHubState;
-  // เก็บ draft ของ Sales Note ไว้ใน state.noteEditor แยกจาก c (ข้อมูลลูกค้า) เอง เพื่อให้ toggle checkbox
-  // แล้ว re-render ไม่ทำให้ข้อความที่พิมพ์ค้างอยู่หาย - สร้างใหม่เฉพาะตอนเปลี่ยนไปดูลูกค้าคนอื่น
   if (!state.noteEditor || state.noteEditor.forPhone !== c.phone) {
     const saved = (window.AppData && window.AppData.notesByKey && window.AppData.notesByKey[c.phone]) || null;
     state.noteEditor = {
       forPhone: c.phone,
-      statuses: (saved && Array.isArray(saved.statuses)) ? saved.statuses.slice() : [],
+      statuses: saved ? saved.statuses.slice() : [],
       text: saved ? saved.note : '',
-      dropdownOpen: false
+      dropdownOpen: false,
     };
   }
 
