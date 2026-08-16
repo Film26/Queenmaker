@@ -86,7 +86,7 @@
       
       <ul class="nav-menu">
         <li class="nav-item"><a href="#" class="nav-link active" id="side-crm" onclick="event.preventDefault(); switchTab('overview')"><i class="fas fa-th-large"></i>CRM DASHBOARD</a></li>
-        <li class="nav-item"><a href="#" class="nav-link" id="side-insight" onclick="event.preventDefault(); switchTab('insighthub')"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
+        <li class="nav-item"><a href="dashboard.html?tab=insighthub" class="nav-link" id="side-insight" target="_blank" rel="noopener noreferrer" onclick="prepareInsightHubHandoff()"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-pie"></i>MUSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
@@ -113,7 +113,6 @@
         </div>
 
         <div class="user-actions" style="justify-self: end; display: flex; gap: 15px; align-items: center;">
-          <span id="scope-indicator-pill" style="display:none; background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; border-radius: 20px; padding: 8px 16px; font-weight: 600; font-size: 13px; align-items: center; gap: 6px;"><i class="fas fa-user-lock"></i> <span id="scope-indicator-pill-text"></span></span>
           <button id="importBtn" class="btn" style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
             <i class="fas fa-file-import"></i> Import Data
           </button>
@@ -129,12 +128,6 @@
           <button id="tab-executive2" class="tab-btn" onclick="switchTab('executive2')">Migration</button>
           <button id="tab-retention" class="tab-btn" onclick="switchTab('retention')">Retention</button>
           <button id="tab-cohort" class="tab-btn" onclick="switchTab('cohort')">Cohort Heatmap</button>
-        </div>
-        <!-- อยู่นอก .view-* ทุกอันโดยตั้งใจ (ไม่ใช่ลูกของ tabs-container ที่บางแท็บ เช่น Insight Hub/Settings/
-             KPI Setting จะซ่อนไปเลย) เพื่อให้ยังเห็นแบนเนอร์นี้ได้ไม่ว่าจะสลับไปแท็บไหนก็ตาม ดู applyScopeUi -->
-        <div id="scope-warning-banner" style="display:none; align-items:center; gap:10px; background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:10px; padding:12px 20px; margin-bottom:16px; font-size:13px; font-weight:600;">
-          <i class="fas fa-triangle-exclamation"></i>
-          <span>บัญชีนี้ (Sales Admin) ยังไม่ได้กำหนดชื่อแอดมิน (Admin Name) กรุณาติดต่อ Super Admin เพื่อตั้งค่าใน Settings ก่อนจึงจะเห็นข้อมูลได้</span>
         </div>
         <div class="filters-bar" id="mainFiltersBar">
           <div class="filter-dropdown">
@@ -164,6 +157,9 @@
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Admin" onclick="toggleFilter('menu-Admin')">Admin: <span id="lbl-Admin">All</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Admin" class="filter-content"></div>
+          </div>
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-KPI" onclick="toggleKpiCompare()"><i class="fas fa-toggle-off" id="icon-KPI"></i> KPI Compare: <span id="lbl-KPI">Off</span></button>
           </div>
           <button id="clearFiltersBtn" class="clear-filters-btn" onclick="clearFilters()">Clear Filters</button>
         </div>
@@ -200,10 +196,115 @@
             <div id="menu-Exec-Admin" class="filter-content"></div>
           </div>
         </div>
-        <!-- เนื้อหาทั้งหมดของแท็บนี้ (KPI card/กราฟ/ตาราง) สร้างแบบไดนามิกทั้งก้อนโดย renderDashboardOverview()
-             (พอร์ตมาจากเว็บต้นแบบ Film26/Insinghub - js/dashboard.js renderDashboardOverview) แทนที่ของเดิมที่
-             เป็น card/กราฟตายตัวในนี้ - ดู renderDashboardOverview ในสคริปต์ด้านล่าง -->
-        <div id="view-overview"></div>
+        <div id="view-overview">
+          <div id="overview-empty-state" style="display:none; text-align:center; padding:60px 20px; color:#999; font-size:15px; background:#fff; border-radius:16px; margin-bottom:25px;">
+            <i class="fas fa-inbox" style="font-size:32px; display:block; margin-bottom:12px; color:#ccc;"></i>
+            ไม่พบข้อมูลตามเงื่อนไข Filter ที่เลือก กรุณาปรับ Filter หรือตรวจสอบข้อมูลที่ Import เข้ามา
+          </div>
+          <div class="cards-grid">
+            <div class="kpi-card grid-span-1">
+              <div class="kpi-header"><div class="kpi-title" id="title-ytd-sales">ยอดขาย YTD (บาท)</div></div>
+              <div class="kpi-val" id="val-ytd-sales">฿0</div>
+              <div><span class="kpi-change-new neutral" id="change-ytd-sales">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ytd-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+            </div>
+
+            <div class="kpi-card grid-span-1">
+              <div class="kpi-header"><div class="kpi-title">Total Customer (คน)</div></div>
+              <div class="kpi-val" id="val-total-cust">0</div>
+              <div><span class="kpi-change-new neutral" id="change-total-cust">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-total-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+            </div>
+
+            <div class="kpi-card grid-span-1">
+              <div class="kpi-header"><div class="kpi-title">YTD New Customers (คน)</div></div>
+              <div class="kpi-val" id="val-ytd-new">0</div>
+              <div><span class="kpi-change-new neutral" id="change-ytd-new">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ytd-new" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+            </div>
+
+            <div class="kpi-card grid-span-1">
+              <div class="kpi-header"><div class="kpi-title">AOV (ยอดต่อบิลเฉลี่ย (บาท))</div></div>
+              <div class="kpi-val" id="val-aov">฿0</div>
+              <div><span class="kpi-change-new neutral" id="change-aov">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-aov" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+            </div>
+
+            <div class="kpi-card grid-span-1">
+              <div class="kpi-header"><div class="kpi-title" id="title-sales">ยอดขายประจำเดือน (บาท)</div></div>
+              <div class="kpi-val" id="val-sales">฿0</div>
+              <div><span class="kpi-change-new neutral" id="change-sales">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+            </div>
+
+            <div class="kpi-card grid-span-1">
+              <div class="kpi-header"><div class="kpi-title">Active Customer (คน)</div></div>
+              <div class="kpi-val" id="val-active-cust">0%</div>
+              <div><span class="kpi-change-new neutral" id="change-active-cust">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-active-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+            </div>
+
+            <div class="kpi-card grid-span-1">
+              <div class="kpi-header"><div class="kpi-title">New Customer (คน)</div></div>
+              <div class="kpi-val" id="val-new-cust">0</div>
+              <div><span class="kpi-change-new neutral" id="change-new-cust">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-new-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+            </div>
+
+            <div class="kpi-card grid-span-1">
+              <div class="kpi-header"><div class="kpi-title">Retained Customer (คน)</div></div>
+              <div class="kpi-val" id="val-ret-cust">0</div>
+              <div><span class="kpi-change-new neutral" id="change-ret-cust">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ret-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+            </div>
+
+            <div class="kpi-card grid-span-2">
+              <div class="kpi-header"><div class="kpi-title">Spending per Head (ยอดเฉลี่ยต่อคน)</div></div>
+              <div class="kpi-val" id="val-sph">฿0</div>
+              <div><span class="kpi-change-new neutral" id="change-sph">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-sph" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+            </div>
+
+            <div class="kpi-card grid-span-2">
+              <div class="kpi-header"><div class="kpi-title">Repeat Purchase</div></div>
+              <div class="kpi-val" id="val-repeat">0.0 ครั้ง</div>
+              <div><span class="kpi-change-new neutral" id="change-repeat">-</span></div>
+              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-repeat" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+            </div>
+          </div>
+
+          <div class="charts-grid">
+            <div class="chart-box grid-span-1">
+              <div class="chart-title">ยอดขาย (บาท)</div>
+              <div class="chart-container"><canvas id="chart-sales"></canvas></div>
+            </div>
+            
+            <div class="chart-box grid-span-1">
+              <div class="chart-title" style="color:#d95f1d;">ลูกค้าเก่า vs ลูกค้าใหม่</div>
+              <div class="chart-container"><canvas id="chart-ret-new-stacked"></canvas></div>
+            </div>
+
+            <div class="chart-box grid-span-1">
+              <div class="chart-title">ลูกค้าใหม่ (คน)</div>
+              <div class="chart-container"><canvas id="chart-new"></canvas></div>
+            </div>
+            
+            <div class="chart-box grid-span-1">
+              <div class="chart-title">ลูกค้าเก่า (คน)</div>
+              <div class="chart-container"><canvas id="chart-ret"></canvas></div>
+            </div>
+
+            <div class="chart-box grid-span-1">
+              <div class="chart-title">สัดส่วนยอดขายแต่ละ Channel (บาท)</div>
+              <div class="chart-container"><canvas id="chart-channel"></canvas></div>
+            </div>
+            
+            <div class="chart-box grid-span-1">
+              <div class="chart-title">ยอดขายของ Admin แต่ละคน</div>
+              <div class="chart-container"><canvas id="chart-admin"></canvas></div>
+            </div>
+          </div>
+        </div>
         <div id="view-cohort" style="display:none; padding: 20px; background: #fff; border-radius: 16px; margin-top: 20px; overflow-x: auto; min-height: 500px;">
           </div>
         <div id="view-executive1" class="view-content" style="display:none; padding: 20px;"></div>
@@ -231,105 +332,27 @@
     let filteredData = [];
 
     // คอยเก็บสถานะ Filter โดยเพิ่ม 'KPI' เข้ามา (ตั้งค่าเริ่มต้นเป็น Off)
-    let filters = { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All' };
+    let filters = { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All', KPI: 'Off' };
     window.filters = filters;
 
     // --- Auth/session (Task 4/7) ---
     // The server already redirects an unauthenticated GET /dashboard.html to the login page
     // (see requirePageAuth in server.js) - this client-side check additionally catches a
-    // session that expires *while this tab is already open* (idle timeout), hides
-    // admin-only navigation based on role (Manager vs Super Admin), and refreshes the
-    // Sales Admin scope indicator (see applyScopeUi/scopeRowsForCurrentUser above).
-    //
-    // ensureSessionChecked() memoizes the in-flight/last-completed check so the CSV import
-    // handler can `await` it (กันปัญหา window.currentUser ยังไม่มาตอน import ทัน - เดิม
-    // checkSessionOrRedirect ยิง fetch แบบ fire-and-forget ตั้งแต่ DOMContentLoaded คู่ขนานกับการ
-    // ผูก listener ของ fileInput ถ้า import เร็วผิดปกติก่อน fetch นี้ resolve จะได้ rawData ที่ยังไม่ถูกกรอง
-    // ตาม Sales Admin) checkSessionOrRedirect() (เรียกตอน DOMContentLoaded และทุก 5 นาที) ล้าง cache
-    // ก่อนเสมอ เพื่อให้ยังเป็นการเช็คสดใหม่ทุกครั้งเหมือนเดิม ไม่ใช่ค้างค่าเก่าตลอดไป
-    let sessionCheckPromise = null;
-    function ensureSessionChecked() {
-      if (!sessionCheckPromise) {
-        sessionCheckPromise = fetch('/api/auth/me', { credentials: 'same-origin' }).then(res => {
-          if (!res.ok) { window.location.href = '/'; return null; }
-          return res.json();
-        }).then(data => {
-          if (!data) return null;
-          window.currentUser = data.user;
-          const sideSettingsItem = document.getElementById('side-settings');
-          if (sideSettingsItem && data.user.role !== 'Super Admin') {
-            sideSettingsItem.closest('.nav-item').style.display = 'none';
-          }
-          applyScopeUi();
-          return data.user;
-        }).catch(() => null); // transient network error - don't force logout, just resolve empty
-      }
-      return sessionCheckPromise;
-    }
+    // session that expires *while this tab is already open* (idle timeout) and hides
+    // admin-only navigation based on role (Manager vs Super Admin).
     function checkSessionOrRedirect() {
-      sessionCheckPromise = null;
-      ensureSessionChecked();
-    }
-
-    // แสดง/ซ่อน badge "กำลังดูข้อมูลของ: {ชื่อแอดมิน}" (ปกติ) และแบนเนอร์เตือนสีเหลือง (ยังไม่ได้ผูกชื่อแอดมิน
-    // ให้ user Sales Admin คนนี้) เรียกทุกครั้งที่รู้ผล session ใหม่ (ensureSessionChecked) และหลัง import เสร็จ
-    function applyScopeUi() {
-      const user = window.currentUser;
-      const isSalesAdmin = !!(user && user.role === 'Sales Admin');
-      const adminName = isSalesAdmin ? (user.adminName || '').trim() : '';
-
-      const pill = document.getElementById('scope-indicator-pill');
-      const pillText = document.getElementById('scope-indicator-pill-text');
-      if (pill) {
-        if (isSalesAdmin && adminName) {
-          if (pillText) pillText.textContent = 'กำลังดูข้อมูลของ: ' + adminName;
-          pill.style.display = 'inline-flex';
-        } else {
-          pill.style.display = 'none';
+      fetch('/api/auth/me', { credentials: 'same-origin' }).then(res => {
+        if (!res.ok) { window.location.href = '/'; return null; }
+        return res.json();
+      }).then(data => {
+        if (!data) return;
+        window.currentUser = data.user;
+        const sideSettingsItem = document.getElementById('side-settings');
+        if (sideSettingsItem && data.user.role !== 'Super Admin') {
+          sideSettingsItem.closest('.nav-item').style.display = 'none';
         }
-      }
-
-      const banner = document.getElementById('scope-warning-banner');
-      if (banner) banner.style.display = (isSalesAdmin && !adminName) ? 'flex' : 'none';
+      }).catch(() => { /* transient network error - don't force logout */ });
     }
-
-    // โหลด Sales Note (window.AppData.notesByKey) + รายการสถานะการติดต่อที่ตั้งค่าได้ (window.AppData.statusOptions)
-    // จาก /api/notes เข้ามาไว้ให้ insighthub.js ใช้ - เรียกตอนโหลดหน้าแรกและหลัง import ข้อมูลใหม่ทุกครั้ง
-    // (เหมือน settings.js เตรียม window.AppData.config/users ไว้ล่วงหน้า) แล้ว re-render Insight Hub ถ้าเปิดอยู่
-    window.AppData = window.AppData || {};
-    async function loadNotesAndStatusOptions() {
-      if (!window.CrmApi) return;
-      try {
-        const notesResult = await window.CrmApi.getNotes();
-        const notesByKey = {};
-        Object.keys(notesResult || {}).forEach(key => {
-          const row = notesResult[key];
-          if (!row) return;
-          const statusesRaw = (row.statuses || '').toString();
-          notesByKey[key] = {
-            note: (row.note || '').toString(),
-            statuses: statusesRaw ? statusesRaw.split('|').map(s => s.trim()).filter(Boolean) : [],
-            updatedAt: row.updatedAt || '',
-            updatedBy: row.updatedBy || ''
-          };
-        });
-        window.AppData.notesByKey = notesByKey;
-      } catch (err) {
-        console.warn('[loadNotesAndStatusOptions] โหลด Sales Note ไม่สำเร็จ:', err.message);
-      }
-
-      try {
-        const options = await window.CrmApi.getStatusOptions();
-        if (Array.isArray(options) && options.length) window.AppData.statusOptions = options;
-      } catch (err) {
-        console.warn('[loadNotesAndStatusOptions] โหลดสถานะการติดต่อไม่สำเร็จ:', err.message);
-      }
-
-      if (document.getElementById('view-insighthub').style.display === 'block' && typeof renderInsightHub === 'function') {
-        renderInsightHub(filteredData, rawData);
-      }
-    }
-    window.loadNotesAndStatusOptions = loadNotesAndStatusOptions;
 
     function doLogout() {
       fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).finally(() => {
@@ -337,7 +360,25 @@
       });
     }
 
-    let globalFirstPurchase = {};
+    // --- Inside Hub in a new tab (Task 6) ---
+    // Inside Hub has no separate URL/page of its own - it's the #view-insighthub tab inside
+    // this same file. A brand-new browser tab has no access to this tab's in-memory `rawData`
+    // (and rel="noopener noreferrer" intentionally blocks the new tab from reaching back into
+    // this window to read it), so the currently-loaded dataset is hand off through localStorage
+    // just before the new tab opens, then consumed once and immediately removed - see
+    // restoreInsightHubHandoffIfAny() in the DOMContentLoaded handler below.
+    function prepareInsightHubHandoff() {
+      try {
+        localStorage.setItem('qm_insighthub_handoff', JSON.stringify({ rawData: rawData, savedAt: Date.now() }));
+      } catch (e) {
+        console.error('[InsightHub] Failed to hand off dataset to the new tab:', e);
+        alert('ไม่สามารถส่งข้อมูลไปยังแท็บใหม่ได้ (ข้อมูลอาจมีขนาดใหญ่เกินไปสำหรับ localStorage) กรุณากด Import Data หรือ Load Sample อีกครั้งในแท็บใหม่');
+      }
+    }
+    let monthlyData = {}; 
+    let globalFirstPurchase = {}; 
+    let availableMonths = [];
+    let charts = {};
     const keyCache = {};
 
     // 💡 คลังสำหรับรับค่าตัวเลขที่ Manual พิมพ์มาจากหน้า KPI SETTING (เมื่อกดบันทึกแล้วส่งค่ามาใส่ที่นี่ได้เลย)
@@ -369,7 +410,25 @@
     window.addEventListener('DOMContentLoaded', () => {
       checkSessionOrRedirect();
       setInterval(checkSessionOrRedirect, 5 * 60 * 1000);
-      loadNotesAndStatusOptions();
+
+      // Restore a dataset handed off from the Dashboard tab that opened this one via
+      // "Inside Hub" (see prepareInsightHubHandoff() above), then jump straight to that tab.
+      (function restoreInsightHubHandoffIfAny() {
+        if (new URLSearchParams(window.location.search).get('tab') !== 'insighthub') return;
+        try {
+          const raw = localStorage.getItem('qm_insighthub_handoff');
+          if (!raw) return;
+          localStorage.removeItem('qm_insighthub_handoff');
+          const payload = JSON.parse(raw);
+          if (!payload || !Array.isArray(payload.rawData) || Date.now() - (payload.savedAt || 0) > 5 * 60 * 1000) return;
+          rawData = payload.rawData;
+          precomputeGlobalFirstPurchases();
+          applyFilters();
+          switchTab('insighthub');
+        } catch (e) {
+          console.error('[InsightHub] Failed to restore handed-off dataset:', e);
+        }
+      })();
 
       const importBtn = document.getElementById('importBtn');
       const fileInput = document.getElementById('fileInput');
@@ -385,37 +444,25 @@
             showLoading(true);
             Papa.parse(file, {
               header: true,
-              skipEmptyLines: true,
-              complete: async (results) => {
+              skipEmptyLines: true, 
+              complete: (results) => {
                 try {
                   for (let k in keyCache) delete keyCache[k];
                   window.userCohorts = null;
                   window.scFirstPurchase = null;
-
-                  // ต้องรู้ตัวตน/สิทธิ์ผู้ใช้ปัจจุบันให้แน่ชัดก่อนกรองข้อมูล (กัน race condition กับ
-                  // checkSessionOrRedirect ที่ยิงตอน DOMContentLoaded แบบ fire-and-forget - ถ้า import
-                  // เร็วผิดปกติก่อน fetch นั้น resolve จะได้ rawData ที่ยังไม่ถูกกรองตาม Sales Admin)
-                  await ensureSessionChecked();
-                  if (!window.currentUser) {
-                    alert('ไม่สามารถยืนยันตัวตนผู้ใช้งานได้ กรุณาลองใหม่อีกครั้ง หรือ Login ใหม่');
-                    return;
-                  }
-
-                  const parsedRows = results.data.filter(row => {
+                  
+                  rawData = results.data.filter(row => {
                     if (!row) return false;
                     return Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
                   });
-                  rawData = scopeRowsForCurrentUser(parsedRows);
 
                   precomputeGlobalFirstPurchases();
                   applyFilters();
-                  applyScopeUi();
-                  loadNotesAndStatusOptions();
                 } catch (err) {
                   console.error(err);
                   alert('เกิดข้อผิดพลาดในการประมวลผลข้อมูล');
                 } finally {
-                  showLoading(false);
+                  showLoading(false); 
                 }
               },
               error: (err) => { console.error(err); showLoading(false); alert('Error parsing CSV'); }
@@ -423,6 +470,8 @@
           }
         });
       }
+
+      initCharts();
     });
 
     window.onclick = function(event) {
@@ -494,7 +543,6 @@
         if (tabId === 'overview') {
           document.getElementById('tab-overview').classList.add('active');
           document.getElementById('view-overview').style.display = 'block';
-          if (typeof renderDashboardOverview === 'function') { renderDashboardOverview(rawData); }
         } else if (tabId === 'cohort') {
           document.getElementById('tab-cohort').classList.add('active');
           document.getElementById('view-cohort').style.display = 'block';
@@ -518,6 +566,50 @@
 
     function toggleFilter(id) { document.getElementById(id).classList.toggle("show"); }
     function showLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none'; }
+
+    function formatCurrency(num) { return '฿' + num.toLocaleString('th-TH', {minimumFractionDigits: 0, maximumFractionDigits: 0}); }
+    function formatPercent(num) { 
+      if (!isFinite(num) || isNaN(num)) return '-';
+      const sign = num > 0 ? '+' : '';
+      return sign + (num * 100).toFixed(1) + '%';
+    }
+
+    function updateChangeUI(elId, current, previous) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      if (!previous || previous === 0) {
+        el.textContent = '-'; el.className = 'kpi-change-new neutral'; return;
+      }
+      const change = (current - previous) / previous;
+      el.textContent = formatPercent(change);
+      
+      let icon = '';
+      if (change > 0) { el.className = 'kpi-change-new up'; icon = '<i class="fas fa-arrow-up"></i> '; }
+      else if (change < 0) { el.className = 'kpi-change-new down'; icon = '<i class="fas fa-arrow-down"></i> '; }
+      else { el.className = 'kpi-change-new neutral'; }
+      el.innerHTML = icon + el.textContent;
+    }
+
+    // badge ใหม่สำหรับเทียบ % กับเป้าหมายจากหน้า KPI Setting (แยกจาก updateChangeUI เดิมที่เทียบเดือนก่อนหน้า)
+    // ปักไว้มุมล่างขวาของกรอบการ์ด (ผ่าน class .kpi-target-badge) และใช้ป้าย "KPI" แยกให้เห็นว่าเป็นคนละความหมายกับ badge เดิม
+    function updateKpiTargetUI(elId, current, target) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      const kpiLabel = '<span style="font-size:9px; font-weight:800; letter-spacing:0.5px;">KPI</span> ';
+      if (!target || target === 0) {
+        el.innerHTML = kpiLabel + '-';
+        el.className = 'kpi-change-new neutral kpi-target-badge';
+        return;
+      }
+      const change = (current - target) / target;
+      const pct = formatPercent(change);
+
+      let icon = kpiLabel;
+      if (change > 0) { el.className = 'kpi-change-new up kpi-target-badge'; icon += '<i class="fas fa-arrow-up"></i> '; }
+      else if (change < 0) { el.className = 'kpi-change-new down kpi-target-badge'; icon += '<i class="fas fa-arrow-down"></i> '; }
+      else { el.className = 'kpi-change-new neutral kpi-target-badge'; }
+      el.innerHTML = icon + pct;
+    }
 
     // --- Data Mapping & Parsing ---
     function getRowValue(row, possibleKeys) {
@@ -741,10 +833,9 @@
         const aStd = ((row['Admin_STD'] !== undefined ? row['Admin_STD'] : row['Admin Name_1']) || '').toString().trim();
         return aStd || 'Unknown';
       }
-      // ห้าม fallback ไปอ่านจาก หมายเหตุ/Remark เหมือนที่ Channel ทำ - ช่องนี้มักเป็นเลข Tracking/โน้ตส่งของ
-      // ไม่ใช่ชื่อแอดมิน ถ้าเผลออ่านมาจะได้เลข Tracking มาปนเป็น "ชื่อแอดมิน" ในกราฟยอดขายของ Admin แต่ละคน
       let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
-
+      if (!val) val = getRowValue(row, ['หมายเหตุ', 'Remark']);
+      
       let a = (val || '').toString().trim();
       if (!a) return 'Unknown';
       let lower = a.toLowerCase();
@@ -767,18 +858,6 @@
         if (adminPart) return adminPart;
       }
       return a;
-    }
-
-    // จำกัดข้อมูลที่ Sales Admin เห็นให้เหลือแค่ของตัวเอง (กรองด้วยชื่อแอดมินที่ตั้งไว้ตอนสร้าง user ใน
-    // Settings เทียบกับ getNormalizedAdmin(row) ด้านบน) - Super Admin/Manager ไม่ถูกกรอง เห็นข้อมูลทั้งหมดเหมือนเดิม
-    // สำคัญ: นี่เป็นการกรองฝั่ง Client เท่านั้น (แอปนี้ import CSV ในเบราว์เซอร์ล้วนๆ ไม่มี API ฝั่ง Server
-    // ที่ส่งข้อมูลมาให้) ไม่ใช่ระบบรักษาความปลอดภัยจริง แค่ช่วยให้ Sales Admin ใช้งานสะดวกไม่เห็นข้อมูลคนอื่นปนเข้ามา
-    function scopeRowsForCurrentUser(rows) {
-      const user = window.currentUser;
-      if (!user || user.role !== 'Sales Admin') return rows;
-      const adminName = (user.adminName || '').trim();
-      if (!adminName) return []; // ยังไม่ได้ผูกชื่อแอดมิน -> fail closed ไม่โชว์อะไรเลย (ดู applyScopeUi แจ้งเตือน)
-      return rows.filter(row => getNormalizedAdmin(row) === adminName);
     }
 
     // --- Dropdowns & Filters Logic ---
@@ -1024,7 +1103,7 @@
       const menu = document.getElementById('menu-' + type);
       if (menu) menu.classList.remove('show');
 
-      if (val !== 'All') {
+      if (val !== 'All' && val !== 'Off') {
         document.getElementById('btn-' + type).classList.add('active');
         if(document.getElementById('clearFilterBtn')) {
           document.getElementById('clearFilterBtn').style.display = 'inline-block';
@@ -1036,8 +1115,17 @@
       if (type === 'Year') {
         populateMonthMenu(val);
       }
+      if (type === 'KPI') {
+        const icon = document.getElementById('icon-KPI');
+        if (icon) icon.className = val === 'On' ? 'fas fa-toggle-on' : 'fas fa-toggle-off';
+      }
 
       applyFilters();
+    }
+
+    // KPI Compare is a plain on/off switch, so a single click toggles it directly instead of opening a picker.
+    function toggleKpiCompare() {
+      setFilter('KPI', filters.KPI === 'On' ? 'Off' : 'On');
     }
 
     function clearFilters() {
@@ -1046,6 +1134,12 @@
         document.getElementById('lbl-' + type).textContent = 'All';
         document.getElementById('btn-' + type).classList.remove('active');
       });
+
+      filters['KPI'] = 'Off';
+      document.getElementById('lbl-KPI').textContent = 'Off';
+      document.getElementById('btn-KPI').classList.remove('active');
+      const kpiIcon = document.getElementById('icon-KPI');
+      if (kpiIcon) kpiIcon.className = 'fas fa-toggle-off';
 
       if(document.getElementById('clearFilterBtn')) {
         document.getElementById('clearFilterBtn').style.display = 'none';
@@ -1096,15 +1190,7 @@
       if (rawData.length > 0 && document.getElementById('menu-Year').children.length === 0) populateDropdowns();
       filteredData = computeFilteredData(filters);
 
-      // หน้า Dashboard/Overview ใหม่ (พอร์ตจาก Film26/Insinghub) อ่านจาก rawData ตรงๆ ไม่ผ่าน Filter บนสุด
-      // เลย (เหมือนต้นฉบับ) - rawData ถูกจำกัดสิทธิ์ตาม Sales Admin ไว้แล้วตั้งแต่ตอน import (ดู
-      // scopeRowsForCurrentUser) จึงยังถูกต้องตามสิทธิ์อยู่ ไม่ต้องกรองซ้ำอีกชั้น
-      // #view-overview ไม่มี class="view-content" (ไม่ถูกซ่อนด้วย display:none ตั้งแต่แรกใน HTML เหมือน view
-      // อื่นๆ) เพราะเป็นแท็บเริ่มต้นที่ active อยู่แล้วตั้งแต่โหลดหน้า - ตอนโหลดหน้าครั้งแรก .style.display ยัง
-      // เป็นค่าว่าง (ไม่เคยถูก switchTab() มาตั้ง inline style ให้) ไม่ใช่ 'block' ถ้าเช็คแบบ === 'block' เหมือน
-      // view อื่นจะพลาด (import ข้อมูลตั้งแต่หน้าแรกโดยยังไม่เคยกดแท็บ Overview จะไม่ขึ้นอะไรเลย) -> เช็คแค่ว่า
-      // "ไม่ได้ถูกซ่อนไว้" (!== 'none') แทน
-      try { if (document.getElementById('view-overview').style.display !== 'none' && typeof renderDashboardOverview === 'function') { renderDashboardOverview(rawData); } } catch(e) { console.error(e); }
+      processData(filteredData);
 
       try { if (document.getElementById('view-cohort').style.display === 'block' && typeof renderCohortHeatmap === 'function') { renderCohortHeatmap(filteredData, rawData); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-executive2').style.display === 'block' && typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, rawData); } } catch(e) { console.error(e); }
@@ -1125,534 +1211,374 @@
       }
     }
 
-    // ==========================================================================
-    // Dashboard / Overview - พอร์ตมาจากเว็บต้นแบบ Film26/Insinghub (js/dashboard.js
-    // renderDashboardOverview) แทนที่การ์ด/กราฟแบบเดิมทั้งหมด อ่านจาก rawData ตรงๆ ไม่ผ่าน Filter บนสุด
-    // เลย (เหมือนต้นฉบับ) - rawData ถูกจำกัดสิทธิ์ตาม Sales Admin ไว้แล้วตั้งแต่ตอน import
-    // (scopeRowsForCurrentUser) จึงยังถูกต้องตามสิทธิ์อยู่โดยไม่ต้องกรองซ้ำอีกชั้น
-    // ==========================================================================
-    const OV_REVENUE_KEYS = ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน'];
-    const OV_DATE_KEYS = ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่'];
-    const OV_NAME_KEYS = ['CustomerName', 'ชื่อผู้ส่ง', 'Customer ID', 'รหัสลูกค้า'];
-    const OV_PHONE_KEYS = ['Phone', 'เบอร์โทร', 'เบอร์โทรศัพท์'];
-
-    function ovFmtMoney(n) { return '฿' + Math.round(n || 0).toLocaleString(); }
-    function ovPctStr(n, total) { return total > 0 ? ((n / total) * 100).toFixed(1) : '0.0'; }
-    function ovGetRowRevenue(row) {
-      const revStr = getRowValue(row, OV_REVENUE_KEYS) || '0';
-      const rev = parseFloat(revStr.toString().replace(/,/g, ''));
-      return isNaN(rev) ? 0 : rev;
-    }
-    function ovGetCustomerKey(row) {
-      const phone = getRowValue(row, OV_PHONE_KEYS);
-      const name = getRowValue(row, OV_NAME_KEYS);
-      return (phone || name || '').toString().trim().toLowerCase();
+    // เปิด/ปิดข้อความ "ไม่พบข้อมูล" ในหน้า Overview และซ่อน/แสดงการ์ด+กราฟตามสถานะข้อมูลที่ผ่าน Filter
+    function setOverviewEmptyState(isEmpty) {
+      const banner = document.getElementById('overview-empty-state');
+      const cardsGrid = document.querySelector('#view-overview .cards-grid');
+      const chartsGrid = document.querySelector('#view-overview .charts-grid');
+      if (banner) banner.style.display = isEmpty ? 'block' : 'none';
+      if (cardsGrid) cardsGrid.style.display = isEmpty ? 'none' : '';
+      if (chartsGrid) chartsGrid.style.display = isEmpty ? 'none' : '';
     }
 
-    const OV_TIER_ORDER = ['Diamond', 'Platinum', 'Gold', 'Silver', 'Junior'];
-    const OV_TIER_COLORS = { Diamond: '#2a78d6', Platinum: '#4a3aa7', Gold: '#eda100', Silver: '#1baf7a', Junior: '#008300' };
-    const OV_SEGMENT1_ORDER = ['NEW', 'ACTIVE', 'RISK', 'CHURN'];
-    const OV_SEGMENT1_ICON = { NEW: 'fa-star', ACTIVE: 'fa-bolt', RISK: 'fa-triangle-exclamation', CHURN: 'fa-user-slash' };
-    const OV_SEGMENT2_ORDER = ['NEW', 'ACTIVE', 'REFILL', 'RISK', 'CHURN'];
-    const OV_TREND_VISUAL_COLOR_KEYS = { '#dc2626': 'red', '#f97316': 'orange', '#eab308': 'yellow', '#0ea5e9': 'blue', '#16a34a': 'green' };
-    const OV_TREND_VISUAL_META = {
-      red: { hex: '#dc2626', label: 'ยอดซื้อและ Tier ลดลง' },
-      orange: { hex: '#f97316', label: 'ยอดซื้อเพิ่ม แต่ Tier ลดลง' },
-      yellow: { hex: '#eab308', label: 'ยอดซื้อลดลง Tier เท่าเดิม' },
-      blue: { hex: '#0ea5e9', label: 'ยอดซื้อเพิ่ม Tier เท่าเดิม' },
-      green: { hex: '#16a34a', label: 'ยอดซื้อและ Tier เพิ่มขึ้น' }
+    function processData(data) {
+      monthlyData = {};
+      if (!data || data.length === 0) { renderEmpty(); return; }
+      setOverviewEmptyState(false);
+
+      data.forEach(row => {
+        if (!isSaleOrder(row)) return;
+        const id = getCustomerUniqueId(row);
+        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+        const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+        
+        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
+        const admin = getNormalizedAdmin(row);
+        
+        if (!id || !dateStr) return;
+        const d = parseDate(dateStr);
+        if (!d) return;
+        const revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim()) || 0;
+        const mStr = d.str;
+        
+        if (!monthlyData[mStr]) {
+          monthlyData[mStr] = { sales: 0, orders: 0, buyers: new Set(), channels: {}, admins: {}, year: d.y };
+        }
+        let m = monthlyData[mStr];
+        m.sales += revenue;
+        m.orders++;
+        m.buyers.add(id);
+        if (!m.channels[channel]) m.channels[channel] = 0;
+        m.channels[channel] += revenue;
+        if (!m.admins[admin]) m.admins[admin] = 0;
+        m.admins[admin] += revenue;
+      });
+      availableMonths = Object.keys(monthlyData).sort();
+      renderDashboard();
+    }
+
+    const thaiMonths = {
+      '01': 'มกราคม', '02': 'กุมภาพันธ์', '03': 'มีนาคม', '04': 'เมษายน',
+      '05': 'พฤษภาคม', '06': 'มิถุนายน', '07': 'กรกฎาคม', '08': 'สิงหาคม',
+      '09': 'กันยายน', '10': 'ตุลาคม', '11': 'พฤศจิกายน', '12': 'ธันวาคม'
     };
-    const OV_TREND_MONTH_LABELS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
-    // ต่อยอดจาก buildInsightCustomers (insighthub.js) - ให้ตัวเลขลูกค้า/Tier/Segment ตรงกับตาราง
-    // Customer InsightHub เป๊ะๆ เสมอ (คำนวณจุดเดียว ใช้ร่วมกันสองหน้า ตามที่เว็บต้นแบบตั้งใจออกแบบไว้)
-    function ovBuildDashboardAggregates(rawDataForOv) {
-      const { customers, availableYears, today } = buildInsightCustomers(rawDataForOv);
-      const currentYear = availableYears.length ? availableYears[availableYears.length - 1] : today.getFullYear();
-
-      const tierCounts = { Diamond: 0, Platinum: 0, Gold: 0, Silver: 0, Junior: 0 };
-      const segment1Counts = { NEW: 0, ACTIVE: 0, RISK: 0, CHURN: 0 };
-      const segment2Counts = { NEW: 0, ACTIVE: 0, REFILL: 0, RISK: 0, CHURN: 0 };
-
-      customers.forEach(c => {
-        // Tier ปีปัจจุบัน (ไม่ใช่ LTV สะสมตลอดชีพ) เป็นตัวขับ Donut ของหน้านี้ - ตรงกับคอลัมน์
-        // "ยอดซื้อปี {ปีล่าสุด}" ในตาราง Customer InsightHub
-        const currentYearAmount = (c.annualSpending && c.annualSpending[currentYear]) || 0;
-        c.currentYearTier = getAnnualTier(currentYearAmount);
-        if (c.currentYearTier && tierCounts[c.currentYearTier] !== undefined) tierCounts[c.currentYearTier]++;
-        if (segment1Counts[c.segment1] !== undefined) segment1Counts[c.segment1]++;
-        if (segment2Counts[c.segment2] !== undefined) segment2Counts[c.segment2]++;
+    function renderEmpty() {
+      setOverviewEmptyState(true);
+      const titleSalesEl = document.getElementById('title-sales');
+      if (titleSalesEl) titleSalesEl.textContent = 'ยอดขายประจำเดือน';
+      const ids = ['sales','total-cust','active-cust','ytd-sales','ytd-new','new-cust','ret-cust','aov','sph','repeat'];
+      ids.forEach(id => {
+        const el = document.getElementById('val-'+id);
+        if(el) {
+          if (id === 'sales' || id === 'aov' || id === 'sph' || id === 'ytd-sales') el.textContent = '฿0';
+          else if (id === 'active-cust') el.textContent = '0%';
+          else if (id === 'repeat') el.textContent = '0.0 ครั้ง';
+          else el.textContent = '0 คน';
+        }
       });
-
-      return { customers, availableYears, today, currentYear, tierCounts, segment1Counts, segment2Counts, total: customers.length };
+      Object.values(charts).forEach(c => { if(c && c.data) { c.data.labels = []; c.update(); } });
     }
 
-    // เส้นละ 1 Tier จุดละ 1 ปี - จำนวนลูกค้าที่อยู่ Tier นั้นในปีนั้น (ใช้ getAnnualTier กับยอดซื้อของปีนั้นๆ
-    // เกณฑ์เดียวกับทุกจุดในระบบ) ใช้กับกราฟแนวโน้มการเติบโตแต่ละ Tier ที่มี Checkbox กรอง Tier ได้
-    function ovBuildTierGrowthSeries(customers, availableYears) {
-      const series = {};
-      OV_TIER_ORDER.forEach(t => { series[t] = availableYears.map(() => 0); });
-      customers.forEach(c => {
-        availableYears.forEach((y, idx) => {
-          const amt = (c.annualSpending && c.annualSpending[y]) || 0;
-          const tier = getAnnualTier(amt);
-          if (tier) series[tier][idx]++;
+    // ==========================================
+    // 🛠️ ปรับปรุงความแม่นยำในการนับยอดสะสมของลูกค้าในระบบ Dashboard
+    // ==========================================
+    function renderDashboard() {
+      if (availableMonths.length === 0) { renderEmpty(); return; }
+      // เลือก Month แล้วต้องมีข้อมูลจริงของเดือนนั้นเท่านั้น (ตาม Channel/SubChannel/Product/SubProduct/Admin
+      // ที่กรองอยู่ด้วย) ห้ามย้อนไปโชว์ยอดของเดือนก่อนหน้าแทน ไม่งั้นจะดูเหมือนมีข้อมูลทั้งที่เดือนที่เลือกจริงๆ ไม่มี
+      if (filters.Month !== 'All' && !monthlyData[filters.Month]) { renderEmpty(); return; }
+      const selectedMonthStr = filters.Month !== 'All' ? filters.Month : availableMonths[availableMonths.length - 1];
+      const idx = availableMonths.indexOf(selectedMonthStr);
+      const curr = monthlyData[selectedMonthStr];
+      const prev = idx > 0 ? monthlyData[availableMonths[idx - 1]] : null;
+      
+      const currYear = curr.year;
+      let newCount = 0, retCount = 0;
+      curr.buyers.forEach(id => {
+        if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === selectedMonthStr) newCount++;
+        else retCount++;
+      });
+      let prevNew = 0, prevRet = 0, prevSales = 0, prevBuyers = 0, prevAov = 0, prevSph = 0, prevRepeat = 0;
+      if (prev) {
+        prevSales = prev.sales; prevBuyers = prev.buyers.size;
+        prev.buyers.forEach(id => {
+          if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === availableMonths[idx - 1]) prevNew++;
+          else prevRet++;
         });
-      });
-      return series;
-    }
-
-    // "High" priority = ลูกค้าที่ถึงรอบเติมสินค้าแล้ว (segment2 REFILL) - จำนวนที่แอดมินควรทักวันนี้
-    // คาดการณ์รายได้ = รวม AOV ของลูกค้ากลุ่มนี้ (ใช้แทนค่า "ยอดออเดอร์ถัดไป" ที่ไม่มีข้อมูลจริงให้)
-    function ovComputeHighPriorityPrediction(customers) {
-      const highCustomers = customers.filter(c => c.adminPriority.includes('High'));
-      const predictedRevenue = highCustomers.reduce((sum, c) => sum + (c.aov || 0), 0);
-      return { count: highCustomers.length, predictedRevenue };
-    }
-
-    function ovCountTrendVisualColors(customers) {
-      const counts = { red: 0, orange: 0, yellow: 0, blue: 0, green: 0 };
-      customers.forEach(c => {
-        const key = c.trendVisual && OV_TREND_VISUAL_COLOR_KEYS[c.trendVisual.color];
-        if (key) counts[key]++;
-      });
-      return counts;
-    }
-
-    // ยอดขายรายแอดมิน (ชื่อแอดมิน) ใช้ทั้งตัวเลือกแอดมินใน picker และค่าเริ่มต้น (แอดมินที่ทำยอดสูงสุด)
-    function ovBuildAdminStats(rows) {
-      const map = {};
-      rows.forEach(r => {
-        if (!isSaleOrder(r)) return;
-        const admin = getNormalizedAdmin(r);
-        if (!map[admin]) map[admin] = { admin, orders: 0, revenue: 0, customers: new Set() };
-        map[admin].orders += 1;
-        map[admin].revenue += ovGetRowRevenue(r);
-        const key = ovGetCustomerKey(r);
-        if (key) map[admin].customers.add(key);
-      });
-      return Object.values(map)
-        .map(a => ({ admin: a.admin, orders: a.orders, revenue: a.revenue, customers: a.customers.size, aov: a.orders > 0 ? a.revenue / a.orders : 0 }))
-        .sort((a, b) => b.revenue - a.revenue);
-    }
-
-    function ovGetAdminYearRange(rows) {
-      const years = new Set();
-      rows.forEach(r => {
-        if (!isSaleOrder(r)) return;
-        const d = parseDate(getRowValue(r, OV_DATE_KEYS));
-        if (d) years.add(d.y);
-      });
-      return Array.from(years).sort((a, b) => a - b);
-    }
-
-    // yearFilter: ปีที่เจาะจง (ตัวเลข/สตริง) หรือ 'all' = จุดละ 1 ปี (รวมทั้งปี)
-    function ovBuildAdminTrendSeries(rows, adminName, yearFilter) {
-      const filtered = rows.filter(r => isSaleOrder(r) && getNormalizedAdmin(r) === adminName);
-      if (yearFilter === 'all') {
-        const years = ovGetAdminYearRange(rows);
-        const totals = years.map(y => filtered.reduce((sum, r) => {
-          const d = parseDate(getRowValue(r, OV_DATE_KEYS));
-          return d && d.y === y ? sum + ovGetRowRevenue(r) : sum;
-        }, 0));
-        return { labels: years.map(String), data: totals };
+        prevAov = prev.orders > 0 ? prevSales / prev.orders : 0;
+        prevSph = prevBuyers > 0 ? prevSales / prevBuyers : 0;
+        prevRepeat = prevBuyers > 0 ? prev.orders / prevBuyers : 0;
       }
-      const monthTotals = new Array(12).fill(0);
-      filtered.forEach(r => {
-        const d = parseDate(getRowValue(r, OV_DATE_KEYS));
-        if (d && d.y === Number(yearFilter)) monthTotals[d.m - 1] += ovGetRowRevenue(r);
+      let ytdSales = 0, ytdBuyers = new Set(), ytdNew = 0;
+      availableMonths.forEach(m => {
+        if (monthlyData[m].year === currYear && m <= selectedMonthStr) {
+          ytdSales += monthlyData[m].sales;
+          monthlyData[m].buyers.forEach(id => ytdBuyers.add(id));
+          monthlyData[m].buyers.forEach(id => {
+            if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === m) ytdNew++;
+          });
+        }
       });
-      return { labels: OV_TREND_MONTH_LABELS, data: monthTotals };
+
+      // 🔍 ค้นหาจำนวนสะสมลูกค้าจากตัวแปรกรองข้อมูลจริงให้ตรงตามเงื่อนไข
+      let totalEver = new Set();
+      filteredData.forEach(row => {
+        const id = getCustomerUniqueId(row);
+        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+        if (!id || !dateStr) return;
+        const d = parseDate(dateStr);
+        if (d && d.str <= selectedMonthStr) totalEver.add(id);
+      });
+
+      let totalEverPrev = new Set();
+      if (prev) {
+        filteredData.forEach(row => {
+          const id = getCustomerUniqueId(row);
+          const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+          if (!id || !dateStr) return;
+          const d = parseDate(dateStr);
+          if (d && d.str <= availableMonths[idx - 1]) totalEverPrev.add(id);
+        });
+      }
+
+      const totalCust = totalEver.size;
+      const activeCustThisMonth = curr.buyers.size;
+      const activePct = totalCust > 0 ? (activeCustThisMonth / totalCust) : 0;
+      const prevActivePct = (prev && totalEverPrev.size > 0) ? (prevBuyers / totalEverPrev.size) : 0;
+      const aov = curr.orders > 0 ? curr.sales / curr.orders : 0;
+      const sph = activeCustThisMonth > 0 ? curr.sales / activeCustThisMonth : 0;
+      const repeat = activeCustThisMonth > 0 ? curr.orders / activeCustThisMonth : 0;
+      
+      const monthPart = selectedMonthStr.split('-')[1];
+      const monthName = thaiMonths[monthPart] || monthPart;
+      const titleSalesEl = document.getElementById('title-sales');
+      if (titleSalesEl) titleSalesEl.textContent = `ยอดขายประจำเดือน ${monthName}`;
+
+      // เติมค่าสถิติดั้งเดิมลงบนหน้าจอ Dashboard (% เทียบเดือนก่อนหน้า - ของเดิม ไม่แตะต้อง)
+      document.getElementById('val-sales').textContent = formatCurrency(curr.sales);
+      updateChangeUI('change-sales', curr.sales, prevSales);
+      document.getElementById('val-total-cust').textContent = totalCust.toLocaleString() + ' คน';
+      document.getElementById('val-active-cust').textContent = (activePct * 100).toFixed(1) + '%';
+      updateChangeUI('change-active-cust', activePct, prevActivePct);
+      document.getElementById('val-ytd-sales').textContent = formatCurrency(ytdSales);
+      document.getElementById('val-ytd-new').textContent = ytdNew.toLocaleString() + ' คน';
+      document.getElementById('val-new-cust').textContent = newCount.toLocaleString() + ' คน';
+      updateChangeUI('change-new-cust', newCount, prevNew);
+      document.getElementById('val-ret-cust').textContent = retCount.toLocaleString() + ' คน';
+      updateChangeUI('change-ret-cust', retCount, prevRet);
+      document.getElementById('val-aov').textContent = formatCurrency(aov);
+      updateChangeUI('change-aov', aov, prevAov);
+      document.getElementById('val-sph').textContent = formatCurrency(sph);
+      updateChangeUI('change-sph', sph, prevSph);
+      document.getElementById('val-repeat').textContent = repeat.toFixed(2) + ' ครั้ง';
+      updateChangeUI('change-repeat', repeat, prevRepeat);
+
+      // ==========================================
+      // 💡 บรรทัดเปรียบเทียบ % กับเดือนก่อนหน้า (MoM) - เหมือนการ์ดอื่นๆ ด้านล่าง แสดงตลอดเวลา
+      // ไม่ผูกกับปุ่ม KPI Compare อีกต่อไป (ของเดิมสลับความหมาย MoM/KPI บน element เดียวกัน ทำให้
+      // กด KPI แล้วข้อมูล MoM หาย - ตอนนี้แยก badge กด KPI ต่างหาก ดูส่วน kpiTargetList ด้านล่าง)
+      // ==========================================
+      const prevYtdSales = prev ? (ytdSales - curr.sales) : 0;
+      const prevYtdNew = prev ? (ytdNew - newCount) : 0;
+      updateChangeUI('change-ytd-sales', ytdSales, prevYtdSales);
+      updateChangeUI('change-total-cust', totalCust, prev ? totalEverPrev.size : 0);
+      updateChangeUI('change-ytd-new', ytdNew, prevYtdNew);
+
+      // ==========================================
+      // 🎯 badge เทียบเป้าหมาย KPI Setting (มุมล่างขวาของกรอบการ์ด) ควบคุมด้วยปุ่ม KPI Compare
+      // ไม่ยุ่งกับ change-* ตัวเดิมที่โชว์ % เทียบเดือนก่อนหน้าอยู่แล้วด้านบน
+      // ==========================================
+      const monthIdx = parseInt(monthPart, 10) - 1; // 0 = Jan ... 11 = Dec ตรงกับ index ในอาร์เรย์ 12 เดือนของ KPI Setting
+      const kpiData = window.kpiSettingsData || {};
+      const kMonthlySales = kpiData.monthlyOnlineSales || [];
+      const kMonthlyNew = kpiData.monthlyCustomerNew || [];
+      const kMonthlyOld = kpiData.monthlyCustomerOld || [];
+      const kpiAt = (arr, idx) => Number(arr[idx]) || 0;
+
+      // elId ของ badge ใหม่, ค่าจริง, เป้าหมายจาก KPI Setting
+      const kpiTargetList = [
+        ['kpi-target-ytd-sales', ytdSales, kpiData.salesYTD || 0],
+        ['kpi-target-total-cust', totalCust, kpiData.totalCust || 0],
+        ['kpi-target-ytd-new', ytdNew, kpiData.newCustYTD || 0],
+        ['kpi-target-aov', aov, kpiData.aov || 0],
+        ['kpi-target-sales', curr.sales, kpiAt(kMonthlySales, monthIdx)],
+        ['kpi-target-active-cust', activeCustThisMonth, kpiAt(kMonthlyNew, monthIdx) + kpiAt(kMonthlyOld, monthIdx)],
+        ['kpi-target-new-cust', newCount, kpiAt(kMonthlyNew, monthIdx)],
+        ['kpi-target-ret-cust', retCount, kpiAt(kMonthlyOld, monthIdx)],
+        ['kpi-target-sph', sph, kpiData.sph || 0],
+        ['kpi-target-repeat', repeat, kpiData.frequency || 0]
+      ];
+
+      kpiTargetList.forEach(([elId, current, target]) => {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        if (filters.KPI === 'On') {
+          el.style.display = 'inline-flex';
+          updateKpiTargetUI(elId, current, target);
+        } else {
+          el.style.display = 'none';
+        }
+      });
+
+      // --- ชุดโค้ดการจัดการโครงสร้างและข้อมูลของกราฟทำงานปกติ 100% ---
+      const trendMonths = availableMonths.slice(0, idx + 1).slice(-12);
+      const salesData = trendMonths.map(m => monthlyData[m].sales);
+      const newCustArr = [], retCustArr = [];
+      
+      trendMonths.forEach(m => {
+        let n = 0, r = 0;
+        monthlyData[m].buyers.forEach(id => {
+          if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === m) n++; else r++;
+        });
+        newCustArr.push(n); retCustArr.push(r);
+      });
+      
+      if(charts.sales) { charts.sales.data.labels = trendMonths; charts.sales.data.datasets[0].data = salesData; charts.sales.update(); }
+      if(charts.retNew) { charts.retNew.data.labels = trendMonths; charts.retNew.data.datasets[0].data = retCustArr; charts.retNew.data.datasets[1].data = newCustArr; charts.retNew.update(); }
+      if(charts.newCust) { charts.newCust.data.labels = trendMonths; charts.newCust.data.datasets[0].data = newCustArr; charts.newCust.update(); }
+      if(charts.retCust) { charts.retCust.data.labels = trendMonths; charts.retCust.data.datasets[0].data = retCustArr; charts.retCust.update(); }
+      
+      const channelColors = { 'Facebook': '#1877f2', 'Line': '#06c755', 'Instagram': '#1e40af', 'CRM': '#d95f1d', 'Other': '#9ca3af', 'Tiktok': '#ff0050', 'Shopee': '#ff5722', 'Lazada': '#1a1446', 'Call': '#71717a' };
+      const channels = Object.keys(curr.channels).sort((a,b) => curr.channels[b] - curr.channels[a]).slice(0,5);
+      if(charts.channel) {
+        charts.channel.data.labels = channels;
+        charts.channel.data.datasets[0].data = channels.map(c => curr.channels[c]);
+        charts.channel.data.datasets[0].backgroundColor = channels.map(c => channelColors[c] || '#9ca3af');
+        charts.channel.update();
+      }
+      
+      const admins = Object.keys(curr.admins).sort((a,b) => curr.admins[b] - curr.admins[a]).slice(0,5);
+      if(charts.admin) {
+        charts.admin.data.labels = admins;
+        charts.admin.data.datasets[0].data = admins.map(a => curr.admins[a]);
+        charts.admin.update();
+      }
     }
 
-    // Chart ของหน้านี้ถูกสร้างใหม่ทุกครั้งที่ render (container.innerHTML แทนที่ทั้งก้อน ต่างจาก Chart อื่นๆ
-    // ในไฟล์นี้ที่สร้าง canvas ครั้งเดียวตอน initCharts() แล้ว mutate data ทีหลัง) ต้อง destroy ของเก่าก่อนสร้าง
-    // ใหม่เสมอ ไม่งั้น Chart.js จะ error เพราะ canvas element เดิมถูกทิ้งไปแล้วตอน innerHTML เปลี่ยน
-    window.__dashboardCharts = window.__dashboardCharts || {};
-    function ovRenderChartInto(canvasId, config) {
-      const canvas = document.getElementById(canvasId);
-      if (!canvas || typeof Chart === 'undefined') return null;
-      if (window.__dashboardCharts[canvasId]) { window.__dashboardCharts[canvasId].destroy(); }
-      const chart = new Chart(canvas.getContext('2d'), config);
-      window.__dashboardCharts[canvasId] = chart;
-      return chart;
+    // ใช้กับกราฟเส้น "ลูกค้าใหม่ (คน)" / "ลูกค้าเก่า (คน)" เท่านั้น - ทำ area fill ใต้เส้นเป็น gradient
+    // จางลงเรื่อยๆ (ให้ความรู้สึกเทรนด์ ไม่ใช่แท่งทึบ) โดยอิงตามพื้นที่วาดจริงของกราฟ (chartArea) ต้องเป็น
+    // ฟังก์ชัน ไม่ใช่สีคงที่ เพราะ chartArea ยังไม่รู้ขนาดจนกว่าจะ layout เสร็จรอบแรก
+    function hexToRgba(hex, alpha) {
+      const h = hex.replace('#', '');
+      const r = parseInt(h.substring(0, 2), 16), g = parseInt(h.substring(2, 4), 16), b = parseInt(h.substring(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
-
-    // วาดเส้นชี้ + label นอกวงโดนัทให้ชิ้นที่เล็กกว่า threshold ของทั้งหมด (อ่านยากถ้าใส่ label ในชิ้นเล็กๆ)
-    // Chart.js ไม่มี label นอกวงให้ในตัว เลยวาดเองบน canvas หลัง Chart.js วาดวงหลักเสร็จ
-    const ovTierOutlabelsPlugin = {
-      id: 'ovTierOutlabels',
-      afterDraw(chart, args, opts) {
-        if (!opts || !opts.enabled) return;
-        const meta = chart.getDatasetMeta(0);
-        const dataset = chart.data.datasets[0];
-        const total = dataset.data.reduce((a, b) => a + b, 0);
-        if (!total) return;
+    function lineAreaGradient(hex) {
+      return (context) => {
+        const { ctx, chartArea } = context.chart;
+        if (!chartArea) return hexToRgba(hex, 0.15);
+        const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+        gradient.addColorStop(0, hexToRgba(hex, 0.22));
+        gradient.addColorStop(1, hexToRgba(hex, 0));
+        return gradient;
+      };
+    }
+    // เส้นบางๆ ไล่ตามเมาส์ไปที่จุดข้อมูลที่ tooltip กำลังชี้อยู่ (crosshair) ช่วยให้กวาดสายตาลงไปที่แกน X
+    // (เดือน) ได้ตรงจุดง่ายขึ้นเวลาชี้ดูกราฟระหว่างประชุม
+    const crosshairPlugin = {
+      id: 'crosshair',
+      afterDraw(chart) {
+        const active = chart.tooltip && chart.tooltip._active;
+        if (!active || !active.length) return;
+        const { ctx, chartArea } = chart;
+        const x = active[0].element.x;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x, chartArea.top);
+        ctx.lineTo(x, chartArea.bottom);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
+        ctx.stroke();
+        ctx.restore();
+      }
+    };
+    // Label ค่าล่าสุด (เดือนปัจจุบัน) ไว้ที่ปลายเส้นเสมอ ให้เห็นตัวเลขเด่นๆ ได้ทันทีโดยไม่ต้อง hover -
+    // ตาม anti-pattern ห้ามใส่ label ทุกจุด (รก อ่านยาก) จึงใส่แค่จุดสุดท้ายพอ ส่วนจุดอื่นดูผ่าน tooltip
+    const lineEndLabelPlugin = {
+      id: 'lineEndLabel',
+      afterDatasetsDraw(chart) {
+        if (chart.config.type !== 'line') return;
         const { ctx } = chart;
-        meta.data.forEach((arc, i) => {
-          const value = dataset.data[i];
-          if (!value) return;
-          const share = value / total;
-          if (share >= opts.threshold) return;
-          const angle = (arc.startAngle + arc.endAngle) / 2;
-          const cx = arc.x, cy = arc.y;
-          const outerR = arc.outerRadius;
-          const startX = cx + Math.cos(angle) * outerR;
-          const startY = cy + Math.sin(angle) * outerR;
-          const bendR = outerR + 14;
-          const bendX = cx + Math.cos(angle) * bendR;
-          const bendY = cy + Math.sin(angle) * bendR;
-          const isRight = Math.cos(angle) >= 0;
-          const labelX = bendX + (isRight ? 16 : -16);
+        chart.data.datasets.forEach((dataset, i) => {
+          const meta = chart.getDatasetMeta(i);
+          if (meta.hidden || !meta.data.length) return;
+          const lastIndex = dataset.data.length - 1;
+          const point = meta.data[lastIndex];
+          const val = dataset.data[lastIndex];
+          if (!point || val === undefined || val === null) return;
           ctx.save();
-          ctx.strokeStyle = '#c3c2b7';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          ctx.lineTo(bendX, bendY);
-          ctx.lineTo(labelX, bendY);
-          ctx.stroke();
-          ctx.fillStyle = '#334155';
-          ctx.font = '600 11px Inter, sans-serif';
+          ctx.font = '700 12px Inter, sans-serif';
+          ctx.fillStyle = dataset.borderColor;
+          ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
-          ctx.textAlign = isRight ? 'left' : 'right';
-          ctx.fillText(`${chart.data.labels[i]}: ${value} (${(share * 100).toFixed(1)}%)`, labelX + (isRight ? 4 : -4), bendY);
+          ctx.fillText(Number(val).toLocaleString('th-TH'), point.x + 10, point.y);
           ctx.restore();
         });
       }
     };
-    if (typeof Chart !== 'undefined') Chart.register(ovTierOutlabelsPlugin);
 
-    function ovBuildTierDonutConfig(tierCounts, total) {
-      return {
-        type: 'doughnut',
-        data: { labels: OV_TIER_ORDER, datasets: [{ data: OV_TIER_ORDER.map(t => tierCounts[t]), backgroundColor: OV_TIER_ORDER.map(t => OV_TIER_COLORS[t]), borderColor: '#fff', borderWidth: 2 }] },
-        options: {
-          responsive: true, maintainAspectRatio: false, cutout: '62%', layout: { padding: 44 },
-          plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.parsed.toLocaleString()} (${ovPctStr(ctx.parsed, total)}%)` } },
-            ovTierOutlabels: { enabled: true, threshold: 0.05 }
-          }
-        }
-      };
-    }
-
-    function ovBuildTrendLineConfig(series, yearFilter) {
-      return {
-        type: 'line',
-        data: { labels: series.labels, datasets: [{
-          label: yearFilter === 'all' ? 'ยอดขายรายปี' : 'ยอดขายรายเดือน', data: series.data,
-          borderColor: '#d95f1d', backgroundColor: 'rgba(217, 95, 29, 0.12)', pointBackgroundColor: '#d95f1d',
-          pointRadius: 4, pointHoverRadius: 6, borderWidth: 2, tension: 0.3, fill: true
-        }] },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ovFmtMoney(ctx.parsed.y) } } },
-          scales: { y: { beginAtZero: true, ticks: { callback: (v) => ovFmtMoney(v) }, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } }
-        }
-      };
-    }
-
-    function ovBuildTierGrowthChartConfig(tierGrowthSeries, availableYears, selectedTiers) {
-      return {
-        type: 'line',
-        data: { labels: availableYears.map(String), datasets: OV_TIER_ORDER.filter(t => selectedTiers.includes(t)).map(t => ({
-          label: t, data: tierGrowthSeries[t], borderColor: OV_TIER_COLORS[t], backgroundColor: OV_TIER_COLORS[t],
-          pointRadius: 3, pointHoverRadius: 5, borderWidth: 2, tension: 0.3, fill: false
-        })) },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
-            tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()} คน` } }
-          },
-          scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } }
-        }
-      };
-    }
-
-    // สถานะของ picker/checkbox ในหน้านี้ (แอดมินที่เลือกดู, ปีของกราฟเทรนด์, Tier ที่ติ๊กในกราฟเติบโต) -
-    // อยู่นอก renderDashboardOverview เพื่อให้ค้างค่าไว้ข้ามการ re-render (เปลี่ยน filter บนสุด/import ใหม่)
-    window.__ovState = window.__ovState || { selectedAdmin: null, selectedTrendYear: 'all', tierGrowthFilter: OV_TIER_ORDER.slice() };
-
-    function renderDashboardOverview(rawDataForOv) {
-      const container = document.getElementById('view-overview');
-      if (!container) return;
-
-      if (!document.getElementById('dashboard-overview-styles')) {
-        const style = document.createElement('style');
-        style.id = 'dashboard-overview-styles';
-        style.innerHTML = `
-          .ov-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 26px; }
-          @media (max-width: 1100px) { .ov-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
-          @media (max-width: 600px) { .ov-kpi-grid { grid-template-columns: 1fr; } }
-          .ov-kpi-card {
-            display: flex; flex-direction: column; min-height: 108px; background: #fff;
-            border: 1px solid #f0e6df; border-radius: 16px; padding: 18px 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.02); transition: box-shadow 0.15s ease, transform 0.15s ease;
-          }
-          .ov-kpi-card:hover { box-shadow: 0 8px 22px rgba(0,0,0,0.05); transform: translateY(-1px); }
-          .ov-kpi-card .icon {
-            align-self: flex-end; width: 38px; height: 38px; border-radius: 50%; background: #fdf1e6;
-            color: #d95f1d; display: flex; align-items: center; justify-content: center; font-size: 15px; margin-bottom: 12px;
-          }
-          .ov-kpi-card .lbl { font-size: 11.5px; font-weight: 600; color: #7a665e; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; }
-          .ov-kpi-card .val { font-size: 26px; font-weight: 700; color: #0f172a; line-height: 1.2; margin-top: auto; }
-          .ov-kpi-card .pct { font-size: 11.5px; font-weight: 700; color: #d95f1d; margin-top: 4px; }
-
-          .ov-section { background: #fff; border: 1px solid #f0e6df; border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
-          .ov-section h3 { font-size: 14px; font-weight: 700; color: #7a665e; text-transform: uppercase; letter-spacing: 0.4px; margin: 0 0 16px 0; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-          .ov-section-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 16px; }
-          .ov-section-header h3 { margin: 0; border: none; padding: 0; }
-          .ov-select { padding: 7px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: #334155; background: #fff; }
-          .ov-select:disabled { background: #f8fafc; color: #94a3b8; }
-
-          .ov-tier-donut-row { display: flex; align-items: center; gap: 30px; flex-wrap: wrap; }
-          .ov-tier-donut-canvas-wrap { position: relative; width: 260px; height: 260px; flex-shrink: 0; }
-          .ov-tier-legend { flex-grow: 1; min-width: 220px; display: flex; flex-direction: column; gap: 10px; }
-          .ov-tier-legend-row { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #f8fafc; }
-          .ov-tier-legend-row:last-child { border-bottom: none; }
-          .ov-tier-legend-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
-          .ov-tier-legend-name { font-weight: 600; color: #334155; flex-grow: 1; }
-          .ov-tier-legend-count { font-weight: 700; color: #0f172a; }
-          .ov-tier-legend-pct { min-width: 52px; text-align: right; color: #7a665e; font-weight: 600; }
-
-          .ov-tier-filter-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-          .ov-tier-filter-chip {
-            display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px;
-            background: color-mix(in srgb, var(--chip-color) 12%, #fff); border: 1px solid var(--chip-color);
-            color: var(--chip-color); font-size: 12px; font-weight: 700; cursor: pointer; user-select: none;
-          }
-          .ov-tier-filter-chip input { accent-color: var(--chip-color); }
-
-          .ov-trend-chart-wrap { position: relative; height: 280px; }
-          .ov-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-          .ov-table th, .ov-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #f1f5f9; }
-          .ov-table th { color: #64748b; font-weight: 600; font-size: 11.5px; text-transform: uppercase; }
-
-          .ov-locked-note { display: flex; align-items: center; gap: 10px; background: #fff8ec; border: 1px solid #f5d9a8; color: #92600a; border-radius: 10px; padding: 12px 16px; font-size: 12.5px; margin-bottom: 20px; }
-
-          .ov-channel-bar-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; font-size: 13px; }
-          .ov-channel-bar-label { width: 110px; flex-shrink: 0; color: #334155; font-weight: 600; }
-          .ov-channel-bar-track { flex-grow: 1; background: #f1f5f9; border-radius: 6px; height: 10px; overflow: hidden; }
-          .ov-channel-bar-fill { height: 100%; background: linear-gradient(90deg, #f68843, #d95f1d); border-radius: 6px; }
-          .ov-channel-bar-value { width: 130px; flex-shrink: 0; text-align: right; font-weight: 600; color: #0f172a; }
-        `;
-        document.head.appendChild(style);
-      }
-
-      if (!rawDataForOv || rawDataForOv.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">No data loaded. Please import or load sample data.</div>';
-        return;
-      }
-
-      const user = window.currentUser;
-      const isLocked = !!(user && user.role === 'Sales Admin');
-      if (isLocked && !(user.adminName || '').trim()) {
-        container.innerHTML = `
-          <div class="ov-locked-note">
-            <i class="fas fa-triangle-exclamation"></i>
-            บัญชีนี้ (Sales Admin) ยังไม่ได้กำหนดชื่อแอดมิน (Admin Name) กรุณาติดต่อ Super Admin เพื่อตั้งค่าใน Settings ก่อนจึงจะเห็นข้อมูลได้
-          </div>
-        `;
-        return;
-      }
-
-      const saleRows = rawDataForOv.filter(r => isSaleOrder(r));
-      const totalRevenue = saleRows.reduce((sum, r) => sum + ovGetRowRevenue(r), 0);
-      const customerSet = new Set(saleRows.map(ovGetCustomerKey).filter(Boolean));
-      const totalOrders = saleRows.length;
-      const aov = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-      const sph = customerSet.size > 0 ? totalRevenue / customerSet.size : 0;
-
-      const dashAgg = ovBuildDashboardAggregates(rawDataForOv);
-      const currentYear = dashAgg.currentYear;
-
-      const ytdSaleRows = saleRows.filter(r => { const d = parseDate(getRowValue(r, OV_DATE_KEYS)); return d && d.y === currentYear; });
-      const ytdRevenue = ytdSaleRows.reduce((s, r) => s + ovGetRowRevenue(r), 0);
-      const ytdOrders = ytdSaleRows.length;
-      const ytdAov = ytdOrders > 0 ? ytdRevenue / ytdOrders : 0;
-      const ytdCustomerSet = new Set(ytdSaleRows.map(ovGetCustomerKey).filter(Boolean));
-      const ytdSph = ytdCustomerSet.size > 0 ? ytdRevenue / ytdCustomerSet.size : 0;
-      const newCustomersYtd = dashAgg.customers.filter(c => c.firstPurchaseDate && c.firstPurchaseDate.getFullYear() === currentYear).length;
-
-      const subChannelTotals = {};
-      ytdSaleRows.forEach(r => {
-        const std = getRowChannelStd(r);
-        const sub = std.subChannel || 'Other';
-        subChannelTotals[sub] = (subChannelTotals[sub] || 0) + ovGetRowRevenue(r);
-      });
-      const topSubChannels = Object.entries(subChannelTotals).sort((a, b) => b[1] - a[1]).slice(0, 8);
-      const maxSubChannelRevenue = Math.max(1, ...topSubChannels.map(([, v]) => v));
-
-      const adminStats = ovBuildAdminStats(rawDataForOv);
-      const adminOptions = isLocked ? [user.adminName] : adminStats.map(a => a.admin);
-      let selectedAdmin = window.__ovState.selectedAdmin;
-      if (isLocked) selectedAdmin = user.adminName;
-      if (!selectedAdmin || !adminOptions.includes(selectedAdmin)) selectedAdmin = adminOptions[0];
-      window.__ovState.selectedAdmin = selectedAdmin;
-
-      const trendYears = ovGetAdminYearRange(rawDataForOv);
-      let selectedTrendYear = window.__ovState.selectedTrendYear || 'all';
-      if (selectedTrendYear !== 'all' && !trendYears.map(String).includes(String(selectedTrendYear))) selectedTrendYear = 'all';
-      window.__ovState.selectedTrendYear = selectedTrendYear;
-      const adminTrendSeries = selectedAdmin ? ovBuildAdminTrendSeries(rawDataForOv, selectedAdmin, selectedTrendYear) : { labels: [], data: [] };
-
-      const tierGrowthSeries = ovBuildTierGrowthSeries(dashAgg.customers, dashAgg.availableYears);
-      const highPriority = ovComputeHighPriorityPrediction(dashAgg.customers);
-      const trendVisualCounts = ovCountTrendVisualColors(dashAgg.customers);
-
-      container.innerHTML = `
-        <div class="ov-kpi-grid">
-          <div class="ov-kpi-card"><div class="icon"><i class="fas fa-users"></i></div><div class="lbl">Total Customers</div><div class="val">${customerSet.size.toLocaleString()}</div></div>
-          <div class="ov-kpi-card"><div class="icon"><i class="fas fa-receipt"></i></div><div class="lbl">Total Orders</div><div class="val">${totalOrders.toLocaleString()}</div></div>
-          <div class="ov-kpi-card"><div class="icon"><i class="fas fa-sack-dollar"></i></div><div class="lbl">Total Revenue</div><div class="val">${ovFmtMoney(totalRevenue)}</div></div>
-          <div class="ov-kpi-card"><div class="icon"><i class="fas fa-scale-balanced"></i></div><div class="lbl">Avg. Order Value</div><div class="val">${ovFmtMoney(aov)}</div></div>
-          <div class="ov-kpi-card"><div class="icon"><i class="fas fa-hand-holding-dollar"></i></div><div class="lbl">Spending Per Head</div><div class="val">${ovFmtMoney(sph)}</div></div>
-        </div>
-
-        <div class="ov-section">
-          <h3>YTD ${currentYear}</h3>
-          <div class="ov-kpi-grid">
-            <div class="ov-kpi-card"><div class="icon"><i class="fas fa-user-plus"></i></div><div class="lbl">New Customers</div><div class="val">${newCustomersYtd.toLocaleString()}</div></div>
-            <div class="ov-kpi-card"><div class="icon"><i class="fas fa-receipt"></i></div><div class="lbl">YTD Orders</div><div class="val">${ytdOrders.toLocaleString()}</div></div>
-            <div class="ov-kpi-card"><div class="icon"><i class="fas fa-sack-dollar"></i></div><div class="lbl">YTD Revenue</div><div class="val">${ovFmtMoney(ytdRevenue)}</div></div>
-            <div class="ov-kpi-card"><div class="icon"><i class="fas fa-scale-balanced"></i></div><div class="lbl">YTD AOV</div><div class="val">${ovFmtMoney(ytdAov)}</div></div>
-            <div class="ov-kpi-card"><div class="icon"><i class="fas fa-hand-holding-dollar"></i></div><div class="lbl">YTD SPH</div><div class="val">${ovFmtMoney(ytdSph)}</div></div>
-          </div>
-        </div>
-
-        <div class="ov-section">
-          <h3>ยอดขายแยกตาม Sub Channel (ปี ${currentYear})</h3>
-          ${topSubChannels.length === 0
-            ? '<p style="color:#94a3b8; font-size:12.5px;">ไม่มีข้อมูลช่องทางในปีนี้</p>'
-            : topSubChannels.map(([sub, revenue]) => `
-              <div class="ov-channel-bar-row">
-                <div class="ov-channel-bar-label">${escapeHtml(sub)}</div>
-                <div class="ov-channel-bar-track"><div class="ov-channel-bar-fill" style="width:${(revenue / maxSubChannelRevenue) * 100}%"></div></div>
-                <div class="ov-channel-bar-value">${ovFmtMoney(revenue)}</div>
-              </div>
-            `).join('')
-          }
-        </div>
-
-        <div class="ov-section">
-          <h3>สัดส่วน Tier ลูกค้า (ปี ${currentYear})</h3>
-          <div class="ov-tier-donut-row">
-            <div class="ov-tier-donut-canvas-wrap"><canvas id="ov-tier-donut"></canvas></div>
-            <div class="ov-tier-legend">
-              ${OV_TIER_ORDER.map(t => `
-                <div class="ov-tier-legend-row">
-                  <span class="ov-tier-legend-dot" style="background:${OV_TIER_COLORS[t]}"></span>
-                  <span class="ov-tier-legend-name">${t}</span>
-                  <span class="ov-tier-legend-count">${dashAgg.tierCounts[t].toLocaleString()}</span>
-                  <span class="ov-tier-legend-pct">${ovPctStr(dashAgg.tierCounts[t], dashAgg.total)}%</span>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        </div>
-
-        <div class="ov-section">
-          <h3>แนวโน้มการเติบโตแต่ละ Tier</h3>
-          <div class="ov-tier-filter-row">
-            ${OV_TIER_ORDER.map(t => `
-              <label class="ov-tier-filter-chip" style="--chip-color:${OV_TIER_COLORS[t]};">
-                <input type="checkbox" class="ov-tier-growth-filter-chk" value="${t}" ${window.__ovState.tierGrowthFilter.includes(t) ? 'checked' : ''}>
-                ${t}
-              </label>
-            `).join('')}
-          </div>
-          <div class="ov-trend-chart-wrap"><canvas id="ov-tier-growth-chart"></canvas></div>
-        </div>
-
-        <div class="ov-section">
-          <h3>Segment 1 : Standard Period</h3>
-          <div class="ov-kpi-grid">
-            ${OV_SEGMENT1_ORDER.map(seg => `
-              <div class="ov-kpi-card">
-                <div class="icon"><i class="fas ${OV_SEGMENT1_ICON[seg]}"></i></div>
-                <div class="lbl">${seg}</div>
-                <div class="val">${dashAgg.segment1Counts[seg].toLocaleString()}</div>
-                <div class="pct">${ovPctStr(dashAgg.segment1Counts[seg], dashAgg.total)}%</div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <div class="ov-section">
-          <h3>RFM Segment (รอบเติมสินค้ารายบุคคล)</h3>
-          <table class="ov-table">
-            <thead><tr><th>Segment</th><th style="text-align:right;">จำนวนคน</th><th style="text-align:right;">สัดส่วน %</th></tr></thead>
-            <tbody>
-              ${OV_SEGMENT2_ORDER.map(seg => `
-                <tr>
-                  <td style="font-weight:600;">${seg}</td>
-                  <td style="text-align:right;">${dashAgg.segment2Counts[seg].toLocaleString()}</td>
-                  <td style="text-align:right;">${ovPctStr(dashAgg.segment2Counts[seg], dashAgg.total)}%</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-
-        <div class="ov-section">
-          <h3>Admin Priority — High (เงินที่รออยู่)</h3>
-          <p style="color:#94a3b8; font-size:12.5px; margin-top:-8px;">ลูกค้าที่ถึงรอบเติมสินค้า รอแอดมินทักปิดการขาย</p>
-          <div class="ov-kpi-grid">
-            <div class="ov-kpi-card"><div class="icon"><i class="fas fa-fire"></i></div><div class="lbl">จำนวนลูกค้า High</div><div class="val">${highPriority.count.toLocaleString()}</div></div>
-            <div class="ov-kpi-card"><div class="icon"><i class="fas fa-sack-dollar"></i></div><div class="lbl">คาดการณ์รายได้ถ้าปิดได้ทั้งหมด</div><div class="val">${ovFmtMoney(highPriority.predictedRevenue)}</div></div>
-          </div>
-        </div>
-
-        <div class="ov-section">
-          <h3>Trend Visual</h3>
-          <div class="ov-kpi-grid">
-            ${Object.keys(OV_TREND_VISUAL_META).map(key => `
-              <div class="ov-kpi-card">
-                <div class="icon" style="background:${OV_TREND_VISUAL_META[key].hex}22; color:${OV_TREND_VISUAL_META[key].hex};"><i class="fas fa-circle"></i></div>
-                <div class="lbl">${OV_TREND_VISUAL_META[key].label}</div>
-                <div class="val">${trendVisualCounts[key].toLocaleString()}</div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <div class="ov-section">
-          <div class="ov-section-header">
-            <h3>แนวโน้มยอดขายรายแอดมิน (Sales Trend)</h3>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <select id="ov-admin-picker" class="ov-select" ${isLocked ? 'disabled' : ''}>
-                ${adminOptions.map(o => `<option value="${escapeHtml(o)}" ${o === selectedAdmin ? 'selected' : ''}>${o === 'Unknown' ? '(ไม่ระบุ)' : escapeHtml(o)}</option>`).join('')}
-              </select>
-              <select id="ov-trend-year-picker" class="ov-select">
-                <option value="all" ${selectedTrendYear === 'all' ? 'selected' : ''}>รวมทุกปี</option>
-                ${trendYears.map(y => `<option value="${y}" ${String(y) === String(selectedTrendYear) ? 'selected' : ''}>${y}</option>`).join('')}
-              </select>
-            </div>
-          </div>
-          <div class="ov-trend-chart-wrap"><canvas id="ov-admin-trend-chart"></canvas></div>
-        </div>
-      `;
-
-      const adminPicker = document.getElementById('ov-admin-picker');
-      if (adminPicker) adminPicker.addEventListener('change', (e) => { window.__ovState.selectedAdmin = e.target.value; if (window.applyFilters) window.applyFilters(); });
-      const yearPicker = document.getElementById('ov-trend-year-picker');
-      if (yearPicker) yearPicker.addEventListener('change', (e) => { window.__ovState.selectedTrendYear = e.target.value; if (window.applyFilters) window.applyFilters(); });
-      document.querySelectorAll('.ov-tier-growth-filter-chk').forEach(chk => {
-        chk.addEventListener('change', () => {
-          const checked = Array.from(document.querySelectorAll('.ov-tier-growth-filter-chk:checked')).map(c => c.value);
-          window.__ovState.tierGrowthFilter = checked;
-          if (window.applyFilters) window.applyFilters();
+    const datalabelsPlugin = {
+      id: 'datalabels',
+      afterDatasetsDraw(chart, args, options) {
+        const { ctx } = chart; ctx.save();
+        ctx.font = 'bold 10px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        chart.data.datasets.forEach((dataset, i) => {
+          const meta = chart.getDatasetMeta(i);
+          const isHorizontal = chart.config.options.indexAxis === 'y';
+          meta.data.forEach((bar, index) => {
+            const val = dataset.data[index]; if (val === 0 || !val) return;
+            const isSales = chart.canvas.id === 'chart-sales' || chart.canvas.id === 'chart-admin' || chart.canvas.id === 'chart-channel';
+            let displayVal = isSales ? '฿' + val.toLocaleString('th-TH', {minimumFractionDigits: 0, maximumFractionDigits: 0}) : val.toLocaleString('th-TH');
+            let x = bar.x, y = bar.y; ctx.fillStyle = '#ffffff'; 
+            if (chart.config.type === 'doughnut') {
+              const arc = bar; const centerAngle = arc.startAngle + (arc.endAngle - arc.startAngle) / 2; const rangeFromCenter = arc.innerRadius + (arc.outerRadius - arc.innerRadius) / 2;
+              x = arc.x + Math.cos(centerAngle) * rangeFromCenter; y = arc.y + Math.sin(centerAngle) * rangeFromCenter;
+              if (arc.endAngle - arc.startAngle < 0.15) return;
+              ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            } else if (isHorizontal) {
+              const barWidth = bar.x - bar.base;
+              if (barWidth > 45) { x = bar.x - 20; ctx.textAlign = 'right'; } else { x = bar.x + 5; ctx.textAlign = 'left'; ctx.fillStyle = '#333333'; }
+            } else {
+              const barHeight = bar.base - bar.y; const isStacked = chart.config.options.scales?.y?.stacked === true;
+              if (isStacked) { if (barHeight < 14) return; y = bar.y + barHeight / 2; ctx.textBaseline = 'middle'; } 
+              else { if (barHeight > 25) { y = bar.y + barHeight / 2; ctx.textBaseline = 'middle'; } else { y = bar.y - 6; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#333333'; } }
+            }
+            ctx.fillText(displayVal, x, y);
+          });
         });
-      });
+        ctx.restore();
+      }
+    };
 
-      ovRenderChartInto('ov-tier-donut', ovBuildTierDonutConfig(dashAgg.tierCounts, dashAgg.total));
-      ovRenderChartInto('ov-tier-growth-chart', ovBuildTierGrowthChartConfig(tierGrowthSeries, dashAgg.availableYears, window.__ovState.tierGrowthFilter));
-      ovRenderChartInto('ov-admin-trend-chart', ovBuildTrendLineConfig(adminTrendSeries, selectedTrendYear));
+    function initCharts() {
+      Chart.defaults.font.family = 'Inter'; Chart.defaults.color = '#777';
+      const commonOpts = { maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } }, layout: { padding: { top: 25, bottom: 15, left: 20, right: 20 } } };
+      charts.sales = new Chart(document.getElementById('chart-sales'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] }, options: { ...commonOpts, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
+      charts.retNew = new Chart(document.getElementById('chart-ret-new-stacked'), { type: 'bar', data: { labels: [], datasets: [{ label: 'Retained', data: [], backgroundColor: '#006E99' }, { label: 'New', data: [], backgroundColor: '#d95f1d' }] }, options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
+      const lineOpts = () => ({
+        ...commonOpts,
+        layout: { padding: { top: 25, bottom: 15, left: 20, right: 50 } },
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, grid: { color: '#f5f5f5' }, ticks: { precision: 0 } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1e293b', titleColor: '#fff', bodyColor: '#fff',
+            padding: 10, cornerRadius: 8, displayColors: false, titleFont: { weight: '600' },
+            bodyFont: { weight: '700' },
+            callbacks: { label: (item) => Number(item.parsed.y).toLocaleString('th-TH') + ' คน' }
+          }
+        }
+      });
+      charts.newCust = new Chart(document.getElementById('chart-new'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#e86c31', backgroundColor: lineAreaGradient('#e86c31'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#e86c31', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(), plugins: [crosshairPlugin, lineEndLabelPlugin] });
+      charts.retCust = new Chart(document.getElementById('chart-ret'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#006E99', backgroundColor: lineAreaGradient('#006E99'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#006E99', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(), plugins: [crosshairPlugin, lineEndLabelPlugin] });
+      charts.channel = new Chart(document.getElementById('chart-channel'), { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: ['#d95f1d', '#73d18e', '#006E99', '#ccc', '#888'] }] }, options: { ...commonOpts, plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } } }, plugins: [datalabelsPlugin] });
+      charts.admin = new Chart(document.getElementById('chart-admin'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] }, options: { ...commonOpts, indexAxis: 'y', scales: { x: { beginAtZero: true, grid: { color: '#f5f5f5' } }, y: { grid: { display: false } } } }, plugins: [datalabelsPlugin] });
     }
-    window.renderDashboardOverview = renderDashboardOverview;
 
     window.switchTab = switchTab; window.applyFilters = applyFilters; window.setFilter = setFilter; window.clearFilters = clearFilters; window.toggleFilter = toggleFilter;
   </script>
