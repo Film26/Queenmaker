@@ -86,7 +86,7 @@
       
       <ul class="nav-menu">
         <li class="nav-item"><a href="#" class="nav-link active" id="side-crm" onclick="event.preventDefault(); switchTab('overview')"><i class="fas fa-th-large"></i>CRM DASHBOARD</a></li>
-        <li class="nav-item"><a href="dashboard.html?tab=insighthub" class="nav-link" id="side-insight" target="_blank" rel="noopener noreferrer" onclick="prepareInsightHubHandoff()"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" id="side-insight" onclick="event.preventDefault(); switchTab('insighthub')"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-pie"></i>MUSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
@@ -360,22 +360,59 @@
       });
     }
 
-    // --- Inside Hub in a new tab (Task 6) ---
-    // Inside Hub has no separate URL/page of its own - it's the #view-insighthub tab inside
-    // this same file. A brand-new browser tab has no access to this tab's in-memory `rawData`
-    // (and rel="noopener noreferrer" intentionally blocks the new tab from reaching back into
-    // this window to read it), so the currently-loaded dataset is hand off through localStorage
-    // just before the new tab opens, then consumed once and immediately removed - see
-    // restoreInsightHubHandoffIfAny() in the DOMContentLoaded handler below.
-    function prepareInsightHubHandoff() {
+    // --- InsightHub tab: standalone, own data source (Google Sheet via Apps Script) ---
+    // Deliberately NOT the CSV-imported rawData/filteredData above - InsightHub pulls its own
+    // data independently (window.InsightHubApi, public/insighthub-api.js) so it keeps working
+    // regardless of whether/what CSV file is imported for Overview/Executive/Retention/Cohort/
+    // Migration. See google-apps-script/InsightHub-Code.gs for the backend contract.
+    let insightHubRawData = [];
+    let insightHubFilteredData = [];
+    let insightHubLoading = false;
+
+    // Same Sales-Admin scoping idea the rest of the app would apply to CSV data, reimplemented
+    // here directly (rather than depending on a shared helper) since InsightHub's data pipeline
+    // is intentionally independent - only needs window.currentUser + getNormalizedAdmin, both
+    // already available.
+    function scopeInsightHubRows(rows) {
+      const user = window.currentUser;
+      if (!user || user.role !== 'Sales Admin') return rows;
+      const adminName = (user.adminName || '').trim();
+      if (!adminName) return [];
+      return rows.filter(row => getNormalizedAdmin(row) === adminName);
+    }
+
+    async function loadInsightHubDataFromAppsScript() {
+      if (insightHubLoading || !window.InsightHubApi) return;
+      insightHubLoading = true;
+      showLoading(true);
       try {
-        localStorage.setItem('qm_insighthub_handoff', JSON.stringify({ rawData: rawData, savedAt: Date.now() }));
-      } catch (e) {
-        console.error('[InsightHub] Failed to hand off dataset to the new tab:', e);
-        alert('ไม่สามารถส่งข้อมูลไปยังแท็บใหม่ได้ (ข้อมูลอาจมีขนาดใหญ่เกินไปสำหรับ localStorage) กรุณากด Import Data หรือ Load Sample อีกครั้งในแท็บใหม่');
+        const result = await window.InsightHubApi.getOrders();
+        const rows = (result && result.rows) || [];
+        insightHubRawData = scopeInsightHubRows(rows);
+        insightHubFilteredData = insightHubRawData;
+        window.__hubCache = null; // force buildInsightCustomers to recompute against the new array
+        await window.loadInsightHubNotesAndStatusOptions(); // also re-renders on completion (see public/insighthub.js)
+      } catch (err) {
+        console.error('[InsightHub] โหลดข้อมูลไม่สำเร็จ:', err);
+        const container = document.getElementById('view-insighthub');
+        if (container) {
+          container.innerHTML = '<div style="text-align:center; padding:50px; color:#b91c1c;">โหลดข้อมูลไม่สำเร็จ: ' + (err && err.message ? err.message : err) + '</div>';
+        }
+      } finally {
+        insightHubLoading = false;
+        showLoading(false);
       }
     }
-    let monthlyData = {}; 
+    window.loadInsightHubDataFromAppsScript = loadInsightHubDataFromAppsScript;
+
+    // Re-renders InsightHub from its already-loaded data (no re-fetch) - this is what the ported
+    // insighthub.js calls after in-tab interactions (sort/filter/paginate/save note/etc.) instead
+    // of Queenmaker's own applyFilters() (which is for the CSV-driven tabs, a different pipeline).
+    window.refreshInsightHub = function () {
+      if (typeof renderInsightHub === 'function') renderInsightHub(insightHubFilteredData, insightHubRawData);
+    };
+
+    let monthlyData = {};
     let globalFirstPurchase = {}; 
     let availableMonths = [];
     let charts = {};
@@ -410,25 +447,6 @@
     window.addEventListener('DOMContentLoaded', () => {
       checkSessionOrRedirect();
       setInterval(checkSessionOrRedirect, 5 * 60 * 1000);
-
-      // Restore a dataset handed off from the Dashboard tab that opened this one via
-      // "Inside Hub" (see prepareInsightHubHandoff() above), then jump straight to that tab.
-      (function restoreInsightHubHandoffIfAny() {
-        if (new URLSearchParams(window.location.search).get('tab') !== 'insighthub') return;
-        try {
-          const raw = localStorage.getItem('qm_insighthub_handoff');
-          if (!raw) return;
-          localStorage.removeItem('qm_insighthub_handoff');
-          const payload = JSON.parse(raw);
-          if (!payload || !Array.isArray(payload.rawData) || Date.now() - (payload.savedAt || 0) > 5 * 60 * 1000) return;
-          rawData = payload.rawData;
-          precomputeGlobalFirstPurchases();
-          applyFilters();
-          switchTab('insighthub');
-        } catch (e) {
-          console.error('[InsightHub] Failed to restore handed-off dataset:', e);
-        }
-      })();
 
       const importBtn = document.getElementById('importBtn');
       const fileInput = document.getElementById('fileInput');
@@ -519,7 +537,13 @@
         if (mainFiltersBar) mainFiltersBar.style.display = 'none';
         if (execFiltersBar) execFiltersBar.style.display = 'none';
 
-        if (typeof renderInsightHub === 'function') { renderInsightHub(filteredData, rawData); }
+        // Own data source (Google Sheet via Apps Script), not the CSV filteredData/rawData -
+        // load on first open, otherwise just re-render from what's already loaded.
+        if (insightHubRawData.length === 0) {
+          loadInsightHubDataFromAppsScript();
+        } else if (typeof renderInsightHub === 'function') {
+          renderInsightHub(insightHubFilteredData, insightHubRawData);
+        }
       } else if (tabId === 'kpisetting') {
         if (sideKpiSetting) sideKpiSetting.classList.add('active');
         document.getElementById('view-kpisetting').style.display = 'block';
@@ -1194,7 +1218,9 @@
 
       try { if (document.getElementById('view-cohort').style.display === 'block' && typeof renderCohortHeatmap === 'function') { renderCohortHeatmap(filteredData, rawData); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-executive2').style.display === 'block' && typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, rawData); } } catch(e) { console.error(e); }
-      try { if (document.getElementById('view-insighthub').style.display === 'block' && typeof renderInsightHub === 'function') { renderInsightHub(filteredData, rawData); } } catch(e) { console.error(e); }
+      // InsightHub deliberately NOT re-rendered here - it has its own data source (see
+      // loadInsightHubDataFromAppsScript/window.refreshInsightHub above), unrelated to this
+      // CSV-driven filters/rawData pipeline.
       try { if (document.getElementById('view-retention').style.display === 'block' && typeof renderRetention === 'function') { renderRetention(filteredData, rawData); } } catch(e) { console.error(e); }
       // หน้า Executive ใช้ execFilters แยกต่างหาก ไม่ได้อยู่ในลูป filteredData ด้านบน - ถ้าไม่เรียกตรงนี้ด้วย
       // การ Import Data/Load Sample ใหม่ตอนที่ค้างอยู่หน้า Executive อยู่แล้ว จะไม่รีเฟรชข้อมูลเลย (ค้าง
@@ -1585,10 +1611,11 @@
   <script src="cohort.js?v=13"></script>
   <script src="executive.js?v=18"></script>
   <script src="Migration.js?v=15"></script>
-  <script src="insighthub.js?v=15"></script>
+  <script src="insighthub-api.js?v=1"></script>
+  <script src="insighthub.js?v=16"></script>
   <script src="retention.js?v=1"></script>
   <script src="kpisetting.js?v=2"></script>
   <script src="api-client.js?v=1"></script>
-  <script src="settings.js?v=1"></script>
+  <script src="settings.js?v=2"></script>
 </body>
 </html>
