@@ -54,7 +54,9 @@
     }
     url.searchParams.set('action', action);
     Object.keys(params || {}).forEach((key) => {
-      url.searchParams.set(key, params[key]);
+      const value = params[key];
+      if (value === undefined || value === null) return; // avoid sending the literal string "undefined"/"null"
+      url.searchParams.set(key, value);
     });
     // กัน browser cache ตอบ response เก่าซ้ำ (URL เดิมทุก field เหมือนเดิมทุกครั้งที่เรียก
     // เพราะเป็น GET ล้วน - ถ้าไม่กันไว้ กด Refresh แล้วอาจได้ข้อมูลเก่าที่ไม่ตรงกับชีตปัจจุบัน)
