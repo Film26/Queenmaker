@@ -80,7 +80,7 @@
       </button>
       <div class="brand-section">
         <!-- Logo temporarily removed - bring back: <img class="brand-logo" src="./369223.png" alt="QueenMaker Logo" onerror="this.src='https://via.placeholder.com/120x40?text=QueenMaker'"> -->
-        <!-- <h2 class="brand-name">QueenMaker</h2> -->
+        <h2 class="brand-name">QueenMaker</h2>
         <p class="brand-tagline">Your CRM Dashboard</p>
       </div>
       
@@ -481,6 +481,11 @@
                   });
 
                   precomputeGlobalFirstPurchases();
+                  // เรียกตรงๆ ทุกครั้งที่ import (ไม่ใช่แค่ครั้งแรก) เพื่อให้ตัวเลือก Filter ทั้งหมด
+                  // (Year/Month/Channel/SubChannel/Product/SubProduct/Admin) รีเฟรชตามไฟล์ที่ import เข้ามาใหม่เสมอ
+                  // - ถ้าปล่อยให้ applyFilters() ตัดสินใจเอง (เช็คว่า menu-Year ว่างไหม) จะรีเฟรชแค่ตอน import ครั้งแรก
+                  // ครั้งถัดๆ ไปตัวเลือกจะค้างเป็นของไฟล์เก่าทั้งที่ข้อมูลเปลี่ยนไปแล้ว
+                  populateDropdowns();
                   applyFilters();
                 } catch (err) {
                   console.error(err);
@@ -891,15 +896,6 @@
     }
 
     // --- Dropdowns & Filters Logic ---
-    // ตัวเลือกสำรอง ใช้เฉพาะตอนที่ยังไม่มีข้อมูลจากหน้า Settings (window.AppData.config) เท่านั้น
-    // เมื่อหน้า Settings โหลด/บันทึกข้อมูลแล้ว ตัวเลือกจริงจะมาจาก AppData.config เสมอ (ดู refreshOptionDropdownsFromConfig)
-    const FALLBACK_OPTION_LISTS = {
-      Channel: ['Call', 'CRM', 'Facebook', 'Instagram', 'Lazada', 'Line', 'Other', 'Shopee', 'Tiktok'],
-      SubChannel: ['Call', 'CRM', 'Email', 'FB', 'FBC', 'FBD', 'FBG', 'FBH', 'FBH-IG', 'FBK', 'FBM', 'FBP', 'FBP-W', 'FBSS', 'FBW', 'IG', 'IG-FBH', 'IG-FBSS', 'IG-FBW', 'Lazada', 'Line', 'Other', 'PC', 'Shopee', 'Telesale', 'Tiktok', 'Website'],
-      Product: ['Plus', 'Gold', 'Wiss', 'Kides', 'Collagen'],
-      SubProduct: ['Plus', 'Gold', 'Wiss', 'Kides original', 'Kidesส้ม', 'Kides แตงโม', 'Callagen'],
-      Admin: ['May', 'บี', 'มิ้ว', 'แอน', 'แอล']
-    };
     const OPTION_FILTER_TYPES = ['Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'];
 
     // ใช้เช็คสถานะ Active/Disabled ของสินค้า (ตั้งค่าที่หน้า Settings > Product) ก่อนนับเข้า
@@ -911,16 +907,36 @@
       return match ? !!match.active : true;
     }
 
+    // ตัวเลือกใน Filter (Channel/SubChannel/Product/SubProduct/Admin) มาจากข้อมูลที่ import เข้ามาจริง
+    // เท่านั้น (เหมือนกับ Year/Month ที่ populateYearMenu/populateMonthMenu ทำอยู่แล้ว) ไม่ยึดรายชื่อที่ตั้งค่า
+    // ไว้ล่วงหน้าในหน้า Settings หรือ fallback list ที่ hardcode ไว้ - ถ้าข้อมูลไม่มีค่านั้นจริง จะไม่โผล่เป็นตัวเลือก
+    // นับเฉพาะแถวที่เป็นยอดขายจริง (isSaleOrder) กันของแถม/ของขวัญ/เคลมปนเข้ามาเป็นตัวเลือก filter
+    // Product ยังกรอง isProductActive ต่อ เพราะสินค้าที่ถูกปิดใช้งานจากหน้า Settings จะถูกตัดออกจากทุก
+    // KPI/กราฟอยู่แล้ว (ดู isProductActive) เลือกเป็น filter ไปก็ไม่มีข้อมูลให้แสดง
     function getConfigOptionList(type) {
-      const items = window.AppData && window.AppData.config && window.AppData.config[type];
-      if (Array.isArray(items) && items.length > 0) {
-        return items.filter(item => item.active).map(item => item.name);
-      }
-      return FALLBACK_OPTION_LISTS[type] || [];
+      const values = new Set();
+      rawData.forEach(row => {
+        if (!isSaleOrder(row)) return;
+        let val;
+        if (type === 'Channel') {
+          val = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
+        } else if (type === 'SubChannel') {
+          val = getNormalizedSubChannel(row);
+        } else if (type === 'Product' || type === 'SubProduct') {
+          const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
+          val = type === 'Product' ? getNormalizedProduct(rawProductName) : getNormalizedSubProduct(rawProductName);
+        } else if (type === 'Admin') {
+          val = getNormalizedAdmin(row);
+        }
+        if (val) values.add(val);
+      });
+      let list = Array.from(values);
+      if (type === 'Product') list = list.filter(isProductActive);
+      return list.sort();
     }
 
-    // สร้างเมนู Dropdown ของ Channel/SubChannel/Product/SubProduct/Admin ใหม่จาก window.AppData.config
-    // (ไม่แตะ Year/Month) ถ้า filter ที่เลือกค้างไว้ถูกลบ/ปิดใช้งานไปแล้ว จะรีเซ็ตกลับเป็น 'All' ให้อัตโนมัติ
+    // สร้างเมนู Dropdown ของ Channel/SubChannel/Product/SubProduct/Admin ใหม่จากข้อมูลจริงใน rawData
+    // (ไม่แตะ Year/Month) ถ้า filter ที่เลือกค้างไว้ไม่มีอยู่ในข้อมูลแล้ว (ลบ/ปิดใช้งาน/import ข้อมูลชุดใหม่) จะรีเซ็ตกลับเป็น 'All' ให้อัตโนมัติ
     // หมายเหตุ: ฟังก์ชันนี้ไม่เรียก applyFilters() เอง เพื่อกันการเรียกซ้อนกันเป็น infinite loop
     // (ฟังก์ชันนี้ถูกเรียกจากภายใน applyFilters() ผ่าน populateDropdowns() ด้วย) ผู้เรียกที่ต้องการรีเฟรชข้อมูล
     // ต้องเรียก applyFilters() เองอีกทีหลังจากนี้ (ดู appDataChanged listener ด้านล่าง)
