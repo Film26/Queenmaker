@@ -79,14 +79,20 @@
         <i class="fas fa-times"></i>
       </button>
       <div class="brand-section">
-        <img class="brand-logo" src="./369223.png" alt="QueenMaker Logo" onerror="this.src='https://via.placeholder.com/120x40?text=QueenMaker'">
+        <!-- Logo temporarily removed - bring back: <img class="brand-logo" src="./369223.png" alt="QueenMaker Logo" onerror="this.src='https://via.placeholder.com/120x40?text=QueenMaker'"> -->
         <h2 class="brand-name">QueenMaker</h2>
         <p class="brand-tagline">Your CRM Dashboard</p>
       </div>
       
       <ul class="nav-menu">
         <li class="nav-item"><a href="#" class="nav-link active" id="side-crm" onclick="event.preventDefault(); switchTab('overview')"><i class="fas fa-th-large"></i>CRM DASHBOARD</a></li>
-        <li class="nav-item"><a href="#" class="nav-link" id="side-insight" onclick="event.preventDefault(); switchTab('insighthub')"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
+        <!-- Customer InsightHub is its own separate, already-deployed system (insinghub.vercel.app,
+             the Film26/Insinghub reference app itself - has its own Dashboard/Customer InsightHub/
+             Settings) - Queenmaker just links out to it rather than embedding it in-page. The
+             in-page port (public/insighthub.js, public/insighthub-api.js, api/insighthub/config.js,
+             the Settings > InsightHub connection card) is still in the codebase but unused for now
+             in case this decision changes later. -->
+        <li class="nav-item"><a href="https://insinghub.vercel.app" target="_blank" rel="noopener noreferrer" class="nav-link" id="side-insight"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-pie"></i>MUSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
