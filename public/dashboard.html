@@ -826,37 +826,18 @@
       return applySubChannelAlias(cleanSub);
     }
 
-    function getNormalizedProduct(rawProductName) {
-      let p = (rawProductName || '').toString().trim();
-      if (!p) return 'Unknown';
-      let lower = p.toLowerCase();
-
-      if (lower.includes('plus') || lower.includes('พลัส')) return 'Plus';
-      if (lower.includes('gold') || lower.includes('โกลด์')) return 'Gold';
-      if (lower.includes('wiss') || lower.includes('วิสส์')) return 'Wiss';
-      if (lower.includes('kides') || lower.includes('คิดส์')) return 'Kides';
-      if (lower.includes('collagen') || lower.includes('คลอลาเจน') || lower.includes('คอลลาเจน')) return 'Collagen';
-
-      return 'Unknown'; 
+    // Product กับ Sub Product เป็นคนละคอลัมน์แยกกันจริงในไฟล์ที่ import (คอลัมน์ "Product" และ "Product Set")
+    // -> อ่านค่าดิบจากคอลัมน์ของตัวเองตรงๆ ไม่เดา/ตัดคำแยกหมวดหมู่ใดๆ ทั้งสิ้น (เดิมเคยเดาจากคำในชื่อสินค้าแล้ว
+    // บังคับเข้ากลุ่มตายตัวแค่ Plus/Gold/Wiss/Kides/Collagen ทำให้สินค้าที่เพิ่มใหม่ในไฟล์ import ไม่โผล่เป็น
+    // ตัวเลือก filter) ถ้าคอลัมน์ของตัวเองไม่มีข้อมูลจริง ให้ถือเป็น 'Unknown' เฉยๆ ไม่ไปอ่านคอลัมน์อื่นแทน
+    function getNormalizedProduct(row) {
+      const p = getRowValue(row, ['Product', 'ชื่อสินค้า']);
+      return p ? p.toString().trim() : 'Unknown';
     }
-    
-    function getNormalizedSubProduct(rawProductName) {
-      let p = (rawProductName || '').toString().trim();
-      if (!p) return 'Unknown';
-      let lower = p.toLowerCase();
 
-      if (lower.includes('kides') || lower.includes('คิดส์')) {
-        if (lower.includes('ส้ม') || lower.includes('orange')) return 'Kidesส้ม';
-        if (lower.includes('แตงโม') || lower.includes('watermelon')) return 'Kides แตงโม';
-        return 'Kides original';
-      }
-
-      if (lower.includes('plus') || lower.includes('พลัส')) return 'Plus';
-      if (lower.includes('gold') || lower.includes('โกลด์')) return 'Gold';
-      if (lower.includes('wiss') || lower.includes('วิสส์')) return 'Wiss';
-      if (lower.includes('collagen') || lower.includes('คลอลาเจน') || lower.includes('คอลลาเจน')) return 'Callagen'; 
-
-      return 'Unknown';
+    function getNormalizedSubProduct(row) {
+      const p = getRowValue(row, ['Product Set', 'Sub Product', 'SubProduct', 'รายการขาย']);
+      return p ? p.toString().trim() : 'Unknown';
     }
 
     function getNormalizedAdmin(row) {
@@ -868,9 +849,10 @@
         const aStd = ((row['Admin_STD'] !== undefined ? row['Admin_STD'] : row['Admin Name_1']) || '').toString().trim();
         return aStd || 'Unknown';
       }
+      // จับค่าจากคอลัมน์ Admin Name เท่านั้น (ชื่อแอดมิน/Admin/Admin Name) ถ้าคอลัมน์นี้ไม่มีข้อมูลจริง
+      // ให้ถือว่าไม่ทราบชื่อแอดมินไปเลย ไม่เอาคอลัมน์อื่น (เช่น หมายเหตุ/Remark) มาแสดงแทน
       let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
-      if (!val) val = getRowValue(row, ['หมายเหตุ', 'Remark']);
-      
+
       let a = (val || '').toString().trim();
       if (!a) return 'Unknown';
       let lower = a.toLowerCase();
@@ -922,13 +904,16 @@
           val = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
         } else if (type === 'SubChannel') {
           val = getNormalizedSubChannel(row);
-        } else if (type === 'Product' || type === 'SubProduct') {
-          const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
-          val = type === 'Product' ? getNormalizedProduct(rawProductName) : getNormalizedSubProduct(rawProductName);
+        } else if (type === 'Product') {
+          val = getNormalizedProduct(row);
+        } else if (type === 'SubProduct') {
+          val = getNormalizedSubProduct(row);
         } else if (type === 'Admin') {
           val = getNormalizedAdmin(row);
         }
-        if (val) values.add(val);
+        // 'Unknown' คือค่า placeholder ตอนคอลัมน์จริงไม่มีข้อมูล (Product/SubProduct/Admin) ไม่ใช่ค่าจริงจาก
+        // ไฟล์ import จึงไม่เอามาแสดงเป็นตัวเลือก filter (แถวเหล่านี้ยังถูกนับรวมอยู่ตอนเลือก 'All' ตามปกติ)
+        if (val && val !== 'Unknown') values.add(val);
       });
       let list = Array.from(values);
       if (type === 'Product') list = list.filter(isProductActive);
@@ -1209,9 +1194,8 @@
         const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
         const subChannel = getNormalizedSubChannel(row);
 
-        const rawProductName = getRowValue(row, ['ชื่อสินค้า', 'Product', 'รายการขาย', 'Product Set']);
-        const product = getNormalizedProduct(rawProductName);
-        const subProduct = getNormalizedSubProduct(rawProductName);
+        const product = getNormalizedProduct(row);
+        const subProduct = getNormalizedSubProduct(row);
         const admin = getNormalizedAdmin(row);
 
         if (!isProductActive(product)) return false;
@@ -1298,8 +1282,12 @@
         m.buyers.add(id);
         if (!m.channels[channel]) m.channels[channel] = 0;
         m.channels[channel] += revenue;
-        if (!m.admins[admin]) m.admins[admin] = 0;
-        m.admins[admin] += revenue;
+        // แถวที่ไม่มีชื่อแอดมินจริง (admin === 'Unknown') ไม่เอาเข้ากราฟ Admin เลย - ไม่มีคือไม่มี ไม่ต้องมีแท่ง
+        // "Unknown" มาโชว์แทน (ยอดขายรวม/จำนวนออเดอร์ยังนับปกติที่ด้านบน ไม่กระทบ แค่ไม่ผูกกับแอดมินคนไหน)
+        if (admin !== 'Unknown') {
+          if (!m.admins[admin]) m.admins[admin] = 0;
+          m.admins[admin] += revenue;
+        }
       });
       availableMonths = Object.keys(monthlyData).sort();
       renderDashboard();
