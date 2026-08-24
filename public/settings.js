@@ -10,6 +10,52 @@ const SETTINGS_CATEGORIES = [
   { key: 'Admin', label: 'Admin', sub: 'ผู้ดูแลระบบ/แอดมิน', icon: 'fa-user-shield' }
 ];
 
+// Product/SubProduct เป็น "กลุ่ม" ที่ต้อง Mapping กับค่าดิบจากคอลัมน์สินค้าในไฟล์ที่ import เข้ามาจริง
+// (แต่ละ item จะมี rawValues: string[] เพิ่มจากหมวดอื่นๆ ที่เป็นแค่รายชื่อเฉยๆ) ต่างจาก Channel/SubChannel/Admin
+// ซึ่งยังเป็นแค่รายชื่อ dropdown ธรรมดา ไม่มี mapping - เพราะ dashboard.html จับ Channel/SubChannel/Admin จาก
+// คอลัมน์จริงตรงๆ อยู่แล้ว (ดู getNormalizedChannel/getNormalizedSubChannel/getNormalizedAdmin) มีแค่ Product/
+// SubProduct เท่านั้นที่เดิมเคยเดาหมวดหมู่จากคำในชื่อสินค้าแบบ hardcode แล้วผู้ใช้อยากให้เปลี่ยนมาเป็นตั้งค่าเอง
+const STG_MAPPED_CATEGORIES = ['Product', 'SubProduct'];
+function stgIsMappedCategory(category) {
+  return STG_MAPPED_CATEGORIES.indexOf(category) !== -1;
+}
+// คอลัมน์ดิบในไฟล์ import ที่แต่ละหมวด mapping จับข้อมูลมา (ต้องตรงกับ getNormalizedProduct/
+// getNormalizedSubProduct ใน dashboard.html ไม่งั้นค่าดิบที่เห็นในหน้า Settings จะไม่ตรงกับที่ Filter ใช้จริง)
+const STG_RAW_COLUMN_KEYS = {
+  Product: ['Product', 'ชื่อสินค้า'],
+  SubProduct: ['Product Set', 'Sub Product', 'SubProduct', 'รายการขาย']
+};
+
+// ดึงค่าดิบที่พบจริงในข้อมูลที่ import เข้ามา (rawData/getRowValue/isSaleOrder ประกาศอยู่ใน dashboard.html
+// แต่ share scope เดียวกันเพราะโหลดในหน้าเดียวกัน - เช็ค typeof กันพังตอนถูกโหลดในบริบทอื่น)
+function stgGetRawProductValues(category) {
+  const keys = STG_RAW_COLUMN_KEYS[category];
+  if (!keys) return [];
+  const values = new Set();
+  const data = (typeof rawData !== 'undefined') ? rawData : [];
+  data.forEach(row => {
+    if (typeof isSaleOrder === 'function' && !isSaleOrder(row)) return;
+    const v = typeof getRowValue === 'function' ? getRowValue(row, keys) : '';
+    if (v) values.add(v.toString().trim());
+  });
+  return Array.from(values).sort();
+}
+
+// ค่าดิบไหนถูกผูก (map) กับกลุ่มไหนอยู่แล้วบ้าง คืนเป็น { rawValueตัวพิมพ์เล็ก: groupId }
+function stgGetRawValueOwnerMap(category) {
+  const items = window.AppData.config[category] || [];
+  const map = {};
+  items.forEach(item => {
+    (item.rawValues || []).forEach(rv => { map[(rv || '').toString().trim().toLowerCase()] = item.id; });
+  });
+  return map;
+}
+
+function stgGroupNameById(category, id) {
+  const it = (window.AppData.config[category] || []).find(x => x.id === id);
+  return it ? it.name : '';
+}
+
 const SETTINGS_ROLES = ['Super Admin', 'Manager', 'Sales Admin'];
 
 // หน้าที่ (สิทธิ์การเข้าถึง) ของแต่ละ Role — อิงตามสิทธิ์จริงที่ระบบบังคับใช้อยู่ตอนนี้:
@@ -296,6 +342,10 @@ window.stgSwitchMainTab = function(tab) {
 function stgBuildConfigSection() {
   const activeCat = __settingsUi.configTab;
   const items = (window.AppData.config[activeCat] || []);
+  const isMapped = stgIsMappedCategory(activeCat);
+  const rawValues = isMapped ? stgGetRawProductValues(activeCat) : [];
+  const ownerMap = isMapped ? stgGetRawValueOwnerMap(activeCat) : {};
+  const unmapped = isMapped ? rawValues.filter(v => !ownerMap[v.toLowerCase()]) : [];
 
   return `
     <div class="stg-card">
@@ -310,22 +360,28 @@ function stgBuildConfigSection() {
       <div class="stg-section-toolbar">
         <div>
           <h3>${stgCategoryLabel(activeCat)}</h3>
-          <p class="stg-subtitle">${stgCategorySub(activeCat)} • ทั้งหมด ${items.length} รายการ</p>
+          <p class="stg-subtitle">${stgCategorySub(activeCat)} • ทั้งหมด ${items.length} ${isMapped ? 'กลุ่ม' : 'รายการ'}${isMapped ? ` • ตรวจพบข้อมูลดิบจากไฟล์ import ${rawValues.length} รายการ (ยังไม่จัดหมวดหมู่ ${unmapped.length})` : ''}</p>
         </div>
         <button class="stg-btn stg-btn-primary" onclick="stgOpenConfigModal('${activeCat}')">
-          <i class="fas fa-plus"></i> เพิ่มรายการ
+          <i class="fas fa-plus"></i> ${isMapped ? 'เพิ่มกลุ่ม' : 'เพิ่มรายการ'}
         </button>
       </div>
 
       <div class="stg-table-wrapper">
         <table class="stg-table">
           <thead>
-            <tr><th style="text-align:left;">ชื่อรายการ</th><th>สถานะ</th><th style="width:120px;">จัดการ</th></tr>
+            <tr>
+              <th style="text-align:left;">${isMapped ? 'ชื่อกลุ่ม' : 'ชื่อรายการ'}</th>
+              ${isMapped ? '<th style="text-align:left;">ค่าดิบที่ผูกไว้</th>' : ''}
+              <th>สถานะ</th>
+              <th style="width:120px;">จัดการ</th>
+            </tr>
           </thead>
           <tbody>
-            ${items.length === 0 ? `<tr><td colspan="3" class="stg-empty">ยังไม่มีข้อมูล</td></tr>` : items.map(item => `
+            ${items.length === 0 ? `<tr><td colspan="${isMapped ? 4 : 3}" class="stg-empty">ยังไม่มีข้อมูล</td></tr>` : items.map(item => `
               <tr>
                 <td style="text-align:left; font-weight:600;">${stgEscapeHtml(item.name)}</td>
+                ${isMapped ? `<td style="text-align:left;">${(item.rawValues && item.rawValues.length) ? item.rawValues.map(rv => `<span class="stg-chip">${stgEscapeHtml(rv)}</span>`).join(' ') : '<span class="stg-muted">ยังไม่ได้ผูกค่าดิบ</span>'}</td>` : ''}
                 <td>
                   <span class="stg-badge ${item.active ? 'stg-badge-on' : 'stg-badge-off'}" style="cursor:pointer;"
                     title="คลิกเพื่อสลับสถานะ" onclick="stgToggleConfigActive('${activeCat}', '${item.id}')">
@@ -341,9 +397,81 @@ function stgBuildConfigSection() {
           </tbody>
         </table>
       </div>
+
+      ${isMapped ? stgBuildUnmappedPanel(activeCat, unmapped, items) : ''}
     </div>
   `;
 }
+
+// รายการค่าดิบจากไฟล์ import ที่ยังไม่ถูกจัดเข้ากลุ่มไหนเลย - ให้เลือกกลุ่มปลายทางแบบ inline ได้เลยโดยไม่ต้อง
+// เปิด modal ทีละรายการ (เร็วกว่าเวลามีค่าดิบใหม่เยอะๆ หลัง import ไฟล์ใหม่)
+function stgBuildUnmappedPanel(category, unmapped, items) {
+  if (unmapped.length === 0) {
+    return `
+      <div style="margin-top:18px; border-top:1px solid #f0ece6; padding-top:14px;">
+        <p class="stg-subtitle"><i class="fas fa-circle-check" style="color:#198754;"></i> ${items.length === 0 ? 'ยังไม่พบข้อมูลจากไฟล์ import' : 'ค่าดิบจากไฟล์ import ถูกจัดหมวดหมู่ครบแล้ว'}</p>
+      </div>
+    `;
+  }
+  return `
+    <div style="margin-top:18px; border-top:1px solid #f0ece6; padding-top:14px;">
+      <h4 style="margin:0 0 3px; font-size:13.5px; color:#1e293b;">ค่าดิบจากไฟล์ import ที่ยังไม่ได้จัดหมวดหมู่ (${unmapped.length})</h4>
+      <p class="stg-subtitle" style="margin-bottom:10px;">ตรวจจับจากคอลัมน์${category === 'SubProduct' ? ' "Product Set"' : ' "Product"'} ในไฟล์ที่ import ล่าสุด - เลือกกลุ่มที่จะผูกให้แต่ละรายการ ค่าที่ยังไม่ถูกจัดจะแสดงเป็นชื่อดิบตรงๆ ใน Filter หน้า Overview ไปก่อน</p>
+      <div class="stg-table-wrapper">
+        <table class="stg-table">
+          <thead><tr><th style="text-align:left;">ค่าดิบจากไฟล์</th><th style="width:240px;">จัดเข้ากลุ่ม</th></tr></thead>
+          <tbody>
+            ${unmapped.map(rv => `
+              <tr>
+                <td style="text-align:left;">${stgEscapeHtml(rv)}</td>
+                <td>
+                  <select class="stg-input" data-raw="${stgEscapeHtml(rv)}" onchange="stgAssignRawValue('${category}', this)">
+                    <option value="">-- เลือกกลุ่ม --</option>
+                    ${items.map(it => `<option value="${it.id}">${stgEscapeHtml(it.name)}</option>`).join('')}
+                    <option value="__new__">+ สร้างกลุ่มใหม่จากชื่อนี้</option>
+                  </select>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// เลือกกลุ่มปลายทางจาก dropdown ในตารางค่าดิบที่ยังไม่จัดหมวดหมู่ - ผูกค่าดิบนั้นเข้ากลุ่มที่เลือกทันที
+// (หรือสร้างกลุ่มใหม่ถ้าเลือก "+ สร้างกลุ่มใหม่")
+window.stgAssignRawValue = function(category, selectEl) {
+  const rawValue = selectEl.dataset.raw;
+  const choice = selectEl.value;
+  if (!choice) return;
+  const items = (window.AppData.config[category] || []).slice();
+
+  let nextItems;
+  if (choice === '__new__') {
+    const name = prompt('ตั้งชื่อกลุ่มใหม่สำหรับ "' + rawValue + '"', rawValue);
+    if (!name || !name.trim()) { stgSwitchConfigTab(category); return; }
+    nextItems = items.concat([{ id: stgUid(), name: name.trim(), active: true, rawValues: [rawValue] }]);
+  } else {
+    nextItems = items.map(it => {
+      if (it.id !== choice) return it;
+      const rv = (it.rawValues || []).slice();
+      if (rv.indexOf(rawValue) === -1) rv.push(rawValue);
+      return Object.assign({}, it, { rawValues: rv });
+    });
+  }
+
+  settingsApiSaveConfig(category, nextItems).then(() => {
+    window.AppData.config[category] = nextItems;
+    stgSwitchConfigTab(category);
+    stgToast('จัดหมวดหมู่สำเร็จ', 'success');
+    stgNotifyChange('config', { category: category });
+  }).catch(err => {
+    console.error('[Settings] จัดหมวดหมู่ไม่สำเร็จ', err);
+    stgToast('บันทึกไม่สำเร็จ', 'error');
+  });
+};
 
 function stgCategoryLabel(key) {
   const c = SETTINGS_CATEGORIES.find(x => x.key === key);
@@ -363,14 +491,50 @@ window.stgSwitchConfigTab = function(key) {
 window.stgOpenConfigModal = function(category, itemId) {
   const isEdit = !!itemId;
   const item = isEdit ? (window.AppData.config[category] || []).find(x => x.id === itemId) : null;
+  const isMapped = stgIsMappedCategory(category);
 
   document.getElementById('stg-modal-title').textContent = isEdit
-    ? `แก้ไขรายการ - ${stgCategoryLabel(category)}`
-    : `เพิ่มรายการใหม่ - ${stgCategoryLabel(category)}`;
+    ? `แก้ไข${isMapped ? 'กลุ่ม' : 'รายการ'} - ${stgCategoryLabel(category)}`
+    : `เพิ่ม${isMapped ? 'กลุ่ม' : 'รายการ'}ใหม่ - ${stgCategoryLabel(category)}`;
+
+  let mappingHtml = '';
+  if (isMapped) {
+    const allRaw = stgGetRawProductValues(category);
+    const ownerMap = stgGetRawValueOwnerMap(category);
+    const currentRaw = new Set((item && item.rawValues) || []);
+    if (allRaw.length === 0) {
+      mappingHtml = `
+        <div class="stg-form-group">
+          <label>ค่าดิบจากไฟล์ import</label>
+          <p class="stg-subtitle">ยังไม่พบข้อมูลจากไฟล์ import (หรือยังไม่เจอคอลัมน์สินค้า) - import ไฟล์ก่อนแล้วค่อยกลับมาผูกค่าดิบกับกลุ่มนี้</p>
+        </div>
+      `;
+    } else {
+      mappingHtml = `
+        <div class="stg-form-group">
+          <label>ค่าดิบจากไฟล์ import ที่ผูกกับกลุ่มนี้</label>
+          <div class="stg-checklist">
+            ${allRaw.map(rv => {
+              const ownerId = ownerMap[rv.toLowerCase()];
+              const ownedByOther = ownerId && (!item || ownerId !== item.id);
+              const checked = currentRaw.has(rv);
+              return `
+                <label class="stg-checklist-item${ownedByOther ? ' stg-checklist-item-disabled' : ''}">
+                  <input type="checkbox" value="${stgEscapeHtml(rv)}" ${checked ? 'checked' : ''} ${ownedByOther ? 'disabled' : ''} />
+                  <span>${stgEscapeHtml(rv)}</span>
+                  ${ownedByOther ? `<span class="stg-muted"> (อยู่ในกลุ่ม "${stgEscapeHtml(stgGroupNameById(category, ownerId))}" แล้ว)</span>` : ''}
+                </label>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
+  }
 
   document.getElementById('stg-modal-body').innerHTML = `
     <div class="stg-form-group">
-      <label>ชื่อรายการ</label>
+      <label>${isMapped ? 'ชื่อกลุ่ม' : 'ชื่อรายการ'}</label>
       <input type="text" id="stg-config-name" class="stg-input" value="${item ? stgEscapeHtml(item.name) : ''}" placeholder="เช่น Facebook">
     </div>
     <div class="stg-form-group">
@@ -380,6 +544,7 @@ window.stgOpenConfigModal = function(category, itemId) {
         <option value="0" ${item && !item.active ? 'selected' : ''}>Disabled</option>
       </select>
     </div>
+    ${mappingHtml}
   `;
 
   const saveBtn = document.getElementById('stg-modal-save-btn');
@@ -392,12 +557,28 @@ function stgSaveConfigModal(category, itemId) {
   const active = document.getElementById('stg-config-active').value === '1';
   if (!name) { stgToast('กรุณากรอกชื่อรายการ', 'error'); return; }
 
-  const items = (window.AppData.config[category] || []).slice();
+  const isMapped = stgIsMappedCategory(category);
+  const checkedRaw = isMapped
+    ? Array.from(document.querySelectorAll('#stg-modal-body .stg-checklist-item input[type="checkbox"]:checked')).map(el => el.value)
+    : null;
+
+  let items = (window.AppData.config[category] || []).slice();
+  let savingId = itemId;
   if (itemId) {
     const idx = items.findIndex(x => x.id === itemId);
-    if (idx >= 0) items[idx] = Object.assign({}, items[idx], { name, active });
+    if (idx >= 0) items[idx] = Object.assign({}, items[idx], { name, active }, isMapped ? { rawValues: checkedRaw } : {});
   } else {
-    items.push({ id: stgUid(), name, active });
+    savingId = stgUid();
+    items.push(Object.assign({ id: savingId, name, active }, isMapped ? { rawValues: checkedRaw || [] } : {}));
+  }
+
+  // ค่าดิบแต่ละตัวเป็นของกลุ่มเดียวเท่านั้น - ถ้าเพิ่งถูกเลือกให้เข้ากลุ่มนี้ ต้องดึงออกจากกลุ่มอื่นที่เคยผูกไว้ก่อนหน้า
+  if (isMapped && checkedRaw) {
+    items = items.map(it => {
+      if (it.id === savingId) return it;
+      const rv = (it.rawValues || []).filter(v => checkedRaw.indexOf(v) === -1);
+      return rv.length === (it.rawValues || []).length ? it : Object.assign({}, it, { rawValues: rv });
+    });
   }
 
   settingsApiSaveConfig(category, items).then(() => {
@@ -1038,6 +1219,21 @@ function stgInjectStyles() {
     .stg-input:focus { border-color: #1e293b; outline: none; }
     .stg-input:disabled { background: #f8fafc; color: #94a3b8; }
     textarea.stg-input { resize: vertical; line-height: 1.5; }
+
+    .stg-chip {
+      display: inline-block; background: #f1f5f9; color: #334155; padding: 2px 9px; border-radius: 12px;
+      font-size: 11.5px; font-weight: 600; margin: 2px 3px 2px 0;
+    }
+    .stg-muted { color: #94a3b8; font-size: 12px; }
+    .stg-checklist {
+      max-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px;
+    }
+    .stg-checklist-item {
+      display: flex; align-items: center; gap: 8px; padding: 5px 2px; font-size: 12.5px; color: #334155;
+      cursor: pointer;
+    }
+    .stg-checklist-item input[type="checkbox"] { flex-shrink: 0; }
+    .stg-checklist-item-disabled { color: #94a3b8; cursor: default; }
 
     .stg-toast-container {
       position: fixed; top: 20px; right: 20px; z-index: 2000;
