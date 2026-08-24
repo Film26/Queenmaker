@@ -80,7 +80,7 @@
       </button>
       <div class="brand-section">
         <!-- Logo temporarily removed - bring back: <img class="brand-logo" src="./369223.png" alt="QueenMaker Logo" onerror="this.src='https://via.placeholder.com/120x40?text=QueenMaker'"> -->
-       <!-- <h2 class="brand-name">QueenMak</h2> -->
+        <!--<h2 class="brand-name">QueenMaker</h2> -->
         <p class="brand-tagline">Your CRM Dashboard</p>
       </div>
       
@@ -114,7 +114,7 @@
         </div>
 
         <div style="justify-self: center; display: flex; align-items: center; gap: 12px;">
-         <!--  <img src="./369223.png" alt="QueenMaker" style="width: 42px; height: 42px; object-fit: contain; border-radius: 8px;" onerror="this.style.display='none'">
+         <!-- <img src="./369223.png" alt="QueenMaker" style="width: 42px; height: 42px; object-fit: contain; border-radius: 8px;" onerror="this.style.display='none'">
           <span style="font-family:'Outfit', sans-serif; font-size: 26px; font-weight: 700; color: #1e293b; letter-spacing: 0.3px;">QueenMaker</span>
         </div> -->
 
@@ -827,17 +827,32 @@
     }
 
     // Product กับ Sub Product เป็นคนละคอลัมน์แยกกันจริงในไฟล์ที่ import (คอลัมน์ "Product" และ "Product Set")
-    // -> อ่านค่าดิบจากคอลัมน์ของตัวเองตรงๆ ไม่เดา/ตัดคำแยกหมวดหมู่ใดๆ ทั้งสิ้น (เดิมเคยเดาจากคำในชื่อสินค้าแล้ว
-    // บังคับเข้ากลุ่มตายตัวแค่ Plus/Gold/Wiss/Kides/Collagen ทำให้สินค้าที่เพิ่มใหม่ในไฟล์ import ไม่โผล่เป็น
-    // ตัวเลือก filter) ถ้าคอลัมน์ของตัวเองไม่มีข้อมูลจริง ให้ถือเป็น 'Unknown' เฉยๆ ไม่ไปอ่านคอลัมน์อื่นแทน
+    // -> อ่านค่าดิบจากคอลัมน์ของตัวเองตรงๆ ก่อน แล้วจับคู่ (mapping) กับกลุ่มที่ผู้ใช้ตั้งค่าไว้ในหน้า Settings >
+    // Product/Sub Product (window.AppData.config.Product[].rawValues / .SubProduct[].rawValues - ดูฟังก์ชัน
+    // findMappedGroupName) เพื่อโชว์เป็นชื่อกลุ่มใน Filter หน้า Overview แทนชื่อดิบ - ไม่มีการเดา/ตัดคำแยกหมวดหมู่
+    // แบบ hardcode ในโค้ดอีกต่อไป (เดิมเคยเดาจากคำในชื่อสินค้าแล้วบังคับเข้ากลุ่มตายตัวแค่ Plus/Gold/Wiss/Kides/
+    // Collagen ทำให้สินค้าที่เพิ่มใหม่ในไฟล์ import ไม่โผล่เป็นตัวเลือก filter) ถ้าค่าดิบยังไม่ถูกจัดเข้ากลุ่มไหนเลย
+    // (ยังไม่ได้ไป map ในหน้า Settings) ให้โชว์เป็นชื่อดิบนั้นตรงๆ ไปก่อน ไม่ทิ้งข้อมูล ถ้าคอลัมน์ของตัวเองไม่มี
+    // ข้อมูลจริง ให้ถือเป็น 'Unknown' เฉยๆ ไม่ไปอ่านคอลัมน์อื่นแทน
+    function findMappedGroupName(category, rawValue) {
+      if (!rawValue) return '';
+      const items = window.AppData && window.AppData.config && window.AppData.config[category];
+      if (!Array.isArray(items)) return '';
+      const lower = rawValue.toString().trim().toLowerCase();
+      const match = items.find(item => Array.isArray(item.rawValues) && item.rawValues.some(rv => (rv || '').toString().trim().toLowerCase() === lower));
+      return match ? match.name : '';
+    }
+
     function getNormalizedProduct(row) {
       const p = getRowValue(row, ['Product', 'ชื่อสินค้า']);
-      return p ? p.toString().trim() : 'Unknown';
+      if (!p) return 'Unknown';
+      return findMappedGroupName('Product', p) || p.toString().trim();
     }
 
     function getNormalizedSubProduct(row) {
       const p = getRowValue(row, ['Product Set', 'Sub Product', 'SubProduct', 'รายการขาย']);
-      return p ? p.toString().trim() : 'Unknown';
+      if (!p) return 'Unknown';
+      return findMappedGroupName('SubProduct', p) || p.toString().trim();
     }
 
     function getNormalizedAdmin(row) {
