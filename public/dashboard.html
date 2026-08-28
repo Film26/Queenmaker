@@ -230,7 +230,7 @@
             </div>
 
             <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title">AOV (ยอดต่อบิลเฉลี่ย (บาท))</div></div>
+              <div class="kpi-header"><div class="kpi-title" id="title-aov">AOV (ยอดต่อบิลเฉลี่ย (บาท))</div></div>
               <div class="kpi-val" id="val-aov">฿0</div>
               <div><span class="kpi-change-new neutral" id="change-aov">-</span></div>
               <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-aov" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
@@ -258,21 +258,21 @@
             </div>
 
             <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title">Retained Customer (คน)</div></div>
+              <div class="kpi-header"><div class="kpi-title">Old Customer (คน)</div></div>
               <div class="kpi-val" id="val-ret-cust">0</div>
               <div><span class="kpi-change-new neutral" id="change-ret-cust">-</span></div>
               <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ret-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
             </div>
 
             <div class="kpi-card grid-span-2">
-              <div class="kpi-header"><div class="kpi-title">Spending per Head (ยอดเฉลี่ยต่อคน)</div></div>
+              <div class="kpi-header"><div class="kpi-title" id="title-sph">Spending per Head (ยอดเฉลี่ยต่อคน)</div></div>
               <div class="kpi-val" id="val-sph">฿0</div>
               <div><span class="kpi-change-new neutral" id="change-sph">-</span></div>
               <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-sph" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
             </div>
 
             <div class="kpi-card grid-span-2">
-              <div class="kpi-header"><div class="kpi-title">Repeat Purchase</div></div>
+              <div class="kpi-header"><div class="kpi-title" id="title-repeat">Repeat Purchase</div></div>
               <div class="kpi-val" id="val-repeat">0.0 ครั้ง</div>
               <div><span class="kpi-change-new neutral" id="change-repeat">-</span></div>
               <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-repeat" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
@@ -1318,6 +1318,12 @@
       setOverviewEmptyState(true);
       const titleSalesEl = document.getElementById('title-sales');
       if (titleSalesEl) titleSalesEl.textContent = 'ยอดขายประจำเดือน';
+      const titleAovEl = document.getElementById('title-aov');
+      if (titleAovEl) titleAovEl.textContent = 'AOV (ยอดต่อบิลเฉลี่ย (บาท))';
+      const titleSphEl = document.getElementById('title-sph');
+      if (titleSphEl) titleSphEl.textContent = 'Spending per Head (ยอดเฉลี่ยต่อคน)';
+      const titleRepeatEl = document.getElementById('title-repeat');
+      if (titleRepeatEl) titleRepeatEl.textContent = 'Repeat Purchase';
       const ids = ['sales','total-cust','active-cust','ytd-sales','ytd-new','new-cust','ret-cust','aov','sph','repeat'];
       ids.forEach(id => {
         const el = document.getElementById('val-'+id);
@@ -1405,6 +1411,14 @@
       const monthName = thaiMonths[monthPart] || monthPart;
       const titleSalesEl = document.getElementById('title-sales');
       if (titleSalesEl) titleSalesEl.textContent = `ยอดขายประจำเดือน ${monthName}`;
+      // AOV/SPH/Repeat Purchase คำนวณจากเดือนล่าสุดที่เลือกเดือนเดียว (curr) ไม่ใช่ยอดสะสม YTD
+      // เหมือนการ์ด YTD ด้านบน - เติมชื่อเดือนต่อท้ายชื่อการ์ดกันสับสนว่าเป็นค่าสะสมทั้งปี
+      const titleAovEl = document.getElementById('title-aov');
+      if (titleAovEl) titleAovEl.textContent = `AOV (ยอดต่อบิลเฉลี่ย (บาท)) - เดือน ${monthName}`;
+      const titleSphEl = document.getElementById('title-sph');
+      if (titleSphEl) titleSphEl.textContent = `Spending per Head (ยอดเฉลี่ยต่อคน) - เดือน ${monthName}`;
+      const titleRepeatEl = document.getElementById('title-repeat');
+      if (titleRepeatEl) titleRepeatEl.textContent = `Repeat Purchase - เดือน ${monthName}`;
 
       // เติมค่าสถิติดั้งเดิมลงบนหน้าจอ Dashboard (% เทียบเดือนก่อนหน้า - ของเดิม ไม่แตะต้อง)
       document.getElementById('val-sales').textContent = formatCurrency(curr.sales);
