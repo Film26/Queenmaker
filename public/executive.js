@@ -548,8 +548,8 @@ function renderExecutive1(filteredData, rawData) {
   };
   // ลำดับแถวและสีพื้นตามที่พี่มาร์ทคอมเมนต์ไว้: ลำดับ 1-5 (Revenue...Frequency) = พื้นเทาอ่อน,
   // ลำดับ 6-12 (All Customer...% Old Customer) = พื้นเข้มขึ้น (สีเดิมของกลุ่มนี้), ลำดับ 13-15 (Migration group)
-  // = โชว์เฉพาะตอนที่ผู้ใช้กดเลือก Filter ของหน้า Executive เองครบทั้ง 4 ตัว (Year/Channel/SubChannel/Admin)
-  // แล้วเท่านั้น (ดู execFiltersTouched ที่ dashboard.html) ถ้ายังไม่กดเลือกครบ ปล่อยว่างไว้ (ดู showMigrationRows)
+  // = โชว์เฉพาะตอนที่ผู้ใช้กดเลือก Filter ของหน้า Executive เองอย่างน้อย 1 ใน 2 ตัว (Channel หรือ SubChannel)
+  // แล้วเท่านั้น (ดู execFiltersTouched ที่ dashboard.html) ถ้ายังไม่กดเลือกเลยสักตัว ปล่อยว่างไว้ (ดู showMigrationRows)
   // 1
   html += renderRow('Revenue<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ยอดขาย </span>', revArr, true, false, false, 'group-sales exec-tier-light');
   // 2
@@ -576,9 +576,9 @@ function renderExecutive1(filteredData, rawData) {
   html += renderRow('% Old Customer<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">% ลูกค้าเก่า</span>', oldPctArr, false, false, true, 'group-mix exec-tier-dark');
 
   // 13-15 โชว์เฉพาะตอนที่ผู้ใช้กดเลือก Filter ของหน้า Executive เอง (ไม่ใช่ค่าที่ auto-select ให้ตอนเปิดหน้า)
-  // ครบทั้ง 4 ตัว (Year/Channel/SubChannel/Admin) แล้วเท่านั้น - ก่อนหน้านั้นปล่อยว่างไว้
+  // อย่างน้อย 1 ใน 2 ตัว (Channel หรือ SubChannel) - ก่อนหน้านั้นปล่อยว่างไว้
   const touched = window.execFiltersTouched;
-  const showMigrationRows = !!(touched && touched.Year && touched.Channel && touched.SubChannel && touched.Admin);
+  const showMigrationRows = !!(touched && (touched.Channel || touched.SubChannel));
 
   if (showMigrationRows) {
     // 13-14: แถว New to Sub (Migration) / % Migration Rate
