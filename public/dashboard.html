@@ -95,7 +95,7 @@
         <li class="nav-item"><a href="https://insinghub.vercel.app" target="_blank" rel="noopener noreferrer" class="nav-link" id="side-insight"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-pie"></i>MUSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
-        <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" id="side-ai-analytics" onclick="event.preventDefault(); switchTab('ai-analytics')"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-kpisetting" onclick="event.preventDefault(); switchTab('kpisetting')"><i class="fas fa-chart-line"></i>KPI SETTING</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-settings" onclick="event.preventDefault(); switchTab('settings')"><i class="fas fa-cog"></i>SETTINGS</a></li>
         <li class="nav-item" style="margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border-color);">
@@ -134,7 +134,6 @@
           <button id="tab-executive2" class="tab-btn" onclick="switchTab('executive2')">Migration</button>
           <button id="tab-retention" class="tab-btn" onclick="switchTab('retention')">Retention</button>
           <button id="tab-cohort" class="tab-btn" onclick="switchTab('cohort')">Cohort Heatmap</button>
-          <button id="tab-ai-analytics" class="tab-btn" onclick="switchTab('ai-analytics')">AI Analytics</button>
         </div>
         <div class="filters-bar" id="mainFiltersBar">
           <div class="filter-dropdown">
@@ -527,11 +526,23 @@
       if (sideKpiSetting) sideKpiSetting.classList.remove('active');
       const sideSettings = document.getElementById('side-settings');
       if (sideSettings) sideSettings.classList.remove('active');
+      const sideAiAnalytics = document.getElementById('side-ai-analytics');
+      if (sideAiAnalytics) sideAiAnalytics.classList.remove('active');
 
       const mainFiltersBar = document.getElementById('mainFiltersBar');
       const execFiltersBar = document.getElementById('execFiltersBar');
 
-      if (tabId === 'settings') {
+      if (tabId === 'ai-analytics') {
+        if (sideAiAnalytics) sideAiAnalytics.classList.add('active');
+        document.getElementById('view-ai-analytics').style.display = 'block';
+
+        const tabsContainer = document.querySelector('.tabs-container');
+        if (tabsContainer) tabsContainer.style.display = 'none';
+        if (mainFiltersBar) mainFiltersBar.style.display = 'flex';
+        if (execFiltersBar) execFiltersBar.style.display = 'none';
+
+        if (typeof renderAiAnalytics === 'function') { renderAiAnalytics(filteredData, rawData); }
+      } else if (tabId === 'settings') {
         if (sideSettings) sideSettings.classList.add('active');
         document.getElementById('view-settings').style.display = 'block';
 
@@ -597,10 +608,6 @@
           document.getElementById('tab-retention').classList.add('active');
           document.getElementById('view-retention').style.display = 'block';
           if (typeof renderRetention === 'function') { renderRetention(filteredData, rawData); }
-        } else if (tabId === 'ai-analytics') {
-          document.getElementById('tab-ai-analytics').classList.add('active');
-          document.getElementById('view-ai-analytics').style.display = 'block';
-          if (typeof renderAiAnalytics === 'function') { renderAiAnalytics(filteredData, rawData); }
         }
       }
     }
