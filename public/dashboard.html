@@ -134,6 +134,7 @@
           <button id="tab-executive2" class="tab-btn" onclick="switchTab('executive2')">Migration</button>
           <button id="tab-retention" class="tab-btn" onclick="switchTab('retention')">Retention</button>
           <button id="tab-cohort" class="tab-btn" onclick="switchTab('cohort')">Cohort Heatmap</button>
+          <button id="tab-ai-analytics" class="tab-btn" onclick="switchTab('ai-analytics')">AI Analytics</button>
         </div>
         <div class="filters-bar" id="mainFiltersBar">
           <div class="filter-dropdown">
@@ -318,6 +319,7 @@
         <div id="view-executive2" class="view-content" style="display:none; padding: 20px; background-color: #f8f9fa;"></div>
       
         <div id="view-retention" class="view-content" style="display:none; padding: 20px;"></div>
+        <div id="view-ai-analytics" class="view-content" style="display:none; padding: 20px;"></div>
         <div id="view-insighthub" class="view-content" style="display:none; padding: 20px;"></div>
         <div id="view-kpisetting" class="view-content" style="display:none; padding: 20px;"></div>
         <div id="view-settings" class="view-content" style="display:none; padding: 20px;"></div>
@@ -595,6 +597,10 @@
           document.getElementById('tab-retention').classList.add('active');
           document.getElementById('view-retention').style.display = 'block';
           if (typeof renderRetention === 'function') { renderRetention(filteredData, rawData); }
+        } else if (tabId === 'ai-analytics') {
+          document.getElementById('tab-ai-analytics').classList.add('active');
+          document.getElementById('view-ai-analytics').style.display = 'block';
+          if (typeof renderAiAnalytics === 'function') { renderAiAnalytics(filteredData, rawData); }
         }
       }
     }
@@ -980,13 +986,13 @@
     //
     // execFiltersTouched: แยกจาก execFilters เอง - ใช้ตามว่าผู้ใช้ "กดเลือกเอง" (ผ่าน setExecFilter) แล้วหรือยัง
     // ต่างจากค่าที่ auto-select ให้ตอนเปิดหน้าครั้งแรก ใช้คุมว่าแถว 13-15 (Migration group) ในตาราง CRM Report
-    // จะโชว์ข้อมูลจริงเมื่อไหร่ (ต่อเมื่อกดเลือก Year/Channel/SubChannel/Admin เองครบแล้วเท่านั้น) ดู renderExecutive1 ใน executive.js
+    // จะโชว์ข้อมูลจริงเมื่อไหร่ (ต่อเมื่อกดเลือก Channel หรือ SubChannel เองอย่างน้อย 1 ตัว) ดู renderExecutive1 ใน executive.js
     // ==========================================================================
     let execFilters = { Year: '', Month: '', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All' };
     window.execFilters = execFilters;
     const EXEC_OPTION_FILTER_TYPES = ['Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'];
     // หมายเหตุ: มีทุกคีย์ของ execFilters ยกเว้น Month (Month reset ตาม Year เสมออยู่แล้วโดยไม่ต้องพึ่ง touched
-    // ดู populateExecMonthMenu) แถว 13-15 ใน executive.js เช็คแค่ Year/Channel/SubChannel/Admin เท่านั้น
+    // ดู populateExecMonthMenu) แถว 13-15 ใน executive.js เช็คแค่ Channel/SubChannel (อย่างน้อย 1 ตัว) เท่านั้น
     // ส่วน Product/SubProduct เก็บ touched ไว้เพื่อกันไม่ให้ค่าที่ผู้ใช้เลือกเองโดนรีเซ็ตทิ้งตอนเปลี่ยน Year
     // (ดู setExecFilter: EXEC_OPTION_FILTER_TYPES.forEach reset เฉพาะตัวที่ยัง !touched)
     let execFiltersTouched = { Year: false, Channel: false, SubChannel: false, Product: false, SubProduct: false, Admin: false };
@@ -1243,6 +1249,7 @@
       // loadInsightHubDataFromAppsScript/window.refreshInsightHub above), unrelated to this
       // CSV-driven filters/rawData pipeline.
       try { if (document.getElementById('view-retention').style.display === 'block' && typeof renderRetention === 'function') { renderRetention(filteredData, rawData); } } catch(e) { console.error(e); }
+      try { if (document.getElementById('view-ai-analytics').style.display === 'block' && typeof renderAiAnalytics === 'function') { renderAiAnalytics(filteredData, rawData); } } catch(e) { console.error(e); }
       // หน้า Executive ใช้ execFilters แยกต่างหาก ไม่ได้อยู่ในลูป filteredData ด้านบน - ถ้าไม่เรียกตรงนี้ด้วย
       // การ Import Data/Load Sample ใหม่ตอนที่ค้างอยู่หน้า Executive อยู่แล้ว จะไม่รีเฟรชข้อมูลเลย (ค้าง
       // "No data available" ต่อไปจนกว่าจะสลับแท็บออกแล้วกลับเข้ามาใหม่)
@@ -1650,6 +1657,7 @@
   <script src="cohort.js?v=13"></script>
   <script src="executive.js?v=18"></script>
   <script src="Migration.js?v=15"></script>
+  <script src="ai-analytics.js?v=1"></script>
   <script src="insighthub-api.js?v=1"></script>
   <script src="insighthub.js?v=16"></script>
   <script src="retention.js?v=1"></script>
