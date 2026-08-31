@@ -567,11 +567,11 @@ function renderExecutive1(filteredData, rawData) {
   // 8
   html += renderRow('%Active customer<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">% ลูกค้าที่ Active</span>', activePctArr, false, false, true, 'group-customer exec-tier-dark');
   // 9
-  html += renderRow('New Customers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่ (Global)</span>', newGArr, true, false, false, 'group-mix exec-tier-dark');
+  html += renderRow('New Customers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าใหม่</span>', newGArr, true, false, false, 'group-mix exec-tier-dark');
   // 10
   html += renderRow('Old Customers<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">ลูกค้าเก่าซื้อซ้ำ </span>', retArr, true, false, false, 'group-mix exec-tier-dark');
   // 11
-  html += renderRow('% New Customer Share<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">% ลูกค้าใหม่</span>', newGShrArr, false, false, true, 'group-mix exec-tier-dark');
+  html += renderRow('% New Customer Share<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">% แชร์ลูกค้าใหม่</span>', newGShrArr, false, false, true, 'group-mix exec-tier-dark');
   // 12
   html += renderRow('% Old Customer<br><span style="font-size: 11px; font-weight: normal; color: #4b5563;">% ลูกค้าเก่า</span>', oldPctArr, false, false, true, 'group-mix exec-tier-dark');
 
