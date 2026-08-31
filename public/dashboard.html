@@ -56,9 +56,6 @@
     .kpi-change-new.down { color: #dc3545; background: rgba(220,53,69,0.1); }
     .kpi-change-new.neutral { color: #6c757d; background: rgba(108,117,125,0.1); }
 
-    /* badge เทียบเป้าหมาย KPI Setting: ปักไว้มุมล่างขวาของกรอบการ์ด (การ์ดมี position:relative อยู่แล้ว) */
-    .kpi-target-badge { position: absolute; bottom: 14px; right: 16px; }
-    
     .chart-box {
       background: #fff; border-radius: 16px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);
       display: flex; flex-direction: column; height: 360px;
@@ -85,6 +82,13 @@
     .overview-stat-cell:first-child { border-left: none; }
     .overview-stat-label { font-size: 12px; color: #8a8577; margin-bottom: 8px; }
     .overview-stat-value { font-size: 21px; font-weight: 800; color: #1e293b; }
+    .overview-stat-target {
+      font-size: 10.5px; font-weight: 800; margin-top: 6px; display: inline-flex; align-items: center; gap: 3px;
+      padding: 2px 8px; border-radius: 10px;
+    }
+    .overview-stat-target.up { color: #198754; background: rgba(25,135,84,0.1); }
+    .overview-stat-target.down { color: #dc3545; background: rgba(220,53,69,0.1); }
+    .overview-stat-target.neutral { color: #6c757d; background: rgba(108,117,125,0.1); }
     @media (max-width: 1100px) { .overview-stat-row { grid-template-columns: repeat(3, 1fr); row-gap: 16px; } .overview-stat-cell:nth-child(3n+1) { border-left: none; } }
   </style>
 </head>
@@ -231,6 +235,7 @@
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">ลูกค้าทั้งหมด</div>
                   <div class="overview-stat-value" id="val-all-total-cust">0</div>
+                  <span class="overview-stat-target kpi-target-badge" id="kpi-target-all-total-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">ออเดอร์ทั้งหมด</div>
@@ -265,6 +270,7 @@
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">ลูกค้าใหม่ปีนี้</div>
                   <div class="overview-stat-value" id="val-ytd-new">0</div>
+                  <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-new" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">ออเดอร์ YTD</div>
@@ -273,18 +279,22 @@
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">ยอดขาย YTD</div>
                   <div class="overview-stat-value" id="val-ytd-sales">฿0</div>
+                  <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">AOV YTD</div>
                   <div class="overview-stat-value" id="val-ytd-aov">฿0</div>
+                  <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-aov" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">SPH YTD</div>
                   <div class="overview-stat-value" id="val-ytd-sph">฿0</div>
+                  <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-sph" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">Repeat (ครั้ง/หัว)</div>
                   <div class="overview-stat-value" id="val-ytd-repeat">0.00</div>
+                  <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-repeat" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">Repeat Rate %</div>
@@ -652,6 +662,28 @@
       else if (change < 0) { el.className = 'kpi-change-new down'; icon = '<i class="fas fa-arrow-down"></i> '; }
       else { el.className = 'kpi-change-new neutral'; }
       el.innerHTML = icon + el.textContent;
+    }
+
+    // badge เทียบ % กับเป้าหมายจากหน้า KPI Setting (แยกจาก updateChangeUI เดิมที่เทียบเดือนก่อนหน้า) - แปะไว้
+    // ใต้ตัวเลขในแต่ละ cell ของการ์ด "ภาพรวมทั้งหมด"/"สรุปปีล่าสุด (YTD)" ผ่าน class .overview-stat-target
+    // และใช้ป้าย "KPI" แยกให้เห็นว่าเป็นคนละความหมายกับ badge เทียบเดือนก่อนหน้า
+    function updateKpiTargetUI(elId, current, target) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      const kpiLabel = '<span style="font-size:9px; font-weight:800; letter-spacing:0.5px;">KPI</span> ';
+      if (!target || target === 0) {
+        el.innerHTML = kpiLabel + '-';
+        el.className = 'overview-stat-target kpi-target-badge neutral';
+        return;
+      }
+      const change = (current - target) / target;
+      const pct = formatPercent(change);
+
+      let icon = kpiLabel;
+      if (change > 0) { el.className = 'overview-stat-target kpi-target-badge up'; icon += '<i class="fas fa-arrow-up"></i> '; }
+      else if (change < 0) { el.className = 'overview-stat-target kpi-target-badge down'; icon += '<i class="fas fa-arrow-down"></i> '; }
+      else { el.className = 'overview-stat-target kpi-target-badge neutral'; }
+      el.innerHTML = icon + pct;
     }
 
     // --- Data Mapping & Parsing ---
@@ -1190,8 +1222,10 @@
       });
 
       filters['KPI'] = 'Off';
-      document.getElementById('lbl-KPI').textContent = 'Off';
-      document.getElementById('btn-KPI').classList.remove('active');
+      const kpiLbl = document.getElementById('lbl-KPI');
+      if (kpiLbl) kpiLbl.textContent = 'Off';
+      const kpiBtn = document.getElementById('btn-KPI');
+      if (kpiBtn) kpiBtn.classList.remove('active');
       const kpiIcon = document.getElementById('icon-KPI');
       if (kpiIcon) kpiIcon.className = 'fas fa-toggle-off';
 
@@ -1433,6 +1467,30 @@
       document.getElementById('val-all-sph').textContent = formatCurrency(allTime.sph);
       document.getElementById('val-all-repeat').textContent = allTime.repeat.toFixed(2);
       document.getElementById('val-all-repeat-rate').textContent = allTime.repeatRate.toFixed(1) + '%';
+
+      // ==========================================
+      // 🎯 badge เทียบเป้าหมาย KPI Setting (ใต้ตัวเลขในแต่ละ cell) ควบคุมด้วยปุ่ม KPI Compare
+      // ==========================================
+      const kpiData = window.kpiSettingsData || {};
+      const kpiTargetList = [
+        ['kpi-target-all-total-cust', allTime.totalCust, kpiData.totalCust || 0],
+        ['kpi-target-ytd-sales', ytdSales, kpiData.salesYTD || 0],
+        ['kpi-target-ytd-new', ytdNew, kpiData.newCustYTD || 0],
+        ['kpi-target-ytd-aov', ytdAov, kpiData.aov || 0],
+        ['kpi-target-ytd-sph', ytdSph, kpiData.sph || 0],
+        ['kpi-target-ytd-repeat', ytdRepeat, kpiData.frequency || 0]
+      ];
+
+      kpiTargetList.forEach(([elId, current, target]) => {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        if (filters.KPI === 'On') {
+          el.style.display = 'inline-flex';
+          updateKpiTargetUI(elId, current, target);
+        } else {
+          el.style.display = 'none';
+        }
+      });
 
       // --- ชุดโค้ดการจัดการโครงสร้างและข้อมูลของกราฟทำงานปกติ 100% ---
       const trendMonths = availableMonths.slice(0, idx + 1).slice(-12);
