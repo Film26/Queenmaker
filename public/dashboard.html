@@ -69,6 +69,29 @@
     .tabs-container { margin-bottom: 20px; display: flex; gap: 10px; }
     .tab-btn { background-color: #fff; border: 1px solid #ddd; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; color: #555; }
     .tab-btn.active { background-color: #1e293b; border-color: #1e293b; color: #ffffff; }
+
+    /* Overview: ภาพรวมทั้งปี (บนสุด) / เปรียบเทียบ AOV-SPH / รายละเอียดเดือนที่เลือก (ล่าง) */
+    .overview-section-title { font-size: 15px; font-weight: 700; color: #1e293b; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+    .overview-section-title i { color: #d95f1d; font-size: 13px; }
+    .cards-grid-summary { grid-template-columns: repeat(3, 1fr); }
+
+    .ytd-compare-card {
+      background: #fff; border-radius: 16px; padding: 20px 22px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+      margin-bottom: 25px;
+    }
+    .ytd-compare-title { font-size: 13px; font-weight: 700; color: #555; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .ytd-compare-title i { color: #d95f1d; }
+    .ytd-compare-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; padding: 10px 0; border-top: 1px dashed #eee; }
+    .ytd-compare-row:first-of-type { border-top: none; }
+    .ytd-compare-label { font-size: 13px; font-weight: 700; color: #333; width: 170px; flex-shrink: 0; }
+    .ytd-compare-values { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .ytd-compare-current { font-size: 19px; font-weight: 700; color: #111; }
+    .ytd-compare-vs { font-size: 11.5px; color: #999; }
+    .ytd-compare-ytd { font-size: 13px; color: #555; }
+    #sph-compare-insight {
+      font-size: 12.5px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a;
+      border-radius: 8px; padding: 8px 12px; margin-top: 12px; line-height: 1.6;
+    }
   </style>
 </head>
 <body>
@@ -207,75 +230,104 @@
             <i class="fas fa-inbox" style="font-size:32px; display:block; margin-bottom:12px; color:#ccc;"></i>
             ไม่พบข้อมูลตามเงื่อนไข Filter ที่เลือก กรุณาปรับ Filter หรือตรวจสอบข้อมูลที่ Import เข้ามา
           </div>
-          <div class="cards-grid">
-            <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title" id="title-ytd-sales">ยอดขาย YTD (บาท)</div></div>
-              <div class="kpi-val" id="val-ytd-sales">฿0</div>
-              <div><span class="kpi-change-new neutral" id="change-ytd-sales">-</span></div>
-              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ytd-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+          <div class="overview-cards-wrap">
+            <h3 class="overview-section-title"><i class="fas fa-layer-group"></i> ภาพรวมทั้งปี</h3>
+            <div class="cards-grid cards-grid-summary">
+              <div class="kpi-card grid-span-1">
+                <div class="kpi-header"><div class="kpi-title" id="title-ytd-sales">ยอดขาย YTD (บาท)</div></div>
+                <div class="kpi-val" id="val-ytd-sales">฿0</div>
+                <div><span class="kpi-change-new neutral" id="change-ytd-sales">-</span></div>
+                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ytd-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+              </div>
+
+              <div class="kpi-card grid-span-1">
+                <div class="kpi-header"><div class="kpi-title">Total Customer (คน)</div></div>
+                <div class="kpi-val" id="val-total-cust">0</div>
+                <div><span class="kpi-change-new neutral" id="change-total-cust">-</span></div>
+                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-total-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+              </div>
+
+              <div class="kpi-card grid-span-1">
+                <div class="kpi-header"><div class="kpi-title">YTD New Customers (คน)</div></div>
+                <div class="kpi-val" id="val-ytd-new">0</div>
+                <div><span class="kpi-change-new neutral" id="change-ytd-new">-</span></div>
+                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ytd-new" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+              </div>
             </div>
 
-            <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title">Total Customer (คน)</div></div>
-              <div class="kpi-val" id="val-total-cust">0</div>
-              <div><span class="kpi-change-new neutral" id="change-total-cust">-</span></div>
-              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-total-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+            <div class="ytd-compare-card">
+              <div class="ytd-compare-title"><i class="fas fa-scale-balanced"></i> เทียบเดือนที่เลือกกับภาพรวมทั้งปี</div>
+              <div class="ytd-compare-row">
+                <div class="ytd-compare-label">AOV (ยอดต่อบิลเฉลี่ย)</div>
+                <div class="ytd-compare-values">
+                  <span class="ytd-compare-current" id="compare-aov-current">฿0</span>
+                  <span class="ytd-compare-vs">เดือนนี้ vs ภาพรวมทั้งปี</span>
+                  <span class="ytd-compare-ytd" id="compare-aov-ytd">฿0</span>
+                  <span class="kpi-change-new neutral" id="compare-aov-change">-</span>
+                </div>
+              </div>
+              <div class="ytd-compare-row">
+                <div class="ytd-compare-label">Spending per Head</div>
+                <div class="ytd-compare-values">
+                  <span class="ytd-compare-current" id="compare-sph-current">฿0</span>
+                  <span class="ytd-compare-vs">เดือนนี้ vs ภาพรวมทั้งปี</span>
+                  <span class="ytd-compare-ytd" id="compare-sph-ytd">฿0</span>
+                  <span class="kpi-change-new neutral" id="compare-sph-change">-</span>
+                </div>
+              </div>
+              <div id="sph-compare-insight" style="display:none;"></div>
             </div>
 
-            <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title">YTD New Customers (คน)</div></div>
-              <div class="kpi-val" id="val-ytd-new">0</div>
-              <div><span class="kpi-change-new neutral" id="change-ytd-new">-</span></div>
-              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ytd-new" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-            </div>
+            <h3 class="overview-section-title"><i class="fas fa-magnifying-glass-chart"></i> รายละเอียด — เดือนที่เลือก</h3>
+            <div class="cards-grid cards-grid-detail">
+              <div class="kpi-card grid-span-1">
+                <div class="kpi-header"><div class="kpi-title" id="title-sales">ยอดขายประจำเดือน (บาท)</div></div>
+                <div class="kpi-val" id="val-sales">฿0</div>
+                <div><span class="kpi-change-new neutral" id="change-sales">-</span></div>
+                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+              </div>
 
-            <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title" id="title-aov">AOV (ยอดต่อบิลเฉลี่ย (บาท))</div></div>
-              <div class="kpi-val" id="val-aov">฿0</div>
-              <div><span class="kpi-change-new neutral" id="change-aov">-</span></div>
-              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-aov" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-            </div>
+              <div class="kpi-card grid-span-1">
+                <div class="kpi-header"><div class="kpi-title" id="title-aov">AOV (ยอดต่อบิลเฉลี่ย (บาท))</div></div>
+                <div class="kpi-val" id="val-aov">฿0</div>
+                <div><span class="kpi-change-new neutral" id="change-aov">-</span></div>
+                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-aov" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+              </div>
 
-            <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title" id="title-sales">ยอดขายประจำเดือน (บาท)</div></div>
-              <div class="kpi-val" id="val-sales">฿0</div>
-              <div><span class="kpi-change-new neutral" id="change-sales">-</span></div>
-              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-            </div>
+              <div class="kpi-card grid-span-1">
+                <div class="kpi-header"><div class="kpi-title">Active Customer (คน)</div></div>
+                <div class="kpi-val" id="val-active-cust">0%</div>
+                <div><span class="kpi-change-new neutral" id="change-active-cust">-</span></div>
+                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-active-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+              </div>
 
-            <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title">Active Customer (คน)</div></div>
-              <div class="kpi-val" id="val-active-cust">0%</div>
-              <div><span class="kpi-change-new neutral" id="change-active-cust">-</span></div>
-              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-active-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-            </div>
+              <div class="kpi-card grid-span-1">
+                <div class="kpi-header"><div class="kpi-title">New Customer (คน)</div></div>
+                <div class="kpi-val" id="val-new-cust">0</div>
+                <div><span class="kpi-change-new neutral" id="change-new-cust">-</span></div>
+                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-new-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+              </div>
 
-            <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title">New Customer (คน)</div></div>
-              <div class="kpi-val" id="val-new-cust">0</div>
-              <div><span class="kpi-change-new neutral" id="change-new-cust">-</span></div>
-              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-new-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-            </div>
+              <div class="kpi-card grid-span-1">
+                <div class="kpi-header"><div class="kpi-title">Old Customer (คน)</div></div>
+                <div class="kpi-val" id="val-ret-cust">0</div>
+                <div><span class="kpi-change-new neutral" id="change-ret-cust">-</span></div>
+                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ret-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+              </div>
 
-            <div class="kpi-card grid-span-1">
-              <div class="kpi-header"><div class="kpi-title">Old Customer (คน)</div></div>
-              <div class="kpi-val" id="val-ret-cust">0</div>
-              <div><span class="kpi-change-new neutral" id="change-ret-cust">-</span></div>
-              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ret-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-            </div>
+              <div class="kpi-card grid-span-2">
+                <div class="kpi-header"><div class="kpi-title" id="title-sph">Spending per Head (ยอดเฉลี่ยต่อคน)</div></div>
+                <div class="kpi-val" id="val-sph">฿0</div>
+                <div><span class="kpi-change-new neutral" id="change-sph">-</span></div>
+                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-sph" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+              </div>
 
-            <div class="kpi-card grid-span-2">
-              <div class="kpi-header"><div class="kpi-title" id="title-sph">Spending per Head (ยอดเฉลี่ยต่อคน)</div></div>
-              <div class="kpi-val" id="val-sph">฿0</div>
-              <div><span class="kpi-change-new neutral" id="change-sph">-</span></div>
-              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-sph" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-            </div>
-
-            <div class="kpi-card grid-span-2">
-              <div class="kpi-header"><div class="kpi-title" id="title-repeat">Repeat Purchase</div></div>
-              <div class="kpi-val" id="val-repeat">0.0 ครั้ง</div>
-              <div><span class="kpi-change-new neutral" id="change-repeat">-</span></div>
-              <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-repeat" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+              <div class="kpi-card grid-span-2">
+                <div class="kpi-header"><div class="kpi-title" id="title-repeat">Repeat Purchase</div></div>
+                <div class="kpi-val" id="val-repeat">0.0 ครั้ง</div>
+                <div><span class="kpi-change-new neutral" id="change-repeat">-</span></div>
+                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-repeat" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+              </div>
             </div>
           </div>
 
@@ -1275,10 +1327,10 @@
     // เปิด/ปิดข้อความ "ไม่พบข้อมูล" ในหน้า Overview และซ่อน/แสดงการ์ด+กราฟตามสถานะข้อมูลที่ผ่าน Filter
     function setOverviewEmptyState(isEmpty) {
       const banner = document.getElementById('overview-empty-state');
-      const cardsGrid = document.querySelector('#view-overview .cards-grid');
+      const cardsWrap = document.querySelector('#view-overview .overview-cards-wrap');
       const chartsGrid = document.querySelector('#view-overview .charts-grid');
       if (banner) banner.style.display = isEmpty ? 'block' : 'none';
-      if (cardsGrid) cardsGrid.style.display = isEmpty ? 'none' : '';
+      if (cardsWrap) cardsWrap.style.display = isEmpty ? 'none' : '';
       if (chartsGrid) chartsGrid.style.display = isEmpty ? 'none' : '';
     }
 
@@ -1381,16 +1433,20 @@
         prevSph = prevBuyers > 0 ? prevSales / prevBuyers : 0;
         prevRepeat = prevBuyers > 0 ? prev.orders / prevBuyers : 0;
       }
-      let ytdSales = 0, ytdBuyers = new Set(), ytdNew = 0;
+      let ytdSales = 0, ytdOrders = 0, ytdBuyers = new Set(), ytdNew = 0;
       availableMonths.forEach(m => {
         if (monthlyData[m].year === currYear && m <= selectedMonthStr) {
           ytdSales += monthlyData[m].sales;
+          ytdOrders += monthlyData[m].orders;
           monthlyData[m].buyers.forEach(id => ytdBuyers.add(id));
           monthlyData[m].buyers.forEach(id => {
             if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === m) ytdNew++;
           });
         }
       });
+      // ใช้เทียบ AOV/SPH ของเดือนที่เลือกกับภาพรวมทั้งปี (การ์ด "เทียบเดือนที่เลือกกับภาพรวมทั้งปี" ด้านบน)
+      const ytdAov = ytdOrders > 0 ? ytdSales / ytdOrders : 0;
+      const ytdSph = ytdBuyers.size > 0 ? ytdSales / ytdBuyers.size : 0;
 
       // 🔍 ค้นหาจำนวนสะสมลูกค้าจากตัวแปรกรองข้อมูลจริงให้ตรงตามเงื่อนไข
       let totalEver = new Set();
@@ -1452,6 +1508,35 @@
       updateChangeUI('change-sph', sph, prevSph);
       document.getElementById('val-repeat').textContent = repeat.toFixed(2) + ' ครั้ง';
       updateChangeUI('change-repeat', repeat, prevRepeat);
+
+      // ==========================================
+      // 📊 การ์ดเทียบ AOV/SPH ของเดือนที่เลือก กับภาพรวมทั้งปี (ytdAov/ytdSph) - ตัวเลขทั้งหมดมาจาก
+      // ข้อมูลจริงที่คำนวณไว้แล้วด้านบน ไม่มีค่าคาดเดา ถ้า SPH เดือนนี้ต่ำกว่าภาพรวมทั้งปี ให้ชี้สาเหตุที่
+      // เป็นไปได้จากสัดส่วนลูกค้าใหม่เดือนนี้ (ลูกค้าใหม่มักซื้อบิลเล็กกว่าลูกค้าเก่า)
+      // ==========================================
+      document.getElementById('compare-aov-current').textContent = formatCurrency(aov);
+      document.getElementById('compare-aov-ytd').textContent = formatCurrency(ytdAov);
+      updateChangeUI('compare-aov-change', aov, ytdAov);
+
+      document.getElementById('compare-sph-current').textContent = formatCurrency(sph);
+      document.getElementById('compare-sph-ytd').textContent = formatCurrency(ytdSph);
+      updateChangeUI('compare-sph-change', sph, ytdSph);
+
+      const sphInsightEl = document.getElementById('sph-compare-insight');
+      if (sphInsightEl) {
+        if (ytdSph > 0 && sph < ytdSph) {
+          const newRatio = activeCustThisMonth > 0 ? (newCount / activeCustThisMonth) : 0;
+          const dropPct = Math.abs((sph - ytdSph) / ytdSph * 100).toFixed(1);
+          if (newRatio >= 0.3) {
+            sphInsightEl.textContent = `ยอดซื้อต่อหัวลดลง ${dropPct}% เมื่อเทียบกับภาพรวมทั้งปี — เดือนนี้มีสัดส่วนลูกค้าใหม่สูงถึง ${(newRatio * 100).toFixed(0)}% ของลูกค้าที่ซื้อทั้งหมด ซึ่งมักเริ่มต้นด้วยบิลขนาดเล็กกว่าลูกค้าเก่า อาจเป็นสาเหตุหลักที่ทำให้ค่าเฉลี่ยต่อหัวลดลง`;
+          } else {
+            sphInsightEl.textContent = `ยอดซื้อต่อหัวลดลง ${dropPct}% เมื่อเทียบกับภาพรวมทั้งปี`;
+          }
+          sphInsightEl.style.display = 'block';
+        } else {
+          sphInsightEl.style.display = 'none';
+        }
+      }
 
       // ==========================================
       // 💡 บรรทัดเปรียบเทียบ % กับเดือนก่อนหน้า (MoM) - เหมือนการ์ดอื่นๆ ด้านล่าง แสดงตลอดเวลา
