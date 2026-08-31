@@ -293,57 +293,6 @@
               </div>
             </div>
 
-            <h3 class="overview-section-title"><i class="fas fa-magnifying-glass-chart"></i> รายละเอียด — เดือนที่เลือก</h3>
-            <div class="cards-grid cards-grid-detail">
-              <div class="kpi-card grid-span-1">
-                <div class="kpi-header"><div class="kpi-title" id="title-sales">ยอดขายประจำเดือน (บาท)</div></div>
-                <div class="kpi-val" id="val-sales">฿0</div>
-                <div><span class="kpi-change-new neutral" id="change-sales">-</span></div>
-                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
-
-              <div class="kpi-card grid-span-1">
-                <div class="kpi-header"><div class="kpi-title" id="title-aov">AOV (ยอดต่อบิลเฉลี่ย (บาท))</div></div>
-                <div class="kpi-val" id="val-aov">฿0</div>
-                <div><span class="kpi-change-new neutral" id="change-aov">-</span></div>
-                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-aov" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
-
-              <div class="kpi-card grid-span-1">
-                <div class="kpi-header"><div class="kpi-title">Active Customer (คน)</div></div>
-                <div class="kpi-val" id="val-active-cust">0%</div>
-                <div><span class="kpi-change-new neutral" id="change-active-cust">-</span></div>
-                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-active-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
-
-              <div class="kpi-card grid-span-1">
-                <div class="kpi-header"><div class="kpi-title">New Customer (คน)</div></div>
-                <div class="kpi-val" id="val-new-cust">0</div>
-                <div><span class="kpi-change-new neutral" id="change-new-cust">-</span></div>
-                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-new-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
-
-              <div class="kpi-card grid-span-1">
-                <div class="kpi-header"><div class="kpi-title">Old Customer (คน)</div></div>
-                <div class="kpi-val" id="val-ret-cust">0</div>
-                <div><span class="kpi-change-new neutral" id="change-ret-cust">-</span></div>
-                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ret-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
-
-              <div class="kpi-card grid-span-2">
-                <div class="kpi-header"><div class="kpi-title" id="title-sph">Spending per Head (ยอดเฉลี่ยต่อคน)</div></div>
-                <div class="kpi-val" id="val-sph">฿0</div>
-                <div><span class="kpi-change-new neutral" id="change-sph">-</span></div>
-                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-sph" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
-
-              <div class="kpi-card grid-span-2">
-                <div class="kpi-header"><div class="kpi-title" id="title-repeat">Repeat Purchase</div></div>
-                <div class="kpi-val" id="val-repeat">0.0 ครั้ง</div>
-                <div><span class="kpi-change-new neutral" id="change-repeat">-</span></div>
-                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-repeat" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
-            </div>
           </div>
 
           <div class="charts-grid">
@@ -703,27 +652,6 @@
       else if (change < 0) { el.className = 'kpi-change-new down'; icon = '<i class="fas fa-arrow-down"></i> '; }
       else { el.className = 'kpi-change-new neutral'; }
       el.innerHTML = icon + el.textContent;
-    }
-
-    // badge ใหม่สำหรับเทียบ % กับเป้าหมายจากหน้า KPI Setting (แยกจาก updateChangeUI เดิมที่เทียบเดือนก่อนหน้า)
-    // ปักไว้มุมล่างขวาของกรอบการ์ด (ผ่าน class .kpi-target-badge) และใช้ป้าย "KPI" แยกให้เห็นว่าเป็นคนละความหมายกับ badge เดิม
-    function updateKpiTargetUI(elId, current, target) {
-      const el = document.getElementById(elId);
-      if (!el) return;
-      const kpiLabel = '<span style="font-size:9px; font-weight:800; letter-spacing:0.5px;">KPI</span> ';
-      if (!target || target === 0) {
-        el.innerHTML = kpiLabel + '-';
-        el.className = 'kpi-change-new neutral kpi-target-badge';
-        return;
-      }
-      const change = (current - target) / target;
-      const pct = formatPercent(change);
-
-      let icon = kpiLabel;
-      if (change > 0) { el.className = 'kpi-change-new up kpi-target-badge'; icon += '<i class="fas fa-arrow-up"></i> '; }
-      else if (change < 0) { el.className = 'kpi-change-new down kpi-target-badge'; icon += '<i class="fas fa-arrow-down"></i> '; }
-      else { el.className = 'kpi-change-new neutral kpi-target-badge'; }
-      el.innerHTML = icon + pct;
     }
 
     // --- Data Mapping & Parsing ---
@@ -1397,24 +1325,14 @@
 
     function renderEmpty() {
       setOverviewEmptyState(true);
-      const titleSalesEl = document.getElementById('title-sales');
-      if (titleSalesEl) titleSalesEl.textContent = 'ยอดขายประจำเดือน';
-      const titleAovEl = document.getElementById('title-aov');
-      if (titleAovEl) titleAovEl.textContent = 'AOV (ยอดต่อบิลเฉลี่ย (บาท))';
-      const titleSphEl = document.getElementById('title-sph');
-      if (titleSphEl) titleSphEl.textContent = 'Spending per Head (ยอดเฉลี่ยต่อคน)';
-      const titleRepeatEl = document.getElementById('title-repeat');
-      if (titleRepeatEl) titleRepeatEl.textContent = 'Repeat Purchase';
-      const ids = ['sales','total-cust','active-cust','ytd-sales','ytd-new','new-cust','ret-cust','aov','sph','repeat'];
-      ids.forEach(id => {
-        const el = document.getElementById('val-'+id);
-        if(el) {
-          if (id === 'sales' || id === 'aov' || id === 'sph' || id === 'ytd-sales') el.textContent = '฿0';
-          else if (id === 'active-cust') el.textContent = '0%';
-          else if (id === 'repeat') el.textContent = '0.0 ครั้ง';
-          else el.textContent = '0 คน';
-        }
-      });
+      const currencyIds = ['all-sales', 'all-aov', 'all-sph', 'ytd-sales', 'ytd-aov', 'ytd-sph'];
+      const countIds = ['all-total-cust', 'all-total-orders', 'ytd-new', 'ytd-orders'];
+      const decimalIds = ['all-repeat', 'ytd-repeat'];
+      const percentIds = ['all-repeat-rate', 'ytd-repeat-rate'];
+      currencyIds.forEach(id => { const el = document.getElementById('val-' + id); if (el) el.textContent = '฿0'; });
+      countIds.forEach(id => { const el = document.getElementById('val-' + id); if (el) el.textContent = '0'; });
+      decimalIds.forEach(id => { const el = document.getElementById('val-' + id); if (el) el.textContent = '0.00'; });
+      percentIds.forEach(id => { const el = document.getElementById('val-' + id); if (el) el.textContent = '0%'; });
       Object.values(charts).forEach(c => { if(c && c.data) { c.data.labels = []; c.update(); } });
     }
 
@@ -1460,25 +1378,7 @@
       const selectedMonthStr = filters.Month !== 'All' ? filters.Month : availableMonths[availableMonths.length - 1];
       const idx = availableMonths.indexOf(selectedMonthStr);
       const curr = monthlyData[selectedMonthStr];
-      const prev = idx > 0 ? monthlyData[availableMonths[idx - 1]] : null;
-      
       const currYear = curr.year;
-      let newCount = 0, retCount = 0;
-      curr.buyers.forEach(id => {
-        if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === selectedMonthStr) newCount++;
-        else retCount++;
-      });
-      let prevNew = 0, prevRet = 0, prevSales = 0, prevBuyers = 0, prevAov = 0, prevSph = 0, prevRepeat = 0;
-      if (prev) {
-        prevSales = prev.sales; prevBuyers = prev.buyers.size;
-        prev.buyers.forEach(id => {
-          if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === availableMonths[idx - 1]) prevNew++;
-          else prevRet++;
-        });
-        prevAov = prev.orders > 0 ? prevSales / prev.orders : 0;
-        prevSph = prevBuyers > 0 ? prevSales / prevBuyers : 0;
-        prevRepeat = prevBuyers > 0 ? prev.orders / prevBuyers : 0;
-      }
       let ytdSales = 0, ytdOrders = 0, ytdBuyers = new Set(), ytdNew = 0;
       availableMonths.forEach(m => {
         if (monthlyData[m].year === currYear && m <= selectedMonthStr) {
@@ -1508,73 +1408,15 @@
       ytdBuyerOrderCounts.forEach(c => { if (c >= 2) ytdRepeatBuyers++; });
       const ytdRepeatRate = ytdBuyers.size > 0 ? (ytdRepeatBuyers / ytdBuyers.size) * 100 : 0;
 
-      // 🔍 ค้นหาจำนวนสะสมลูกค้าจากตัวแปรกรองข้อมูลจริงให้ตรงตามเงื่อนไข
-      let totalEver = new Set();
-      filteredData.forEach(row => {
-        const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-        if (!id || !dateStr) return;
-        const d = parseDate(dateStr);
-        if (d && d.str <= selectedMonthStr) totalEver.add(id);
-      });
-
-      let totalEverPrev = new Set();
-      if (prev) {
-        filteredData.forEach(row => {
-          const id = getCustomerUniqueId(row);
-          const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-          if (!id || !dateStr) return;
-          const d = parseDate(dateStr);
-          if (d && d.str <= availableMonths[idx - 1]) totalEverPrev.add(id);
-        });
-      }
-
-      const totalCust = totalEver.size;
-      const activeCustThisMonth = curr.buyers.size;
-      const activePct = totalCust > 0 ? (activeCustThisMonth / totalCust) : 0;
-      const prevActivePct = (prev && totalEverPrev.size > 0) ? (prevBuyers / totalEverPrev.size) : 0;
-      const aov = curr.orders > 0 ? curr.sales / curr.orders : 0;
-      const sph = activeCustThisMonth > 0 ? curr.sales / activeCustThisMonth : 0;
-      const repeat = activeCustThisMonth > 0 ? curr.orders / activeCustThisMonth : 0;
-      
-      const monthPart = selectedMonthStr.split('-')[1];
-      const monthName = thaiMonths[monthPart] || monthPart;
-      const titleSalesEl = document.getElementById('title-sales');
-      if (titleSalesEl) titleSalesEl.textContent = `ยอดขายประจำเดือน ${monthName}`;
-      // AOV/SPH/Repeat Purchase คำนวณจากเดือนล่าสุดที่เลือกเดือนเดียว (curr) ไม่ใช่ยอดสะสม YTD
-      // เหมือนการ์ด YTD ด้านบน - เติมชื่อเดือนต่อท้ายชื่อการ์ดกันสับสนว่าเป็นค่าสะสมทั้งปี
-      const titleAovEl = document.getElementById('title-aov');
-      if (titleAovEl) titleAovEl.textContent = `AOV (ยอดต่อบิลเฉลี่ย (บาท)) - เดือน ${monthName}`;
-      const titleSphEl = document.getElementById('title-sph');
-      if (titleSphEl) titleSphEl.textContent = `Spending per Head (ยอดเฉลี่ยต่อคน) - เดือน ${monthName}`;
-      const titleRepeatEl = document.getElementById('title-repeat');
-      if (titleRepeatEl) titleRepeatEl.textContent = `Repeat Purchase - เดือน ${monthName}`;
-
-      // เติมค่าสถิติดั้งเดิมลงบนหน้าจอ Dashboard (% เทียบเดือนก่อนหน้า - ของเดิม ไม่แตะต้อง)
-      document.getElementById('val-sales').textContent = formatCurrency(curr.sales);
-      updateChangeUI('change-sales', curr.sales, prevSales);
-      document.getElementById('val-active-cust').textContent = (activePct * 100).toFixed(1) + '%';
-      updateChangeUI('change-active-cust', activePct, prevActivePct);
-      document.getElementById('val-ytd-sales').textContent = formatCurrency(ytdSales);
-      document.getElementById('val-ytd-new').textContent = ytdNew.toLocaleString() + ' คน';
-      document.getElementById('val-new-cust').textContent = newCount.toLocaleString() + ' คน';
-      updateChangeUI('change-new-cust', newCount, prevNew);
-      document.getElementById('val-ret-cust').textContent = retCount.toLocaleString() + ' คน';
-      updateChangeUI('change-ret-cust', retCount, prevRet);
-      document.getElementById('val-aov').textContent = formatCurrency(aov);
-      updateChangeUI('change-aov', aov, prevAov);
-      document.getElementById('val-sph').textContent = formatCurrency(sph);
-      updateChangeUI('change-sph', sph, prevSph);
-      document.getElementById('val-repeat').textContent = repeat.toFixed(2) + ' ครั้ง';
-      updateChangeUI('change-repeat', repeat, prevRepeat);
-
       // ==========================================
       // 📊 การ์ด "สรุปปีล่าสุด (YTD)" ด้านบน - ผูกกับ Filter ที่เลือกอยู่ (Year/Month/Channel/ฯลฯ)
       // ตัวเลขทั้งหมดคำนวณจาก filteredData/monthlyData ที่ผ่าน filter ด้านบนแล้วทั้งสิ้น
       // ==========================================
       const ytdYearLabelEl = document.getElementById('ytd-year-label');
       if (ytdYearLabelEl) ytdYearLabelEl.textContent = currYear;
+      document.getElementById('val-ytd-new').textContent = ytdNew.toLocaleString() + ' คน';
       document.getElementById('val-ytd-orders').textContent = ytdOrders.toLocaleString();
+      document.getElementById('val-ytd-sales').textContent = formatCurrency(ytdSales);
       document.getElementById('val-ytd-aov').textContent = formatCurrency(ytdAov);
       document.getElementById('val-ytd-sph').textContent = formatCurrency(ytdSph);
       document.getElementById('val-ytd-repeat').textContent = ytdRepeat.toFixed(2);
@@ -1591,39 +1433,6 @@
       document.getElementById('val-all-sph').textContent = formatCurrency(allTime.sph);
       document.getElementById('val-all-repeat').textContent = allTime.repeat.toFixed(2);
       document.getElementById('val-all-repeat-rate').textContent = allTime.repeatRate.toFixed(1) + '%';
-
-      // ==========================================
-      // 🎯 badge เทียบเป้าหมาย KPI Setting (มุมล่างขวาของกรอบการ์ด) ควบคุมด้วยปุ่ม KPI Compare
-      // ไม่ยุ่งกับ change-* ตัวเดิมที่โชว์ % เทียบเดือนก่อนหน้าอยู่แล้วด้านบน
-      // ==========================================
-      const monthIdx = parseInt(monthPart, 10) - 1; // 0 = Jan ... 11 = Dec ตรงกับ index ในอาร์เรย์ 12 เดือนของ KPI Setting
-      const kpiData = window.kpiSettingsData || {};
-      const kMonthlySales = kpiData.monthlyOnlineSales || [];
-      const kMonthlyNew = kpiData.monthlyCustomerNew || [];
-      const kMonthlyOld = kpiData.monthlyCustomerOld || [];
-      const kpiAt = (arr, idx) => Number(arr[idx]) || 0;
-
-      // elId ของ badge ใหม่, ค่าจริง, เป้าหมายจาก KPI Setting
-      const kpiTargetList = [
-        ['kpi-target-aov', aov, kpiData.aov || 0],
-        ['kpi-target-sales', curr.sales, kpiAt(kMonthlySales, monthIdx)],
-        ['kpi-target-active-cust', activeCustThisMonth, kpiAt(kMonthlyNew, monthIdx) + kpiAt(kMonthlyOld, monthIdx)],
-        ['kpi-target-new-cust', newCount, kpiAt(kMonthlyNew, monthIdx)],
-        ['kpi-target-ret-cust', retCount, kpiAt(kMonthlyOld, monthIdx)],
-        ['kpi-target-sph', sph, kpiData.sph || 0],
-        ['kpi-target-repeat', repeat, kpiData.frequency || 0]
-      ];
-
-      kpiTargetList.forEach(([elId, current, target]) => {
-        const el = document.getElementById(elId);
-        if (!el) return;
-        if (filters.KPI === 'On') {
-          el.style.display = 'inline-flex';
-          updateKpiTargetUI(elId, current, target);
-        } else {
-          el.style.display = 'none';
-        }
-      });
 
       // --- ชุดโค้ดการจัดการโครงสร้างและข้อมูลของกราฟทำงานปกติ 100% ---
       const trendMonths = availableMonths.slice(0, idx + 1).slice(-12);
