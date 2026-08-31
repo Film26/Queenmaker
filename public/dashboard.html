@@ -70,28 +70,22 @@
     .tab-btn { background-color: #fff; border: 1px solid #ddd; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; color: #555; }
     .tab-btn.active { background-color: #1e293b; border-color: #1e293b; color: #ffffff; }
 
-    /* Overview: ภาพรวมทั้งปี (บนสุด) / เปรียบเทียบ AOV-SPH / รายละเอียดเดือนที่เลือก (ล่าง) */
+    /* Overview: การ์ดสรุป 2 แถว - ภาพรวมทั้งหมด (ทุกปี, ไม่ผูกกับ Filter) / สรุปปีล่าสุด (YTD, ผูกกับ Filter ที่เลือก) */
     .overview-section-title { font-size: 15px; font-weight: 700; color: #1e293b; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
     .overview-section-title i { color: #d95f1d; font-size: 13px; }
-    .cards-grid-summary { grid-template-columns: repeat(3, 1fr); }
 
-    .ytd-compare-card {
-      background: #fff; border-radius: 16px; padding: 20px 22px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-      margin-bottom: 25px;
+    .overview-stat-card { background: #fff; border-radius: 16px; padding: 24px 28px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 20px; }
+    .overview-stat-card-title {
+      font-size: 15px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px;
+      margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid #f0ece4;
     }
-    .ytd-compare-title { font-size: 13px; font-weight: 700; color: #555; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-    .ytd-compare-title i { color: #d95f1d; }
-    .ytd-compare-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; padding: 10px 0; border-top: 1px dashed #eee; }
-    .ytd-compare-row:first-of-type { border-top: none; }
-    .ytd-compare-label { font-size: 13px; font-weight: 700; color: #333; width: 170px; flex-shrink: 0; }
-    .ytd-compare-values { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-    .ytd-compare-current { font-size: 19px; font-weight: 700; color: #111; }
-    .ytd-compare-vs { font-size: 11.5px; color: #999; }
-    .ytd-compare-ytd { font-size: 13px; color: #555; }
-    #sph-compare-insight {
-      font-size: 12.5px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a;
-      border-radius: 8px; padding: 8px 12px; margin-top: 12px; line-height: 1.6;
-    }
+    .overview-stat-card-title i { color: #d95f1d; }
+    .overview-stat-row { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .overview-stat-cell { text-align: center; padding: 2px 8px; border-left: 1px solid #f0ece4; }
+    .overview-stat-cell:first-child { border-left: none; }
+    .overview-stat-label { font-size: 12px; color: #8a8577; margin-bottom: 8px; }
+    .overview-stat-value { font-size: 21px; font-weight: 800; color: #1e293b; }
+    @media (max-width: 1100px) { .overview-stat-row { grid-template-columns: repeat(3, 1fr); row-gap: 16px; } .overview-stat-cell:nth-child(3n+1) { border-left: none; } }
   </style>
 </head>
 <body>
@@ -231,51 +225,72 @@
             ไม่พบข้อมูลตามเงื่อนไข Filter ที่เลือก กรุณาปรับ Filter หรือตรวจสอบข้อมูลที่ Import เข้ามา
           </div>
           <div class="overview-cards-wrap">
-            <h3 class="overview-section-title"><i class="fas fa-layer-group"></i> ภาพรวมทั้งปี</h3>
-            <div class="cards-grid cards-grid-summary">
-              <div class="kpi-card grid-span-1">
-                <div class="kpi-header"><div class="kpi-title" id="title-ytd-sales">ยอดขาย YTD (บาท)</div></div>
-                <div class="kpi-val" id="val-ytd-sales">฿0</div>
-                <div><span class="kpi-change-new neutral" id="change-ytd-sales">-</span></div>
-                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ytd-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
-
-              <div class="kpi-card grid-span-1">
-                <div class="kpi-header"><div class="kpi-title">Total Customer (คน)</div></div>
-                <div class="kpi-val" id="val-total-cust">0</div>
-                <div><span class="kpi-change-new neutral" id="change-total-cust">-</span></div>
-                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-total-cust" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
-              </div>
-
-              <div class="kpi-card grid-span-1">
-                <div class="kpi-header"><div class="kpi-title">YTD New Customers (คน)</div></div>
-                <div class="kpi-val" id="val-ytd-new">0</div>
-                <div><span class="kpi-change-new neutral" id="change-ytd-new">-</span></div>
-                <span class="kpi-change-new neutral kpi-target-badge" id="kpi-target-ytd-new" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
+            <div class="overview-stat-card">
+              <div class="overview-stat-card-title"><i class="fas fa-chart-pie"></i> ภาพรวมทั้งหมด (ทุกปี)</div>
+              <div class="overview-stat-row">
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">ลูกค้าทั้งหมด</div>
+                  <div class="overview-stat-value" id="val-all-total-cust">0</div>
+                </div>
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">ออเดอร์ทั้งหมด</div>
+                  <div class="overview-stat-value" id="val-all-total-orders">0</div>
+                </div>
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">ยอดขายรวม</div>
+                  <div class="overview-stat-value" id="val-all-sales">฿0</div>
+                </div>
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">AOV (ยอด/ออเดอร์)</div>
+                  <div class="overview-stat-value" id="val-all-aov">฿0</div>
+                </div>
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">SPH (ยอด/หัว)</div>
+                  <div class="overview-stat-value" id="val-all-sph">฿0</div>
+                </div>
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">Repeat (ครั้ง/หัว)</div>
+                  <div class="overview-stat-value" id="val-all-repeat">0.00</div>
+                </div>
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">Repeat Rate %</div>
+                  <div class="overview-stat-value" id="val-all-repeat-rate">0%</div>
+                </div>
               </div>
             </div>
 
-            <div class="ytd-compare-card">
-              <div class="ytd-compare-title"><i class="fas fa-scale-balanced"></i> เทียบเดือนที่เลือกกับภาพรวมทั้งปี</div>
-              <div class="ytd-compare-row">
-                <div class="ytd-compare-label">AOV (ยอดต่อบิลเฉลี่ย)</div>
-                <div class="ytd-compare-values">
-                  <span class="ytd-compare-current" id="compare-aov-current">฿0</span>
-                  <span class="ytd-compare-vs">เดือนนี้ vs ภาพรวมทั้งปี</span>
-                  <span class="ytd-compare-ytd" id="compare-aov-ytd">฿0</span>
-                  <span class="kpi-change-new neutral" id="compare-aov-change">-</span>
+            <div class="overview-stat-card">
+              <div class="overview-stat-card-title"><i class="fas fa-calendar-check"></i> สรุปปีล่าสุด (YTD <span id="ytd-year-label">-</span>)</div>
+              <div class="overview-stat-row">
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">ลูกค้าใหม่ปีนี้</div>
+                  <div class="overview-stat-value" id="val-ytd-new">0</div>
+                </div>
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">ออเดอร์ YTD</div>
+                  <div class="overview-stat-value" id="val-ytd-orders">0</div>
+                </div>
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">ยอดขาย YTD</div>
+                  <div class="overview-stat-value" id="val-ytd-sales">฿0</div>
+                </div>
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">AOV YTD</div>
+                  <div class="overview-stat-value" id="val-ytd-aov">฿0</div>
+                </div>
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">SPH YTD</div>
+                  <div class="overview-stat-value" id="val-ytd-sph">฿0</div>
+                </div>
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">Repeat (ครั้ง/หัว)</div>
+                  <div class="overview-stat-value" id="val-ytd-repeat">0.00</div>
+                </div>
+                <div class="overview-stat-cell">
+                  <div class="overview-stat-label">Repeat Rate %</div>
+                  <div class="overview-stat-value" id="val-ytd-repeat-rate">0%</div>
                 </div>
               </div>
-              <div class="ytd-compare-row">
-                <div class="ytd-compare-label">Spending per Head</div>
-                <div class="ytd-compare-values">
-                  <span class="ytd-compare-current" id="compare-sph-current">฿0</span>
-                  <span class="ytd-compare-vs">เดือนนี้ vs ภาพรวมทั้งปี</span>
-                  <span class="ytd-compare-ytd" id="compare-sph-ytd">฿0</span>
-                  <span class="kpi-change-new neutral" id="compare-sph-change">-</span>
-                </div>
-              </div>
-              <div id="sph-compare-insight" style="display:none;"></div>
             </div>
 
             <h3 class="overview-section-title"><i class="fas fa-magnifying-glass-chart"></i> รายละเอียด — เดือนที่เลือก</h3>
@@ -1404,6 +1419,37 @@
     }
 
     // ==========================================
+    // 📊 การ์ด "ภาพรวมทั้งหมด (ทุกปี)" - ยอดสะสมจากข้อมูลที่ Import ทั้งหมด ไม่ผูกกับ Filter ใดๆ เลย
+    // (ต่างจาก filteredData/monthlyData ด้านล่างที่ผูกกับ Year/Channel/Product/ฯลฯ ที่เลือกอยู่)
+    // ==========================================
+    function computeAllTimeOverview() {
+      const buyerOrders = new Map();
+      let totalSales = 0, totalOrders = 0;
+      rawData.forEach(row => {
+        if (!isSaleOrder(row)) return;
+        if (!isProductActive(getNormalizedProduct(row))) return;
+        const id = getCustomerUniqueId(row);
+        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+        if (!id || !dateStr) return;
+        if (!parseDate(dateStr)) return;
+        const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+        totalSales += parseFloat(revenueStr.toString().replace(/,/g, '').trim()) || 0;
+        totalOrders++;
+        buyerOrders.set(id, (buyerOrders.get(id) || 0) + 1);
+      });
+      const totalCust = buyerOrders.size;
+      let repeatBuyers = 0;
+      buyerOrders.forEach(c => { if (c >= 2) repeatBuyers++; });
+      return {
+        totalSales, totalOrders, totalCust,
+        aov: totalOrders > 0 ? totalSales / totalOrders : 0,
+        sph: totalCust > 0 ? totalSales / totalCust : 0,
+        repeat: totalCust > 0 ? totalOrders / totalCust : 0,
+        repeatRate: totalCust > 0 ? (repeatBuyers / totalCust) * 100 : 0
+      };
+    }
+
+    // ==========================================
     // 🛠️ ปรับปรุงความแม่นยำในการนับยอดสะสมของลูกค้าในระบบ Dashboard
     // ==========================================
     function renderDashboard() {
@@ -1444,9 +1490,23 @@
           });
         }
       });
-      // ใช้เทียบ AOV/SPH ของเดือนที่เลือกกับภาพรวมทั้งปี (การ์ด "เทียบเดือนที่เลือกกับภาพรวมทั้งปี" ด้านบน)
+      // ใช้เติมการ์ด "สรุปปีล่าสุด (YTD)" ด้านบน (Repeat/Repeat Rate% นับเฉพาะออเดอร์ในช่วง YTD ของปีนี้)
       const ytdAov = ytdOrders > 0 ? ytdSales / ytdOrders : 0;
       const ytdSph = ytdBuyers.size > 0 ? ytdSales / ytdBuyers.size : 0;
+      const ytdRepeat = ytdBuyers.size > 0 ? ytdOrders / ytdBuyers.size : 0;
+      let ytdBuyerOrderCounts = new Map();
+      filteredData.forEach(row => {
+        const id = getCustomerUniqueId(row);
+        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+        if (!id || !dateStr) return;
+        const d = parseDate(dateStr);
+        if (d && d.y === currYear && d.str <= selectedMonthStr) {
+          ytdBuyerOrderCounts.set(id, (ytdBuyerOrderCounts.get(id) || 0) + 1);
+        }
+      });
+      let ytdRepeatBuyers = 0;
+      ytdBuyerOrderCounts.forEach(c => { if (c >= 2) ytdRepeatBuyers++; });
+      const ytdRepeatRate = ytdBuyers.size > 0 ? (ytdRepeatBuyers / ytdBuyers.size) * 100 : 0;
 
       // 🔍 ค้นหาจำนวนสะสมลูกค้าจากตัวแปรกรองข้อมูลจริงให้ตรงตามเงื่อนไข
       let totalEver = new Set();
@@ -1493,7 +1553,6 @@
       // เติมค่าสถิติดั้งเดิมลงบนหน้าจอ Dashboard (% เทียบเดือนก่อนหน้า - ของเดิม ไม่แตะต้อง)
       document.getElementById('val-sales').textContent = formatCurrency(curr.sales);
       updateChangeUI('change-sales', curr.sales, prevSales);
-      document.getElementById('val-total-cust').textContent = totalCust.toLocaleString() + ' คน';
       document.getElementById('val-active-cust').textContent = (activePct * 100).toFixed(1) + '%';
       updateChangeUI('change-active-cust', activePct, prevActivePct);
       document.getElementById('val-ytd-sales').textContent = formatCurrency(ytdSales);
@@ -1510,44 +1569,28 @@
       updateChangeUI('change-repeat', repeat, prevRepeat);
 
       // ==========================================
-      // 📊 การ์ดเทียบ AOV/SPH ของเดือนที่เลือก กับภาพรวมทั้งปี (ytdAov/ytdSph) - ตัวเลขทั้งหมดมาจาก
-      // ข้อมูลจริงที่คำนวณไว้แล้วด้านบน ไม่มีค่าคาดเดา ถ้า SPH เดือนนี้ต่ำกว่าภาพรวมทั้งปี ให้ชี้สาเหตุที่
-      // เป็นไปได้จากสัดส่วนลูกค้าใหม่เดือนนี้ (ลูกค้าใหม่มักซื้อบิลเล็กกว่าลูกค้าเก่า)
+      // 📊 การ์ด "สรุปปีล่าสุด (YTD)" ด้านบน - ผูกกับ Filter ที่เลือกอยู่ (Year/Month/Channel/ฯลฯ)
+      // ตัวเลขทั้งหมดคำนวณจาก filteredData/monthlyData ที่ผ่าน filter ด้านบนแล้วทั้งสิ้น
       // ==========================================
-      document.getElementById('compare-aov-current').textContent = formatCurrency(aov);
-      document.getElementById('compare-aov-ytd').textContent = formatCurrency(ytdAov);
-      updateChangeUI('compare-aov-change', aov, ytdAov);
-
-      document.getElementById('compare-sph-current').textContent = formatCurrency(sph);
-      document.getElementById('compare-sph-ytd').textContent = formatCurrency(ytdSph);
-      updateChangeUI('compare-sph-change', sph, ytdSph);
-
-      const sphInsightEl = document.getElementById('sph-compare-insight');
-      if (sphInsightEl) {
-        if (ytdSph > 0 && sph < ytdSph) {
-          const newRatio = activeCustThisMonth > 0 ? (newCount / activeCustThisMonth) : 0;
-          const dropPct = Math.abs((sph - ytdSph) / ytdSph * 100).toFixed(1);
-          if (newRatio >= 0.3) {
-            sphInsightEl.textContent = `ยอดซื้อต่อหัวลดลง ${dropPct}% เมื่อเทียบกับภาพรวมทั้งปี — เดือนนี้มีสัดส่วนลูกค้าใหม่สูงถึง ${(newRatio * 100).toFixed(0)}% ของลูกค้าที่ซื้อทั้งหมด ซึ่งมักเริ่มต้นด้วยบิลขนาดเล็กกว่าลูกค้าเก่า อาจเป็นสาเหตุหลักที่ทำให้ค่าเฉลี่ยต่อหัวลดลง`;
-          } else {
-            sphInsightEl.textContent = `ยอดซื้อต่อหัวลดลง ${dropPct}% เมื่อเทียบกับภาพรวมทั้งปี`;
-          }
-          sphInsightEl.style.display = 'block';
-        } else {
-          sphInsightEl.style.display = 'none';
-        }
-      }
+      const ytdYearLabelEl = document.getElementById('ytd-year-label');
+      if (ytdYearLabelEl) ytdYearLabelEl.textContent = currYear;
+      document.getElementById('val-ytd-orders').textContent = ytdOrders.toLocaleString();
+      document.getElementById('val-ytd-aov').textContent = formatCurrency(ytdAov);
+      document.getElementById('val-ytd-sph').textContent = formatCurrency(ytdSph);
+      document.getElementById('val-ytd-repeat').textContent = ytdRepeat.toFixed(2);
+      document.getElementById('val-ytd-repeat-rate').textContent = ytdRepeatRate.toFixed(1) + '%';
 
       // ==========================================
-      // 💡 บรรทัดเปรียบเทียบ % กับเดือนก่อนหน้า (MoM) - เหมือนการ์ดอื่นๆ ด้านล่าง แสดงตลอดเวลา
-      // ไม่ผูกกับปุ่ม KPI Compare อีกต่อไป (ของเดิมสลับความหมาย MoM/KPI บน element เดียวกัน ทำให้
-      // กด KPI แล้วข้อมูล MoM หาย - ตอนนี้แยก badge กด KPI ต่างหาก ดูส่วน kpiTargetList ด้านล่าง)
+      // 📊 การ์ด "ภาพรวมทั้งหมด (ทุกปี)" ด้านบน - ไม่ผูกกับ Filter ใดๆ เลย (ยอดสะสมทั้งหมดของข้อมูลที่ Import)
       // ==========================================
-      const prevYtdSales = prev ? (ytdSales - curr.sales) : 0;
-      const prevYtdNew = prev ? (ytdNew - newCount) : 0;
-      updateChangeUI('change-ytd-sales', ytdSales, prevYtdSales);
-      updateChangeUI('change-total-cust', totalCust, prev ? totalEverPrev.size : 0);
-      updateChangeUI('change-ytd-new', ytdNew, prevYtdNew);
+      const allTime = computeAllTimeOverview();
+      document.getElementById('val-all-total-cust').textContent = allTime.totalCust.toLocaleString();
+      document.getElementById('val-all-total-orders').textContent = allTime.totalOrders.toLocaleString();
+      document.getElementById('val-all-sales').textContent = formatCurrency(allTime.totalSales);
+      document.getElementById('val-all-aov').textContent = formatCurrency(allTime.aov);
+      document.getElementById('val-all-sph').textContent = formatCurrency(allTime.sph);
+      document.getElementById('val-all-repeat').textContent = allTime.repeat.toFixed(2);
+      document.getElementById('val-all-repeat-rate').textContent = allTime.repeatRate.toFixed(1) + '%';
 
       // ==========================================
       // 🎯 badge เทียบเป้าหมาย KPI Setting (มุมล่างขวาของกรอบการ์ด) ควบคุมด้วยปุ่ม KPI Compare
@@ -1562,9 +1605,6 @@
 
       // elId ของ badge ใหม่, ค่าจริง, เป้าหมายจาก KPI Setting
       const kpiTargetList = [
-        ['kpi-target-ytd-sales', ytdSales, kpiData.salesYTD || 0],
-        ['kpi-target-total-cust', totalCust, kpiData.totalCust || 0],
-        ['kpi-target-ytd-new', ytdNew, kpiData.newCustYTD || 0],
         ['kpi-target-aov', aov, kpiData.aov || 0],
         ['kpi-target-sales', curr.sales, kpiAt(kMonthlySales, monthIdx)],
         ['kpi-target-active-cust', activeCustThisMonth, kpiAt(kMonthlyNew, monthIdx) + kpiAt(kMonthlyOld, monthIdx)],
