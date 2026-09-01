@@ -395,41 +395,32 @@ function renderExecutive1(filteredData, rawData) {
 
   // Metrics Array Construction (per-month series, index 0 = Jan ... 11 = Dec, index 12 = Total Year)
   const revArr = [], ordArr = [], aovArr = [], ubArr = [], freqArr = [], sphArr = [], retArr = [], newGArr = [], newGShrArr = [], migArr = [], migRtArr = [];
-  // All Customer: ไม่อิงตาม filter อื่นของหน้า Executive (Channel/SubChannel/Product/SubProduct/Admin/Month)
-  // ตามที่ตกลงกันไว้ - อิงเฉพาะ Year ที่เลือกอยู่เท่านั้น เพื่อให้เป็นยอดลูกค้าจริงทั้งหมด ไม่ผันแปรตาม
-  // Channel/Product ที่กำลังกรองดูอยู่ ใช้ computeFilteredData (ของ dashboard.html) กรองเฉพาะ Year
-  const allCustMonthlyCounts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-  if (typeof window.computeFilteredData === 'function' && window.execFilters) {
-    const yearOnlyFilters = Object.assign({}, window.execFilters, {
-      Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All'
-    });
-    const yearOnlyData = window.computeFilteredData(yearOnlyFilters);
-    const monthlySets = {};
-    for (let m = 1; m <= 12; m++) monthlySets[m] = new Set();
-    yearOnlyData.forEach(row => {
-      const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-      const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
-      const dateStr = getVal(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-      if (!id || !dateStr) return;
-      const d = parseD(dateStr);
-      if (!d || d.m < 1 || d.m > 12) return;
-      monthlySets[d.m].add(id);
-    });
-    for (let m = 1; m <= 12; m++) allCustMonthlyCounts[m - 1] = monthlySets[m].size;
-  } else {
-    // Fallback (ไม่มี computeFilteredData ให้ใช้): ใช้ยอดที่กรองตาม filter ปกติแทน
-    for (let m = 1; m <= 12; m++) allCustMonthlyCounts[m - 1] = agg[m].uniqueBuyers.size;
-  }
-  // เดือนที่ไม่มีลูกค้าจริง (actual = 0) ให้ขึ้น 0 / เดือนที่มีลูกค้าจริง ให้ขึ้นยอดสะสมของเดือนนั้นบวกกับ
-  // ทุกเดือนก่อนหน้าที่เคยมีลูกค้า (เดือนที่เป็น 0 ไม่ทำให้ยอดสะสมขาดตอน แค่ไม่โชว์ผลสะสมในเดือนนั้นเฉยๆ)
-  // เช่น Jan=7, Feb-May=0, Jun=8 -> โชว์ Jan=7, Feb..May=0, Jun=15
-  // Total Year = ยอดสะสมสุดท้าย ณ สิ้นปี ซึ่งเท่ากับผลรวมของค่าจริงรายเดือนทั้ง 12 เดือน
+  // All Customer (ลูกค้าสะสม): จำนวนลูกค้าจริงสะสมทั้งหมดตั้งแต่ซื้อครั้งแรกสุด "ข้ามปี ไม่รีเซ็ตทุกต้นปี"
+  // ต่างจาก Buyers ที่นับเฉพาะคนที่ซื้อในเดือน/ปีนั้นๆ - ใช้ globalFirstPurchase (คำนวณจาก rawData ทุกปี
+  // อยู่แล้วสำหรับแยก New/Old Customer) เทียบกับสิ้นเดือนนั้นๆ ของปีที่เลือก เพื่อนับคนที่เคยซื้อมาแล้วสะสมจริง
   const cumAllCustArr = [];
-  let allCustRunningTotal = 0;
-  // ใช้แยกจาก cumAllCustArr ด้านบน สำหรับเป็นตัวหารของ %Active customer เท่านั้น (ลูกค้าสะสมแบบไม่นับซ้ำ
-  // ไล่ทีละเดือนภายในปี) ไม่งั้นถ้าใช้ cumAllCustArr (ค่าจริงรายเดือน ไม่สะสม) มาหาร %Active จะกลายเป็น 100% ทุกเดือน
-  const activeBaseArr = [];
-  const activeBaseSet = new Set();
+  {
+    const selectedYear = (window.execFilters && window.execFilters.Year) ? String(window.execFilters.Year) : '';
+    if (selectedYear) {
+      const firstPurchaseMonths = Object.keys(globalFirstPurchase)
+        .map(id => globalFirstPurchase[id].monthStr)
+        .sort();
+      let ptr = 0;
+      for (let m = 1; m <= 12; m++) {
+        let boundary = `${selectedYear}-${String(m).padStart(2, '0')}`;
+        if (monthCutoff && monthCutoff < boundary) boundary = monthCutoff;
+        while (ptr < firstPurchaseMonths.length && firstPurchaseMonths[ptr] <= boundary) ptr++;
+        cumAllCustArr.push(ptr);
+      }
+    } else {
+      // Fallback (ไม่ทราบปีที่เลือก): ใช้ผลรวมสะสมของลูกค้าที่ซื้อภายในข้อมูลที่กรองไว้แทน
+      const cumulativeCustomerSet = new Set();
+      for (let m = 1; m <= 12; m++) {
+        agg[m].uniqueBuyers.forEach(id => cumulativeCustomerSet.add(id));
+        cumAllCustArr.push(cumulativeCustomerSet.size);
+      }
+    }
+  }
   for (let m = 1; m <= 12; m++) {
     const r = agg[m].revenue;
     const o = agg[m].orders;
@@ -449,12 +440,6 @@ function renderExecutive1(filteredData, rawData) {
     newGShrArr.push(getSafely(newG, u));
     migArr.push(mig);
     migRtArr.push(getSafely(mig, u));
-
-    const allCustMonthVal = allCustMonthlyCounts[m - 1];
-    allCustRunningTotal += allCustMonthVal;
-    cumAllCustArr.push(allCustMonthVal === 0 ? 0 : allCustRunningTotal);
-    agg[m].uniqueBuyers.forEach(id => activeBaseSet.add(id));
-    activeBaseArr.push(activeBaseSet.size);
   }
   // Totals
   const rT = total.revenue, oT = total.orders, uT = total.uniqueBuyers.size;
@@ -469,12 +454,11 @@ function renderExecutive1(filteredData, rawData) {
   newGShrArr.push(getSafely(total.newGlobalBuyers.size, uT));
   migArr.push(total.newToSubBuyers.size);
   migRtArr.push(getSafely(total.newToSubBuyers.size, uT));
-  // Total Year ของ All Customer = ยอดสะสมสุดท้าย ณ สิ้นปี (ผลรวมของค่าจริงรายเดือนทั้ง 12 เดือน)
-  cumAllCustArr.push(allCustRunningTotal);
-  activeBaseArr.push(uT);
+  // ยอดรวมทั้งปีของ "ลูกค้าสะสม" คือยอดสะสมจริง ณ สิ้นเดือน ธ.ค. (index 11) ไม่ใช่ uT เพราะนับข้ามปีไม่รีเซ็ต
+  cumAllCustArr.push(cumAllCustArr[11]);
 
-  // %Active customer = ลูกค้าที่ซื้อในเดือนนั้น (Active) หารด้วยลูกค้าสะสมแบบไม่นับซ้ำ ณ เดือนนั้น (activeBaseArr)
-  const activePctArr = ubArr.map((u, i) => getSafely(u, activeBaseArr[i]));
+  // %Active customer = ลูกค้าที่ซื้อในเดือนนั้น (Active) หารด้วยลูกค้าสะสม ณ เดือนนั้น
+  const activePctArr = ubArr.map((u, i) => getSafely(u, cumAllCustArr[i]));
   // % Old Customer = ลูกค้าเก่าที่ซื้อในเดือนนั้น หารด้วยลูกค้าทั้งหมดที่ซื้อในเดือนนั้น (= 100% - % New Customer Share)
   const oldPctArr = ubArr.map((u, i) => getSafely(retArr[i], u));
 
