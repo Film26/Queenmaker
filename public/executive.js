@@ -395,9 +395,34 @@ function renderExecutive1(filteredData, rawData) {
 
   // Metrics Array Construction (per-month series, index 0 = Jan ... 11 = Dec, index 12 = Total Year)
   const revArr = [], ordArr = [], aovArr = [], ubArr = [], freqArr = [], sphArr = [], retArr = [], newGArr = [], newGShrArr = [], migArr = [], migRtArr = [];
-  // All Customer: เดือนที่ไม่มีลูกค้าจริง (actual = 0) ให้ขึ้น 0 / เดือนที่มีลูกค้าจริง ให้ขึ้นยอดสะสม
-  // ของเดือนนั้นบวกกับทุกเดือนก่อนหน้าที่เคยมีลูกค้า (เดือนที่เป็น 0 ไม่ทำให้ยอดสะสมขาดตอน แค่ไม่โชว์ผลสะสม
-  // ในเดือนนั้นเฉยๆ) เช่น Jan=7, Feb-May=0, Jun=8 -> โชว์ Jan=7, Feb..May=0, Jun=15
+  // All Customer: ไม่อิงตาม filter อื่นของหน้า Executive (Channel/SubChannel/Product/SubProduct/Admin/Month)
+  // ตามที่ตกลงกันไว้ - อิงเฉพาะ Year ที่เลือกอยู่เท่านั้น เพื่อให้เป็นยอดลูกค้าจริงทั้งหมด ไม่ผันแปรตาม
+  // Channel/Product ที่กำลังกรองดูอยู่ ใช้ computeFilteredData (ของ dashboard.html) กรองเฉพาะ Year
+  const allCustMonthlyCounts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  if (typeof window.computeFilteredData === 'function' && window.execFilters) {
+    const yearOnlyFilters = Object.assign({}, window.execFilters, {
+      Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All'
+    });
+    const yearOnlyData = window.computeFilteredData(yearOnlyFilters);
+    const monthlySets = {};
+    for (let m = 1; m <= 12; m++) monthlySets[m] = new Set();
+    yearOnlyData.forEach(row => {
+      const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
+      const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+      const dateStr = getVal(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+      if (!id || !dateStr) return;
+      const d = parseD(dateStr);
+      if (!d || d.m < 1 || d.m > 12) return;
+      monthlySets[d.m].add(id);
+    });
+    for (let m = 1; m <= 12; m++) allCustMonthlyCounts[m - 1] = monthlySets[m].size;
+  } else {
+    // Fallback (ไม่มี computeFilteredData ให้ใช้): ใช้ยอดที่กรองตาม filter ปกติแทน
+    for (let m = 1; m <= 12; m++) allCustMonthlyCounts[m - 1] = agg[m].uniqueBuyers.size;
+  }
+  // เดือนที่ไม่มีลูกค้าจริง (actual = 0) ให้ขึ้น 0 / เดือนที่มีลูกค้าจริง ให้ขึ้นยอดสะสมของเดือนนั้นบวกกับ
+  // ทุกเดือนก่อนหน้าที่เคยมีลูกค้า (เดือนที่เป็น 0 ไม่ทำให้ยอดสะสมขาดตอน แค่ไม่โชว์ผลสะสมในเดือนนั้นเฉยๆ)
+  // เช่น Jan=7, Feb-May=0, Jun=8 -> โชว์ Jan=7, Feb..May=0, Jun=15
   // Total Year = ยอดสะสมสุดท้าย ณ สิ้นปี ซึ่งเท่ากับผลรวมของค่าจริงรายเดือนทั้ง 12 เดือน
   const cumAllCustArr = [];
   let allCustRunningTotal = 0;
@@ -425,8 +450,9 @@ function renderExecutive1(filteredData, rawData) {
     migArr.push(mig);
     migRtArr.push(getSafely(mig, u));
 
-    allCustRunningTotal += u;
-    cumAllCustArr.push(u === 0 ? 0 : allCustRunningTotal);
+    const allCustMonthVal = allCustMonthlyCounts[m - 1];
+    allCustRunningTotal += allCustMonthVal;
+    cumAllCustArr.push(allCustMonthVal === 0 ? 0 : allCustRunningTotal);
     agg[m].uniqueBuyers.forEach(id => activeBaseSet.add(id));
     activeBaseArr.push(activeBaseSet.size);
   }
