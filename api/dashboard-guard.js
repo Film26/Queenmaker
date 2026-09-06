@@ -4,14 +4,18 @@
 // file directly, since Vercel's static hosting has no built-in per-file auth check.
 const fs = require('fs');
 const path = require('path');
-const { getUserFromRequest } = require('../lib/session');
+const { getAuthorizedUser } = require('../lib/session');
+const auditLog = require('../lib/auditLog');
+const { getClientIp } = require('../lib/reqUtils');
 
 module.exports = async function handler(req, res) {
-  const user = getUserFromRequest(req);
+  const user = await getAuthorizedUser(req);
   if (!user) {
     res.writeHead(302, { Location: '/' });
     return res.end();
   }
+  // Fire-and-forget - do not delay serving the page for this.
+  auditLog.append({ type: 'dashboard_access', userId: user.id, username: user.username, ip: getClientIp(req) });
   const html = fs.readFileSync(path.join(process.cwd(), 'public', 'dashboard.html'), 'utf8');
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.status(200).send(html);

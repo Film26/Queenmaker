@@ -1,13 +1,13 @@
 // api/audit/log.js - Vercel serverless function (also mounted directly in server.js for local dev).
 // Generic audit endpoint for client-triggered events (Insight Hub export/download).
 const auditLog = require('../../lib/auditLog');
-const { getUserFromRequest } = require('../../lib/session');
+const { getAuthorizedUser } = require('../../lib/session');
 const { getClientIp } = require('../../lib/reqUtils');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const sessionUser = getUserFromRequest(req);
+  const sessionUser = await getAuthorizedUser(req);
   if (!sessionUser) return res.status(401).json({ error: 'Not authenticated' });
 
   const { type, detail } = req.body || {};

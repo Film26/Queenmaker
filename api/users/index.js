@@ -2,13 +2,16 @@
 // User management API - Super Admin only (Task 4: add/edit/delete/assign roles).
 const userStore = require('../../lib/userStore');
 const auditLog = require('../../lib/auditLog');
-const { getUserFromRequest } = require('../../lib/session');
+const { getAuthorizedUser } = require('../../lib/session');
 const { getClientIp } = require('../../lib/reqUtils');
 
 module.exports = async function handler(req, res) {
-  const sessionUser = getUserFromRequest(req);
+  const sessionUser = await getAuthorizedUser(req);
   if (!sessionUser) return res.status(401).json({ error: 'Not authenticated' });
-  if (sessionUser.role !== 'Super Admin') return res.status(403).json({ error: 'Forbidden' });
+  if (sessionUser.role !== 'Super Admin') {
+    auditLog.append({ type: 'unauthorized_access', reason: 'forbidden_role', userId: sessionUser.id, username: sessionUser.username, role: sessionUser.role, path: req.url, method: req.method, ip: getClientIp(req) });
+    return res.status(403).json({ error: 'Forbidden' });
+  }
 
   if (req.method === 'GET') {
     const users = await userStore.loadUsers();
