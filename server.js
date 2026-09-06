@@ -15,6 +15,8 @@ app.get('/api/auth/me', require('./api/auth/me'));
 app.get('/api/users', require('./api/users/index'));
 app.put('/api/users', require('./api/users/index'));
 app.post('/api/audit/log', require('./api/audit/log'));
+app.get('/api/discord/config', require('./api/discord/config'));
+app.put('/api/discord/config', require('./api/discord/config'));
 
 // Route guard: dashboard.html (and the Inside Hub tab inside it) requires login.
 // Registered before express.static so it takes priority over the plain static file match
