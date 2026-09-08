@@ -37,9 +37,19 @@
           <a href="#" class="forgot-link">Forgot password?</a>
 
           <button type="submit" id="loginBtn" class="btn-login">LOGIN</button>
-          
+
           <div id="feedback" style="margin-top: 15px; font-size: 0.9rem; min-height: 20px;"></div>
         </form>
+
+        <div style="display:flex; align-items:center; gap:10px; margin:14px 0; color:#999; font-size:0.85rem;">
+          <div style="flex:1; height:1px; background:#e0e0e0;"></div>
+          <span>OR</span>
+          <div style="flex:1; height:1px; background:#e0e0e0;"></div>
+        </div>
+
+        <a href="/api/auth/google/start" style="display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:10px; border:1px solid #dadce0; border-radius:6px; background:#fff; color:#3c4043; text-decoration:none; font-size:0.9rem; box-sizing:border-box;">
+          <i class="fab fa-google"></i> Sign in with Google
+        </a>
 
         <div class="login-card-footer">
           Don't have an account? <a href="#">Contact Support</a>
@@ -57,6 +67,23 @@
     const feedback = document.getElementById('feedback');
     const togglePassword = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
+
+    // Surfaces the ?error=google_* redirect from api/auth/google/callback.js (e.g. the
+    // Google account isn't a registered Queenmaker user) - GOOGLE_ERROR_MESSAGES keys must
+    // match the `deny()` reason strings used there.
+    const GOOGLE_ERROR_MESSAGES = {
+      not_authorized: 'บัญชี Google นี้ยังไม่ได้รับสิทธิ์เข้าใช้งาน กรุณาติดต่อผู้ดูแลระบบ',
+      denied: 'ยกเลิกการเข้าสู่ระบบด้วย Google',
+      email_not_verified: 'อีเมล Google นี้ยังไม่ได้ยืนยัน กรุณายืนยันอีเมลกับ Google ก่อน',
+      not_configured: 'ยังไม่ได้ตั้งค่า Google Sign-in บนระบบนี้'
+    };
+    const googleError = new URLSearchParams(window.location.search).get('error');
+    if (googleError && googleError.startsWith('google_')) {
+      const reason = googleError.slice('google_'.length);
+      feedback.textContent = GOOGLE_ERROR_MESSAGES[reason] || 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่';
+      feedback.style.color = '#dc3545';
+      window.history.replaceState({}, '', window.location.pathname);
+    }
 
     // Password visibility toggle
     togglePassword.addEventListener('click', () => {
