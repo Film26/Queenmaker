@@ -47,9 +47,9 @@
           <div style="flex:1; height:1px; background:#e0e0e0;"></div>
         </div>
 
-        <a href="/api/auth/google/start" style="display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:10px; border:1px solid #dadce0; border-radius:6px; background:#fff; color:#3c4043; text-decoration:none; font-size:0.9rem; box-sizing:border-box;">
+        <button type="button" id="googleLoginBtn" style="display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:10px; border:1px solid #dadce0; border-radius:6px; background:#fff; color:#3c4043; font-size:0.9rem; box-sizing:border-box; cursor:pointer;">
           <i class="fab fa-google"></i> Sign in with Google
-        </a>
+        </button>
 
         <div class="login-card-footer">
           Don't have an account? <a href="#">Contact Support</a>
@@ -68,22 +68,62 @@
     const togglePassword = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
 
-    // Surfaces the ?error=google_* redirect from api/auth/google/callback.js (e.g. the
-    // Google account isn't a registered Queenmaker user) - GOOGLE_ERROR_MESSAGES keys must
-    // match the `deny()` reason strings used there.
+    // "Sign in with Google" opens api/auth/google/start.js in a small popup instead of
+    // navigating this tab away to accounts.google.com - the popup handles the whole OAuth
+    // round trip (including api/auth/google/callback.js, which sets the session cookie)
+    // and reports back here via postMessage before closing itself. GOOGLE_ERROR_MESSAGES
+    // keys must match the `deny()` reason strings used in callback.js.
     const GOOGLE_ERROR_MESSAGES = {
       not_authorized: 'บัญชี Google นี้ยังไม่ได้รับสิทธิ์เข้าใช้งาน กรุณาติดต่อผู้ดูแลระบบ',
       denied: 'ยกเลิกการเข้าสู่ระบบด้วย Google',
       email_not_verified: 'อีเมล Google นี้ยังไม่ได้ยืนยัน กรุณายืนยันอีเมลกับ Google ก่อน',
       not_configured: 'ยังไม่ได้ตั้งค่า Google Sign-in บนระบบนี้'
     };
-    const googleError = new URLSearchParams(window.location.search).get('error');
-    if (googleError && googleError.startsWith('google_')) {
-      const reason = googleError.slice('google_'.length);
-      feedback.textContent = GOOGLE_ERROR_MESSAGES[reason] || 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่';
-      feedback.style.color = '#dc3545';
-      window.history.replaceState({}, '', window.location.pathname);
-    }
+
+    const googleLoginBtn = document.getElementById('googleLoginBtn');
+    let googlePopup = null;
+    let googlePopupWatcher = null;
+
+    window.addEventListener('message', (event) => {
+      if (event.origin !== window.location.origin) return; // ignore messages from anywhere but our own popup
+      const data = event.data;
+      if (!data || data.source !== 'queenmaker-google-auth') return;
+
+      clearInterval(googlePopupWatcher);
+      googleLoginBtn.disabled = false;
+
+      if (data.status === 'success') {
+        feedback.textContent = 'Login สำเร็จ! กำลังเข้าสู่ระบบ...';
+        feedback.style.color = '#198754';
+        setTimeout(() => { window.location.href = 'dashboard.html'; }, 400);
+      } else {
+        feedback.textContent = GOOGLE_ERROR_MESSAGES[data.reason] || 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่';
+        feedback.style.color = '#dc3545';
+      }
+    });
+
+    googleLoginBtn.addEventListener('click', () => {
+      feedback.textContent = '';
+      const width = 480, height = 600;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      googlePopup = window.open('/api/auth/google/start', 'queenmaker-google-login', `width=${width},height=${height},left=${left},top=${top}`);
+
+      if (!googlePopup) {
+        // Popup blocked by the browser - fall back to a normal full-page redirect instead
+        // of leaving the button silently doing nothing.
+        window.location.href = '/api/auth/google/start';
+        return;
+      }
+
+      googleLoginBtn.disabled = true;
+      googlePopupWatcher = setInterval(() => {
+        if (googlePopup.closed) {
+          clearInterval(googlePopupWatcher);
+          googleLoginBtn.disabled = false; // user closed the popup without finishing - let them retry
+        }
+      }, 500);
+    });
 
     // Password visibility toggle
     togglePassword.addEventListener('click', () => {

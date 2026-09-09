@@ -12,8 +12,14 @@ app.use(express.json());
 app.post('/api/auth/login', require('./api/auth/login'));
 app.post('/api/auth/logout', require('./api/auth/logout'));
 app.get('/api/auth/me', require('./api/auth/me'));
-app.get('/api/auth/google/start', require('./api/auth/google/start'));
-app.get('/api/auth/google/callback', require('./api/auth/google/callback'));
+// One handler module for both routes, mirroring Vercel's api/auth/google/[action].js
+// dynamic-route file - Express has no [param].js filename convention, so the :action
+// route param is copied onto req.query.action here to match what that module expects.
+const googleAuthHandler = require('./api/auth/google/[action]');
+app.get('/api/auth/google/:action', (req, res) => {
+  req.query.action = req.params.action;
+  googleAuthHandler(req, res);
+});
 app.get('/api/users', require('./api/users/index'));
 app.put('/api/users', require('./api/users/index'));
 app.post('/api/audit/log', require('./api/audit/log'));
