@@ -20,8 +20,13 @@ app.get('/api/auth/google/:action', (req, res) => {
   req.query.action = req.params.action;
   googleAuthHandler(req, res);
 });
-app.get('/api/users', require('./api/users/index'));
-app.put('/api/users', require('./api/users/index'));
+const usersHandler = require('./api/users/index');
+app.get('/api/users', usersHandler);
+app.put('/api/users', usersHandler);
+// Same function as /api/users (see that file's header comment for why) - mirrors
+// vercel.json's rewrite of this path to /api/users?resource=access-requests.
+app.get('/api/access-requests', (req, res) => { req.query.resource = 'access-requests'; usersHandler(req, res); });
+app.post('/api/access-requests', (req, res) => { req.query.resource = 'access-requests'; usersHandler(req, res); });
 app.post('/api/audit/log', require('./api/audit/log'));
 app.get('/api/discord/config', require('./api/discord/config'));
 app.put('/api/discord/config', require('./api/discord/config'));

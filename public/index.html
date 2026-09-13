@@ -77,8 +77,12 @@
       not_authorized: 'บัญชี Google นี้ยังไม่ได้รับสิทธิ์เข้าใช้งาน กรุณาติดต่อผู้ดูแลระบบ',
       denied: 'ยกเลิกการเข้าสู่ระบบด้วย Google',
       email_not_verified: 'อีเมล Google นี้ยังไม่ได้ยืนยัน กรุณายืนยันอีเมลกับ Google ก่อน',
-      not_configured: 'ยังไม่ได้ตั้งค่า Google Sign-in บนระบบนี้'
+      not_configured: 'ยังไม่ได้ตั้งค่า Google Sign-in บนระบบนี้',
+      access_request_pending: 'ส่งคำขอเข้าถึงระบบแล้ว กรุณารอผู้ดูแลระบบ (Super Admin) อนุมัติ'
     };
+    // Reasons that mean "waiting for approval" rather than an actual failure - shown in a
+    // neutral color instead of red so it doesn't read as an error to the person requesting access.
+    const GOOGLE_PENDING_REASONS = ['access_request_pending'];
 
     const googleLoginBtn = document.getElementById('googleLoginBtn');
     let googlePopup = null;
@@ -98,7 +102,7 @@
         setTimeout(() => { window.location.href = 'dashboard.html'; }, 400);
       } else {
         feedback.textContent = GOOGLE_ERROR_MESSAGES[data.reason] || 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ กรุณาลองใหม่';
-        feedback.style.color = '#dc3545';
+        feedback.style.color = GOOGLE_PENDING_REASONS.includes(data.reason) ? '#b8860b' : '#dc3545';
       }
     });
 

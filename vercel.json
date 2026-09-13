@@ -1,5 +1,6 @@
 {
   "rewrites": [
-    { "source": "/dashboard.html", "destination": "/api/dashboard-guard" }
+    { "source": "/dashboard.html", "destination": "/api/dashboard-guard" },
+    { "source": "/api/access-requests", "destination": "/api/users?resource=access-requests" }
   ]
 }

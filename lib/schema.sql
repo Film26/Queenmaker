@@ -52,3 +52,23 @@ CREATE TABLE IF NOT EXISTS app_config (
   key TEXT PRIMARY KEY,
   value JSONB NOT NULL
 );
+
+-- Google sign-in "request access" flow (see lib/accessRequestStore.js): a Google account
+-- that authenticates successfully but has no matching row in `users` can't get in on its
+-- own anymore - it lands here as a pending request instead, and a Super Admin must approve
+-- it (creating the real user row) or reject it from Settings before that email can log in.
+CREATE TABLE IF NOT EXISTS access_requests (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  name TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  decided_at TIMESTAMPTZ,
+  decided_by TEXT
+);
+
+-- Only one *pending* request per email at a time - once it's approved/rejected, the same
+-- email can end up with another row later (e.g. rejected, then re-requests) without
+-- conflicting with old decided rows.
+CREATE UNIQUE INDEX IF NOT EXISTS access_requests_pending_email_idx
+  ON access_requests (email) WHERE status = 'pending';

@@ -14,6 +14,7 @@
 // going forward, to leave headroom under that limit.
 const crypto = require('crypto');
 const userStore = require('../../../lib/userStore');
+const accessRequestStore = require('../../../lib/accessRequestStore');
 const auditLog = require('../../../lib/auditLog');
 const { createSessionCookie, createStateCookie, getStateFromRequest, clearStateCookie } = require('../../../lib/session');
 const { getClientIp } = require('../../../lib/reqUtils');
@@ -75,10 +76,16 @@ function popupResultPage(status, reason) {
 // Google only proves *identity* here (this really is that Gmail address) - it says
 // nothing about whether that person is allowed into Queenmaker. Authorization is still
 // entirely lib/userStore.js's job: the email must match an existing, active user record
-// that a Super Admin already created (via Settings, same as any other account) or the
-// login is denied even though Google's part succeeded. This is deliberate - Google login
-// was added specifically so unregistered people can't get in just by having a Google
-// account.
+// that a Super Admin already created/approved (via Settings) or the login is denied even
+// though Google's part succeeded. This is deliberate - Google login was added specifically
+// so unregistered people can't get in just by having a Google account.
+//
+// An email with no user row at all doesn't just get turned away, though: it lands in
+// lib/accessRequestStore.js as a pending "request access" row that a Super Admin reviews
+// and approves/rejects from Settings (see api/users/index.js's access-requests branch) -
+// approving creates the real user row. A deactivated *existing* account is different (a
+// deliberate decision by a Super Admin already), so that case is still a flat denial, no
+// request created.
 //
 // Token verification goes through Google's own tokeninfo endpoint (a plain HTTPS call)
 // instead of us decoding/verifying the id_token's JWT signature ourselves - avoids adding
@@ -126,9 +133,18 @@ async function handleCallback(req, res) {
     const email = (claims.email || '').toLowerCase();
     const user = await userStore.findByUsername(email);
 
-    if (!user || !user.active) {
-      auditLog.append({ type: 'unauthorized_access', reason: 'google_email_not_registered', username: email || '(blank)', ip });
+    if (user && !user.active) {
+      auditLog.append({ type: 'unauthorized_access', reason: 'account_deactivated', username: email, ip });
       return deny('not_authorized');
+    }
+
+    if (!user) {
+      const already = await accessRequestStore.findPendingByEmail(email);
+      if (!already) {
+        await accessRequestStore.create(email, claims.name || email);
+        await auditLog.append({ type: 'access_request_created', username: email, ip });
+      }
+      return deny('access_request_pending');
     }
 
     const sessionUser = { id: user.id, username: user.username, name: user.name, role: user.role };

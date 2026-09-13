@@ -156,6 +156,26 @@ function settingsApiSaveUsers(users) {
   return Promise.resolve(users);
 }
 
+// --- Pending "request access" rows (Google sign-in from an email with no user account yet -
+// see api/auth/google/[action].js) - Super Admin only, backed by api/users/index.js's
+// ?resource=access-requests branch (see that file's header comment for why it isn't its own
+// endpoint file). No Demo Mode fallback: this only makes sense against the real backend.
+function settingsApiGetAccessRequests() {
+  return fetch('/api/access-requests', { credentials: 'same-origin' })
+    .then(res => { if (!res.ok) throw new Error('โหลดคำขอเข้าถึงระบบไม่สำเร็จ'); return res.json(); });
+}
+function settingsApiDecideAccessRequest(id, decision, extra) {
+  return fetch('/api/access-requests', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ id, decision }, extra || {}))
+  }).then(res => res.json().then(data => {
+    if (!res.ok) throw new Error(data.error || 'ดำเนินการไม่สำเร็จ');
+    return data;
+  }));
+}
+
 // --- InsightHub Apps Script connection (Redis-backed, shared across the whole team -
 // see lib/insightHubConfigStore.js / api/insighthub/config.js) ---
 function settingsApiGetInsightHubConfig() {
@@ -195,6 +215,7 @@ window.AppData.statusOptions = window.AppData.statusOptions || window.DEFAULT_ST
 window.AppData.appConfig = window.AppData.appConfig || JSON.parse(JSON.stringify(window.DEFAULT_APP_CONFIG));
 window.AppData.insightHubScriptUrl = window.AppData.insightHubScriptUrl || '';
 window.AppData.users = window.AppData.users || [];
+window.AppData.accessRequests = window.AppData.accessRequests || [];
 
 let __settingsUi = { mainTab: 'config', configTab: 'Channel' };
 
@@ -253,9 +274,10 @@ function renderSettings() {
   stgInjectStyles();
   container.innerHTML = stgLoadingSkeleton();
 
-  Promise.all([settingsApiGetConfig(), settingsApiGetUsers()]).then(([config, users]) => {
+  Promise.all([settingsApiGetConfig(), settingsApiGetUsers(), settingsApiGetAccessRequests().catch(() => [])]).then(([config, users, accessRequests]) => {
     window.AppData.config = config;
     window.AppData.users = users;
+    window.AppData.accessRequests = accessRequests;
     stgRenderAll(container);
   }).catch(err => {
     console.error('[Settings] โหลดข้อมูลไม่สำเร็จ', err);
@@ -285,6 +307,7 @@ function stgRenderAll(container) {
       </button>
       <button class="stg-maintab-btn ${__settingsUi.mainTab === 'users' ? 'active' : ''}" onclick="stgSwitchMainTab('users')">
         <i class="fas fa-users-gear"></i> จัดการผู้ใช้งานระบบ
+        ${(window.AppData.accessRequests || []).length > 0 ? `<span class="stg-tab-badge">${window.AppData.accessRequests.length}</span>` : ''}
       </button>
       <button class="stg-maintab-btn ${__settingsUi.mainTab === 'insighthub' ? 'active' : ''}" onclick="stgSwitchMainTab('insighthub')">
         <i class="fas fa-plug-circle-bolt"></i> InsightHub
@@ -330,6 +353,19 @@ window.stgSwitchMainTab = function(tab) {
     body.innerHTML = stgLoadingSkeleton();
     stgLoadInsightHubSettingsData().then(() => {
       if (__settingsUi.mainTab === 'insighthub') body.innerHTML = stgBuildMainTabBody(tab);
+    });
+    return;
+  }
+  if (tab === 'users') {
+    // Pending access requests can change from another admin's session at any time - fetch
+    // fresh every time this tab is opened rather than relying on the preload snapshot.
+    body.innerHTML = stgLoadingSkeleton();
+    settingsApiGetAccessRequests().then(list => {
+      window.AppData.accessRequests = list;
+      if (__settingsUi.mainTab === 'users') body.innerHTML = stgBuildMainTabBody(tab);
+    }).catch(err => {
+      console.error('[Settings] โหลดคำขอเข้าถึงระบบไม่สำเร็จ', err);
+      if (__settingsUi.mainTab === 'users') body.innerHTML = stgBuildMainTabBody(tab);
     });
     return;
   }
@@ -634,6 +670,7 @@ window.stgDeleteConfigItem = function(category, itemId) {
 function stgBuildUsersSection() {
   const users = window.AppData.users || [];
   return `
+    ${stgBuildAccessRequestsPanel()}
     <div class="stg-card">
       <div class="stg-section-toolbar">
         <div>
@@ -682,6 +719,134 @@ function stgBuildUsersSection() {
     </div>
   `;
 }
+
+// คำขอเข้าถึงระบบที่รอการอนุมัติ (เกิดจาก Google Sign-in ด้วยอีเมลที่ยังไม่มี account ในระบบ - ดู
+// api/auth/google/[action].js) แสดงเฉพาะตอนมีคำขอค้างอยู่ ไม่งั้นซ่อนไปเลยเพื่อไม่ให้รกหน้า Users ปกติ
+function stgBuildAccessRequestsPanel() {
+  const requests = window.AppData.accessRequests || [];
+  if (requests.length === 0) return '';
+
+  return `
+    <div class="stg-card stg-access-requests-card">
+      <div class="stg-section-toolbar">
+        <div>
+          <h3><i class="fas fa-user-clock"></i> คำขอเข้าถึงระบบ (รออนุมัติ)</h3>
+          <p class="stg-subtitle">มีคนพยายาม Sign in ด้วย Google ด้วยอีเมลที่ยังไม่มีบัญชีในระบบ • ทั้งหมด ${requests.length} รายการ</p>
+        </div>
+      </div>
+      <div class="stg-table-wrapper">
+        <table class="stg-table">
+          <thead>
+            <tr>
+              <th style="text-align:left;">อีเมล</th>
+              <th style="text-align:left;">ชื่อ (จาก Google)</th>
+              <th>วันที่ขอ</th>
+              <th style="width:170px;">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${requests.map(r => `
+              <tr>
+                <td style="text-align:left; font-weight:600;">${stgEscapeHtml(r.email)}</td>
+                <td style="text-align:left;">${stgEscapeHtml(r.name || '-')}</td>
+                <td>${stgEscapeHtml(stgFormatDateTime(r.createdAt))}</td>
+                <td>
+                  <button class="stg-btn stg-btn-primary" style="padding:6px 14px; font-size:12px;" onclick="stgOpenApproveRequestModal('${r.id}')">
+                    <i class="fas fa-check"></i> อนุมัติ
+                  </button>
+                  <button class="stg-icon-btn stg-icon-btn-danger" title="ปฏิเสธคำขอ" onclick="stgRejectAccessRequest('${r.id}')"><i class="fas fa-xmark"></i></button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function stgFormatDateTime(iso) {
+  if (!iso) return '-';
+  try {
+    return new Date(iso).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', hour12: false });
+  } catch (e) {
+    return iso;
+  }
+}
+
+window.stgOpenApproveRequestModal = function(requestId) {
+  const request = (window.AppData.accessRequests || []).find(r => r.id === requestId);
+  if (!request) return;
+
+  document.getElementById('stg-modal-title').textContent = 'อนุมัติคำขอเข้าถึงระบบ';
+  document.getElementById('stg-modal-body').innerHTML = `
+    <div class="stg-form-group">
+      <label>อีเมล (Username)</label>
+      <input type="text" class="stg-input" value="${stgEscapeHtml(request.email)}" disabled>
+    </div>
+    <div class="stg-form-group">
+      <label>ชื่อ - นามสกุล</label>
+      <input type="text" class="stg-input" value="${stgEscapeHtml(request.name || request.email)}" disabled>
+    </div>
+    <div class="stg-form-group">
+      <label>Role</label>
+      <select id="stg-req-role" class="stg-input">
+        ${SETTINGS_ROLES.map(r => `<option value="${r}">${r}</option>`).join('')}
+      </select>
+    </div>
+    <div class="stg-form-group" id="stg-req-adminname-group" style="display:none;">
+      <label>ชื่อแอดมิน (Admin Name)</label>
+      <select id="stg-req-adminname" class="stg-input">
+        <option value="">-- เลือกชื่อแอดมิน --</option>
+        ${(window.AppData.config.Admin || []).filter(a => a.active).map(a => `<option value="${stgEscapeHtml(a.name)}">${stgEscapeHtml(a.name)}</option>`).join('')}
+      </select>
+    </div>
+    <p class="stg-muted">บัญชีนี้จะ Login ผ่าน Google เท่านั้น (ไม่มีการตั้งรหัสผ่านในขั้นตอนนี้) - Super Admin ตั้งรหัสผ่านเพิ่มให้ทีหลังได้จากหน้าแก้ไขผู้ใช้งาน</p>
+  `;
+
+  const roleSelect = document.getElementById('stg-req-role');
+  const adminNameGroup = document.getElementById('stg-req-adminname-group');
+  roleSelect.onchange = () => {
+    if (adminNameGroup) adminNameGroup.style.display = roleSelect.value === 'Sales Admin' ? '' : 'none';
+  };
+
+  const saveBtn = document.getElementById('stg-modal-save-btn');
+  saveBtn.onclick = () => stgApproveAccessRequest(requestId);
+  stgOpenModal();
+};
+
+function stgApproveAccessRequest(requestId) {
+  const role = document.getElementById('stg-req-role').value;
+  const adminName = document.getElementById('stg-req-adminname')?.value.trim() || '';
+  if (role === 'Sales Admin' && !adminName) { stgToast('กรุณาเลือกชื่อแอดมิน (Admin Name) สำหรับ Sales Admin', 'error'); return; }
+
+  settingsApiDecideAccessRequest(requestId, 'approve', { role, adminName: role === 'Sales Admin' ? adminName : null }).then(newUser => {
+    window.AppData.users = (window.AppData.users || []).concat([newUser]);
+    window.AppData.accessRequests = (window.AppData.accessRequests || []).filter(r => r.id !== requestId);
+    stgCloseModal();
+    stgSwitchMainTab('users');
+    stgToast('อนุมัติคำขอสำเร็จ - สร้างผู้ใช้งานใหม่แล้ว', 'success');
+    stgNotifyChange('users');
+  }).catch(err => {
+    console.error('[Settings] อนุมัติคำขอไม่สำเร็จ', err);
+    stgToast(err.message || 'อนุมัติคำขอไม่สำเร็จ', 'error');
+  });
+}
+
+window.stgRejectAccessRequest = function(requestId) {
+  const request = (window.AppData.accessRequests || []).find(r => r.id === requestId);
+  if (!request) return;
+  if (!confirm(`ต้องการปฏิเสธคำขอเข้าถึงระบบของ "${request.email}" หรือไม่?`)) return;
+
+  settingsApiDecideAccessRequest(requestId, 'reject').then(() => {
+    window.AppData.accessRequests = (window.AppData.accessRequests || []).filter(r => r.id !== requestId);
+    stgSwitchMainTab('users');
+    stgToast('ปฏิเสธคำขอแล้ว', 'success');
+  }).catch(err => {
+    console.error('[Settings] ปฏิเสธคำขอไม่สำเร็จ', err);
+    stgToast(err.message || 'ปฏิเสธคำขอไม่สำเร็จ', 'error');
+  });
+};
 
 window.stgOpenUserModal = function(userId) {
   const isEdit = !!userId;
@@ -1144,6 +1309,12 @@ function stgInjectStyles() {
       display: flex; align-items: center; gap: 8px;
     }
     .stg-maintab-btn.active { background-color: #1e293b; border-color: #1e293b; color: #ffffff; }
+    .stg-tab-badge {
+      background: #f59e0b; color: #fff; font-size: 10.5px; font-weight: 700; line-height: 1;
+      border-radius: 999px; padding: 3px 7px; margin-left: 2px;
+    }
+
+    .stg-access-requests-card { border-left: 4px solid #f59e0b; }
 
     .stg-card {
       background: #fff; border-radius: 16px; padding: 22px;
