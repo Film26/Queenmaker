@@ -429,7 +429,13 @@
         console.error('[InsightHub] โหลดข้อมูลไม่สำเร็จ:', err);
         const container = document.getElementById('view-insighthub');
         if (container) {
-          container.innerHTML = '<div style="text-align:center; padding:50px; color:#b91c1c;">โหลดข้อมูลไม่สำเร็จ: ' + (err && err.message ? err.message : err) + '</div>';
+          // ใช้ textContent แทนการต่อ string เข้า innerHTML - err.message มาจาก response ภายนอก
+          // (Google Apps Script) ไม่ควรเชื่อว่าปลอดภัยพอจะแทรกเป็น HTML ตรงๆ
+          container.innerHTML = '';
+          const errBox = document.createElement('div');
+          errBox.style.cssText = 'text-align:center; padding:50px; color:#b91c1c;';
+          errBox.textContent = 'โหลดข้อมูลไม่สำเร็จ: ' + (err && err.message ? err.message : err);
+          container.appendChild(errBox);
         }
       } finally {
         insightHubLoading = false;
@@ -986,9 +992,19 @@
         const menu = document.getElementById('menu-' + type);
         if (!menu) return;
         const options = getConfigOptionList(type);
-        menu.innerHTML = `<div onclick="setFilter('${type}', 'All')">All</div>`;
+        // ค่า val มาจากข้อมูลดิบใน CSV ที่ import (ชื่อ Admin/Product/Channel ฯลฯ) - ห้ามต่อ string
+        // เข้า innerHTML/onclick ตรงๆ เพราะเป็นช่องโหว่ XSS ถ้าไฟล์ CSV มีชื่อที่ปนโค้ด HTML/JS มา
+        // (เช่น import จากไฟล์ที่ถูกแก้ไข) ใช้ textContent + addEventListener แทนเพื่อกันไว้
+        menu.innerHTML = '';
+        const allOpt = document.createElement('div');
+        allOpt.textContent = 'All';
+        allOpt.addEventListener('click', () => setFilter(type, 'All'));
+        menu.appendChild(allOpt);
         options.forEach(val => {
-          menu.innerHTML += `<div onclick="setFilter('${type}', '${val}')">${val}</div>`;
+          const opt = document.createElement('div');
+          opt.textContent = val;
+          opt.addEventListener('click', () => setFilter(type, val));
+          menu.appendChild(opt);
         });
 
         if (filters[type] !== 'All' && options.indexOf(filters[type]) === -1) {
@@ -1075,7 +1091,17 @@
           execFilters[type] = 'All';
         }
         const menu = document.getElementById('menu-Exec-' + type);
-        if (menu) menu.innerHTML = options.map(val => `<div onclick="setExecFilter('${type}', '${val}')">${val}</div>`).join('');
+        // เหตุผลเดียวกับ refreshOptionDropdownsFromConfig ด้านบน - val มาจาก CSV ที่ import ห้ามต่อ
+        // string เข้า innerHTML/onclick ตรงๆ (ช่องโหว่ XSS)
+        if (menu) {
+          menu.innerHTML = '';
+          options.forEach(val => {
+            const opt = document.createElement('div');
+            opt.textContent = val;
+            opt.addEventListener('click', () => setExecFilter(type, val));
+            menu.appendChild(opt);
+          });
+        }
         const lbl = document.getElementById('lbl-Exec-' + type);
         if (lbl) lbl.textContent = execFilters[type] || '-';
       });
