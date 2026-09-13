@@ -720,15 +720,22 @@
 
     // ==========================================
     // 🛠️ แก้ไขประสิทธิภาพการค้นหารหัสลูกค้าให้รองรับทุกโครงสร้างไฟล์ (รวมถึง CustomerName และ Phone)
+    // ยึดเบอร์โทรเป็นหลักเสมอเมื่อมีเบอร์ที่ใช้งานได้จริง เพราะเบอร์โทรระบุตัวลูกค้าได้แม่นยำกว่าที่อยู่
+    // (คนละคนอาจส่งของไปที่อยู่เดียวกัน เช่นบ้าน/ที่ทำงานเดียวกัน ทำให้ถูกนับรวมเป็นคนเดียวผิดๆ ถ้ายึด
+    // ที่อยู่เป็นหลัก และคนเดียวกันอาจพิมพ์ที่อยู่ไม่ตรงกันในแต่ละออเดอร์ ทำให้ถูกนับเป็นลูกค้าใหม่ซ้ำๆ
+    // ทั้งที่จริงเป็นลูกค้าเก่าคนเดิมที่ซื้อซ้ำ) ตัดเหลือเฉพาะตัวเลขกันกรณีเบอร์เดียวกันพิมพ์ต่างรูปแบบ
+    // (มี/ไม่มีขีด เว้นวรรค) ไม่งั้นจะถูกนับเป็นคนละคน
     // ==========================================
     function getCustomerUniqueId(row) {
+      const phone = getRowValue(row, ['Phone', 'phone', 'เบอร์โทร', 'เบอร์']);
+      const phoneDigits = phone ? phone.toString().replace(/\D/g, '') : '';
+      const isPlaceholderPhone = !phoneDigits || phoneDigits.length < 9 || /^0+$/.test(phoneDigits) || phone.toString().trim().toLowerCase() === 'xxxxxxx';
+      if (!isPlaceholderPhone) {
+        return phoneDigits;
+      }
       const addr = getRowValue(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่', 'Address', 'address']);
       if (addr) {
         return addr.toString().toLowerCase().replace(/[\s\r\n\t\-,\.\/\\_]+/g, '');
-      }
-      const phone = getRowValue(row, ['Phone', 'phone', 'เบอร์โทร', 'เบอร์']);
-      if (phone && phone !== 'xxxxxxx') {
-        return phone.toString().trim();
       }
       const custId = getRowValue(row, ['Customer ID', 'รหัสลูกค้า']);
       if (custId) return custId.toString().trim();
