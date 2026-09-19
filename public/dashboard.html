@@ -278,35 +278,42 @@
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">ลูกค้าใหม่ปีนี้</div>
                   <div class="overview-stat-value" id="val-ytd-new">0</div>
+                  <div><span class="kpi-change-new neutral" id="mom-ytd-new" style="margin-top:6px;">-</span></div>
                   <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-new" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">ออเดอร์ YTD</div>
                   <div class="overview-stat-value" id="val-ytd-orders">0</div>
+                  <div><span class="kpi-change-new neutral" id="mom-ytd-orders" style="margin-top:6px;">-</span></div>
                 </div>
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">ยอดขาย YTD</div>
                   <div class="overview-stat-value" id="val-ytd-sales">฿0</div>
+                  <div><span class="kpi-change-new neutral" id="mom-ytd-sales" style="margin-top:6px;">-</span></div>
                   <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">AOV YTD</div>
                   <div class="overview-stat-value" id="val-ytd-aov">฿0</div>
+                  <div><span class="kpi-change-new neutral" id="mom-ytd-aov" style="margin-top:6px;">-</span></div>
                   <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-aov" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">SPH YTD</div>
                   <div class="overview-stat-value" id="val-ytd-sph">฿0</div>
+                  <div><span class="kpi-change-new neutral" id="mom-ytd-sph" style="margin-top:6px;">-</span></div>
                   <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-sph" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">Repeat (ครั้ง/หัว)</div>
                   <div class="overview-stat-value" id="val-ytd-repeat">0.00</div>
+                  <div><span class="kpi-change-new neutral" id="mom-ytd-repeat" style="margin-top:6px;">-</span></div>
                   <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-repeat" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
                   <div class="overview-stat-label">Repeat Rate %</div>
                   <div class="overview-stat-value" id="val-ytd-repeat-rate">0%</div>
+                  <div><span class="kpi-change-new neutral" id="mom-ytd-repeat-rate" style="margin-top:6px;">-</span></div>
                 </div>
               </div>
             </div>
@@ -663,20 +670,74 @@
       return sign + (num * 100).toFixed(1) + '%';
     }
 
-    function updateChangeUI(elId, current, previous) {
+    // badge เทียบเดือนก่อนหน้า (MoM) ใต้ตัวเลขในการ์ด YTD - current/previous เป็นค่ารายเดือนของเดือนที่เลือก
+    // กับเดือนก่อนหน้า (ไม่ใช่ค่าสะสม YTD) ถ้าเดือนก่อนหน้าไม่มีข้อมูลจะแสดง "-" ไม่เดาเป็น 0
+    // asPoints = true ใช้กับ Repeat Rate % (แสดงส่วนต่างเป็น pts แทนเปลี่ยนแปลงเป็น % ของค่าเดิม)
+    function updateChangeUI(elId, current, previous, opts) {
       const el = document.getElementById(elId);
       if (!el) return;
-      if (!previous || previous === 0) {
-        el.textContent = '-'; el.className = 'kpi-change-new neutral'; return;
+      opts = opts || {};
+      const momLabel = '<span style="font-size:9px; font-weight:800; letter-spacing:0.5px;">MoM</span> ';
+      el.title = opts.title || '';
+      // โหมด pts ค่าเดิมเป็น 0 ได้จริง (Repeat Rate 0% เดือนก่อน) จึงถือว่า "ไม่มีข้อมูล" เฉพาะเมื่อเป็น null
+      const noPrev = opts.asPoints ? (previous === null || previous === undefined) : (!previous || previous === 0);
+      if (noPrev) {
+        el.innerHTML = momLabel + '-'; el.className = 'kpi-change-new neutral'; return;
       }
-      const change = (current - previous) / previous;
-      el.textContent = formatPercent(change);
-      
+      const change = opts.asPoints ? (current - previous) : (current - previous) / previous;
+      const text = opts.asPoints
+        ? (change > 0 ? '+' : '') + change.toFixed(1) + ' pts'
+        : formatPercent(change);
+
       let icon = '';
       if (change > 0) { el.className = 'kpi-change-new up'; icon = '<i class="fas fa-arrow-up"></i> '; }
       else if (change < 0) { el.className = 'kpi-change-new down'; icon = '<i class="fas fa-arrow-down"></i> '; }
       else { el.className = 'kpi-change-new neutral'; }
-      el.innerHTML = icon + el.textContent;
+      el.innerHTML = momLabel + icon + text;
+    }
+
+    function getPrevMonthStr(monthStr) {
+      let [y, m] = monthStr.split('-').map(Number);
+      m -= 1;
+      if (m === 0) { m = 12; y -= 1; }
+      return y + '-' + m.toString().padStart(2, '0');
+    }
+
+    // สถิติรายเดือนสำหรับเทียบ MoM - ใช้ข้อมูลที่ผ่านทุก Filter ยกเว้น Year (Group/Channel/ฯลฯ ยังมีผล) เพื่อให้
+    // เดือน ม.ค. เทียบกับ ธ.ค. ปีก่อนได้แม้เลือก Year เป็นปีเดียวอยู่ ลูกค้าใหม่ใช้ globalFirstPurchase ชุดเดียวกับการ์ด
+    function computeMonthlyStats(monthStrs) {
+      const src = computeFilteredData(Object.assign({}, filters, { Year: 'All' }));
+      const acc = {};
+      monthStrs.forEach(ms => { acc[ms] = { sales: 0, orders: 0, buyerOrders: new Map() }; });
+      src.forEach(row => {
+        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+        const d = dateStr ? parseDate(dateStr) : null;
+        if (!d || !acc[d.str]) return;
+        const a = acc[d.str];
+        const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
+        a.sales += parseFloat(revenueStr.toString().replace(/,/g, '').trim()) || 0;
+        a.orders++;
+        const id = getCustomerUniqueId(row);
+        if (id) a.buyerOrders.set(id, (a.buyerOrders.get(id) || 0) + 1);
+      });
+      const out = {};
+      monthStrs.forEach(ms => {
+        const a = acc[ms];
+        const buyers = a.buyerOrders.size;
+        let newCust = 0, repeatBuyers = 0;
+        a.buyerOrders.forEach((cnt, id) => {
+          if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === ms) newCust++;
+          if (cnt >= 2) repeatBuyers++;
+        });
+        out[ms] = {
+          newCust, orders: a.orders, sales: a.sales,
+          aov: a.orders > 0 ? a.sales / a.orders : 0,
+          sph: buyers > 0 ? a.sales / buyers : 0,
+          repeat: buyers > 0 ? a.orders / buyers : 0,
+          repeatRate: buyers > 0 ? (repeatBuyers / buyers) * 100 : 0
+        };
+      });
+      return out;
     }
 
     // badge เทียบ % กับเป้าหมายจากหน้า KPI Setting (แยกจาก updateChangeUI เดิมที่เทียบเดือนก่อนหน้า) - แปะไว้
@@ -1457,19 +1518,22 @@
         const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
         const admin = getNormalizedAdmin(row);
         
-        if (!id || !dateStr) return;
+        // ยอดขาย/จำนวนออเดอร์นับทุกแถวที่เป็นการขายจริงและมีวันที่ ไม่ขึ้นกับว่าระบุตัวลูกค้าได้หรือไม่ (แถวที่ไม่มี
+        // เบอร์/ที่อยู่/ชื่อเลย ยังเป็นยอดขายจริง ถ้าตัดทิ้งจะทำให้ Sum ยอดขาย/AOV ต่ำกว่าไฟล์ โดยเฉพาะปีเก่าที่เบอร์
+        // ถูกมาสก์) ส่วนจำนวนลูกค้า (buyers) นับเฉพาะแถวที่มี id
+        if (!dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
         const revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim()) || 0;
         const mStr = d.str;
-        
+
         if (!monthlyData[mStr]) {
           monthlyData[mStr] = { sales: 0, orders: 0, buyers: new Set(), channels: {}, admins: {}, year: d.y };
         }
         let m = monthlyData[mStr];
         m.sales += revenue;
         m.orders++;
-        m.buyers.add(id);
+        if (id) m.buyers.add(id);
         if (!m.channels[channel]) m.channels[channel] = 0;
         m.channels[channel] += revenue;
         // แถวที่ไม่มีชื่อแอดมินจริง (admin === 'Unknown') ไม่เอาเข้ากราฟ Admin เลย - ไม่มีคือไม่มี ไม่ต้องมีแท่ง
@@ -1499,6 +1563,7 @@
       countIds.forEach(id => { const el = document.getElementById('val-' + id); if (el) el.textContent = '0'; });
       decimalIds.forEach(id => { const el = document.getElementById('val-' + id); if (el) el.textContent = '0.00'; });
       percentIds.forEach(id => { const el = document.getElementById('val-' + id); if (el) el.textContent = '0%'; });
+      ['ytd-new', 'ytd-orders', 'ytd-sales', 'ytd-aov', 'ytd-sph', 'ytd-repeat', 'ytd-repeat-rate'].forEach(id => updateChangeUI('mom-' + id, 0, 0));
       Object.values(charts).forEach(c => { if(c && c.data) { c.data.labels = []; c.update(); } });
     }
 
@@ -1514,12 +1579,12 @@
         if (!isProductActive(getNormalizedProduct(row))) return;
         const id = getCustomerUniqueId(row);
         const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-        if (!id || !dateStr) return;
+        if (!dateStr) return;
         if (!parseDate(dateStr)) return;
         const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
         totalSales += parseFloat(revenueStr.toString().replace(/,/g, '').trim()) || 0;
         totalOrders++;
-        buyerOrders.set(id, (buyerOrders.get(id) || 0) + 1);
+        if (id) buyerOrders.set(id, (buyerOrders.get(id) || 0) + 1);
       });
       const totalCust = buyerOrders.size;
       let repeatBuyers = 0;
@@ -1573,6 +1638,26 @@
       let ytdRepeatBuyers = 0;
       ytdBuyerOrderCounts.forEach(c => { if (c >= 2) ytdRepeatBuyers++; });
       const ytdRepeatRate = ytdBuyers.size > 0 ? (ytdRepeatBuyers / ytdBuyers.size) * 100 : 0;
+
+      // เทียบเดือนที่เลือก (Month filter หรือเดือนล่าสุด) กับเดือนก่อนหน้า - ค่ารายเดือน ไม่ใช่ YTD สะสม
+      const prevMonthStr = getPrevMonthStr(selectedMonthStr);
+      const momStats = computeMonthlyStats([selectedMonthStr, prevMonthStr]);
+      const momCur = momStats[selectedMonthStr], momPrev = momStats[prevMonthStr];
+      const momTitle = (label, fmt, key) => 'เทียบเดือนก่อนหน้า (' + selectedMonthStr + ' vs ' + prevMonthStr + ') - ' + label + ': ' + fmt(momCur[key]) + ' vs ' + fmt(momPrev[key]);
+      const fmtInt = v => Math.round(v).toLocaleString();
+      const fmt2 = v => v.toFixed(2);
+      const fmtPct = v => v.toFixed(1) + '%';
+      [
+        ['ytd-new', 'newCust', 'ลูกค้าใหม่', fmtInt],
+        ['ytd-orders', 'orders', 'ออเดอร์', fmtInt],
+        ['ytd-sales', 'sales', 'ยอดขาย', formatCurrency],
+        ['ytd-aov', 'aov', 'AOV', formatCurrency],
+        ['ytd-sph', 'sph', 'SPH', formatCurrency],
+        ['ytd-repeat', 'repeat', 'Repeat', fmt2]
+      ].forEach(([id, key, label, fmt]) => {
+        updateChangeUI('mom-' + id, momCur[key], momPrev[key], { title: momTitle(label, fmt, key) });
+      });
+      updateChangeUI('mom-ytd-repeat-rate', momCur.repeatRate, momPrev.orders > 0 ? momPrev.repeatRate : null, { asPoints: true, title: momTitle('Repeat Rate', fmtPct, 'repeatRate') });
 
       // ==========================================
       // 📊 การ์ด "สรุปปีล่าสุด (YTD)" ด้านบน - ผูกกับ Filter ที่เลือกอยู่ (Year/Month/Channel/ฯลฯ)
