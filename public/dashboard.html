@@ -158,6 +158,10 @@
         </div>
         <div class="filters-bar" id="mainFiltersBar">
           <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-Group" onclick="toggleFilter('menu-Group')">Group: <span id="lbl-Group">All</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-Group" class="filter-content"></div>
+          </div>
+          <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Year" onclick="toggleFilter('menu-Year')">Year: <span id="lbl-Year">All</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Year" class="filter-content"></div>
           </div>
@@ -194,6 +198,10 @@
              Year/Month ต้องเลือกค่าจริงเสมอ (ตาราง CRM Report เป็นรายเดือนของปีเดียว) ส่วน Channel/SubChannel/
              Product/SubProduct/Admin มีตัวเลือก "All" ดู execFilters/setExecFilter ในสคริปต์ด้านล่าง -->
         <div class="filters-bar" id="execFiltersBar" style="display:none;">
+          <div class="filter-dropdown">
+            <button class="filter-btn-new" id="btn-Exec-Group" onclick="toggleFilter('menu-Exec-Group')">Group: <span id="lbl-Exec-Group">All</span> <i class="fas fa-caret-down"></i></button>
+            <div id="menu-Exec-Group" class="filter-content"></div>
+          </div>
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-Exec-Year" onclick="toggleFilter('menu-Exec-Year')">Year: <span id="lbl-Exec-Year">-</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Exec-Year" class="filter-content"></div>
@@ -365,7 +373,7 @@
     let filteredData = [];
 
     // คอยเก็บสถานะ Filter โดยเพิ่ม 'KPI' เข้ามา (ตั้งค่าเริ่มต้นเป็น Off)
-    let filters = { Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All', KPI: 'Off' };
+    let filters = { Group: 'All', Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All', KPI: 'Off' };
     window.filters = filters;
 
     // --- Auth/session (Task 4/7) ---
@@ -467,8 +475,8 @@
     function precomputeGlobalFirstPurchases() {
       globalFirstPurchase = {};
       if (!rawData || rawData.length === 0) return;
-      
-      rawData.forEach(row => {
+
+      getScopedRawData().forEach(row => {
         if (!isSaleOrder(row)) return;
         const id = getCustomerUniqueId(row);
         const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
@@ -513,6 +521,7 @@
                     return Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
                   });
 
+                  refreshGroupMenus();
                   precomputeGlobalFirstPurchases();
                   // เรียกตรงๆ ทุกครั้งที่ import (ไม่ใช่แค่ครั้งแรก) เพื่อให้ตัวเลือก Filter ทั้งหมด
                   // (Year/Month/Channel/SubChannel/Product/SubProduct/Admin) รีเฟรชตามไฟล์ที่ import เข้ามาใหม่เสมอ
@@ -573,7 +582,7 @@
         if (mainFiltersBar) mainFiltersBar.style.display = 'flex';
         if (execFiltersBar) execFiltersBar.style.display = 'none';
 
-        if (typeof renderAiAnalytics === 'function') { renderAiAnalytics(filteredData, rawData); }
+        if (typeof renderAiAnalytics === 'function') { renderAiAnalytics(filteredData, getScopedRawData()); }
       } else if (tabId === 'settings') {
         if (sideSettings) sideSettings.classList.add('active');
         document.getElementById('view-settings').style.display = 'block';
@@ -626,7 +635,7 @@
         } else if (tabId === 'cohort') {
           document.getElementById('tab-cohort').classList.add('active');
           document.getElementById('view-cohort').style.display = 'block';
-          if (typeof renderCohortHeatmap === 'function') { renderCohortHeatmap(filteredData, rawData); }
+          if (typeof renderCohortHeatmap === 'function') { renderCohortHeatmap(filteredData, getScopedRawData()); }
         } else if (tabId === 'executive1') {
           document.getElementById('tab-executive1').classList.add('active');
           document.getElementById('view-executive1').style.display = 'block';
@@ -635,11 +644,11 @@
         } else if (tabId === 'executive2') {
           document.getElementById('tab-executive2').classList.add('active');
           document.getElementById('view-executive2').style.display = 'block';
-          if (typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, rawData); }
+          if (typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, getScopedRawData()); }
         } else if (tabId === 'retention') {
           document.getElementById('tab-retention').classList.add('active');
           document.getElementById('view-retention').style.display = 'block';
-          if (typeof renderRetention === 'function') { renderRetention(filteredData, rawData); }
+          if (typeof renderRetention === 'function') { renderRetention(filteredData, getScopedRawData()); }
         }
       }
     }
@@ -945,6 +954,88 @@
       return a;
     }
 
+    // --- Group filter (ใหญ่สุดของทั้งระบบ) ---
+    // Group คือคอลัมน์ "Group" ในไฟล์ (เช่น Holista / Kides / CRM) - ทุก filter/การ์ด/กราฟ/หน้าอื่นๆ
+    // (Year, Channel ฯลฯ รวมถึงตัวเลือกในแต่ละ dropdown) ทำงานอยู่ภายใต้ข้อมูลของกลุ่มที่เลือกเท่านั้น
+    // ใช้ชื่อคอลัมน์ตรงตัว (ไม่ใช้ getRowValue ที่จับแบบ includes) กันไปชนคอลัมน์อื่นที่มีคำว่า group
+    function getNormalizedGroup(row) {
+      if (!row) return 'Unknown';
+      let v = row['Group'];
+      if (v === undefined) {
+        const k = Object.keys(row).find(key => /^(group|กลุ่ม|กรุ๊ป)$/i.test(key.trim()));
+        v = k !== undefined ? row[k] : '';
+      }
+      const g = (v || '').toString().trim();
+      return g || 'Unknown';
+    }
+
+    // rawData ที่ถูกจำกัดตามกลุ่มที่เลือกอยู่ (ทุกกลุ่มคืน rawData ตรงๆ) - ใช้แทน rawData ในทุกจุดที่ต้องมองย้อน
+    // ประวัติลูกค้า (first purchase / cohort) เพื่อให้ลูกค้าใหม่/เก่านับภายในกลุ่มนั้น
+    let scopedRawCache = { src: null, group: null, data: null };
+    function getScopedRawData() {
+      const g = filters.Group;
+      if (!g || g === 'All') return rawData;
+      if (scopedRawCache.src !== rawData || scopedRawCache.group !== g) {
+        scopedRawCache = { src: rawData, group: g, data: rawData.filter(r => getNormalizedGroup(r) === g) };
+      }
+      return scopedRawCache.data;
+    }
+
+    function getGroupOptionList() {
+      const values = new Set();
+      rawData.forEach(row => {
+        if (!isSaleOrder(row)) return;
+        const g = getNormalizedGroup(row);
+        if (g !== 'Unknown') values.add(g);
+      });
+      return Array.from(values).sort();
+    }
+
+    function refreshGroupMenus() {
+      const options = getGroupOptionList();
+      if (filters.Group !== 'All' && options.indexOf(filters.Group) === -1) {
+        filters.Group = 'All';
+        execFilters.Group = 'All';
+      }
+      ['menu-Group', 'menu-Exec-Group'].forEach(menuId => {
+        const menu = document.getElementById(menuId);
+        if (!menu) return;
+        menu.innerHTML = '';
+        ['All'].concat(options).forEach(val => {
+          const opt = document.createElement('div');
+          opt.textContent = val;
+          opt.addEventListener('click', () => setGroup(val));
+          menu.appendChild(opt);
+        });
+      });
+      syncGroupButtons();
+    }
+
+    function syncGroupButtons() {
+      ['Group', 'Exec-Group'].forEach(suffix => {
+        const lbl = document.getElementById('lbl-' + suffix);
+        if (lbl) lbl.textContent = filters.Group;
+        const btn = document.getElementById('btn-' + suffix);
+        if (btn) btn.classList.toggle('active', filters.Group !== 'All');
+        const menu = document.getElementById('menu-' + suffix);
+        if (menu) menu.classList.remove('show');
+      });
+    }
+
+    function setGroup(val) {
+      filters.Group = val;
+      execFilters.Group = val;
+      syncGroupButtons();
+      window.userCohorts = null;
+      window.scFirstPurchase = null;
+      precomputeGlobalFirstPurchases();
+      // ตัวเลือกของ filter อื่นทั้งหมดต้องมาจากข้อมูลของกลุ่มที่เลือกเท่านั้น (ค่าที่ไม่มีในกลุ่มนี้จะถูกรีเซ็ตเป็น All)
+      populateDropdowns();
+      if (rawData.length > 0) populateExecDropdowns();
+      applyFilters();
+    }
+    window.setGroup = setGroup;
+
     // --- Dropdowns & Filters Logic ---
     const OPTION_FILTER_TYPES = ['Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'];
 
@@ -965,7 +1056,7 @@
     // KPI/กราฟอยู่แล้ว (ดู isProductActive) เลือกเป็น filter ไปก็ไม่มีข้อมูลให้แสดง
     function getConfigOptionList(type) {
       const values = new Set();
-      rawData.forEach(row => {
+      getScopedRawData().forEach(row => {
         if (!isSaleOrder(row)) return;
         let val;
         if (type === 'Channel') {
@@ -1045,7 +1136,7 @@
     // ต่างจากค่าที่ auto-select ให้ตอนเปิดหน้าครั้งแรก ใช้คุมว่าแถว 13-15 (Migration group) ในตาราง CRM Report
     // จะโชว์ข้อมูลจริงเมื่อไหร่ (ต่อเมื่อกดเลือก Channel หรือ SubChannel เองอย่างน้อย 1 ตัว) ดู renderExecutive1 ใน executive.js
     // ==========================================================================
-    let execFilters = { Year: '', Month: '', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All' };
+    let execFilters = { Group: 'All', Year: '', Month: '', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All' };
     window.execFilters = execFilters;
     const EXEC_OPTION_FILTER_TYPES = ['Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'];
     // หมายเหตุ: มีทุกคีย์ของ execFilters ยกเว้น Month (Month reset ตาม Year เสมออยู่แล้วโดยไม่ต้องพึ่ง touched
@@ -1057,7 +1148,7 @@
 
     function populateExecYearMenu() {
       const yearsSet = new Set();
-      rawData.forEach(row => {
+      getScopedRawData().forEach(row => {
         const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
         if (!dateStr) return;
         const d = parseDate(dateStr);
@@ -1075,7 +1166,7 @@
 
     function populateExecMonthMenu() {
       const monthsSet = new Set();
-      rawData.forEach(row => {
+      getScopedRawData().forEach(row => {
         const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
         if (!dateStr) return;
         const d = parseDate(dateStr);
@@ -1149,7 +1240,7 @@
 
     function applyExecFilters() {
       const execFilteredData = computeFilteredData(execFilters);
-      if (typeof renderExecutive1 === 'function') { renderExecutive1(execFilteredData, rawData); }
+      if (typeof renderExecutive1 === 'function') { renderExecutive1(execFilteredData, getScopedRawData()); }
     }
 
     // อัปเดตแบบเรียลไทม์: หน้า Settings ยิง 'appDataChanged' ทุกครั้งที่ เพิ่ม/แก้ไข/ลบ/เปลี่ยนสถานะ
@@ -1172,13 +1263,20 @@
     // Year list never depends on the current filter selection - built once from all raw data.
     function populateYearMenu() {
       const yearsSet = new Set();
-      rawData.forEach(row => {
+      getScopedRawData().forEach(row => {
         const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
         if (!dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
         yearsSet.add(d.y.toString());
       });
+      if (filters.Year !== 'All' && !yearsSet.has(filters.Year)) {
+        filters.Year = 'All';
+        const lbl = document.getElementById('lbl-Year');
+        if (lbl) lbl.textContent = 'All';
+        const btn = document.getElementById('btn-Year');
+        if (btn) btn.classList.remove('active');
+      }
       const yearMenu = document.getElementById('menu-Year');
       if (yearMenu) {
         yearMenu.innerHTML = `<div onclick="setFilter('Year', 'All')">All</div>`;
@@ -1192,7 +1290,7 @@
     // after switching years. Resets the Month filter if it's no longer valid for the new year.
     function populateMonthMenu(selectedYear) {
       const monthsSet = new Set();
-      rawData.forEach(row => {
+      getScopedRawData().forEach(row => {
         const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
         if (!dateStr) return;
         const d = parseDate(dateStr);
@@ -1289,6 +1387,7 @@
         const admin = getNormalizedAdmin(row);
 
         if (!isProductActive(product)) return false;
+        if (sourceFilters.Group && sourceFilters.Group !== 'All' && getNormalizedGroup(row) !== sourceFilters.Group) return false;
         if (sourceFilters.Year !== 'All' && d.y.toString() !== sourceFilters.Year) return false;
         if (sourceFilters.Channel !== 'All' && channel !== sourceFilters.Channel) return false;
         if (sourceFilters.SubChannel !== 'All' && subChannel !== sourceFilters.SubChannel) return false;
@@ -1312,13 +1411,13 @@
 
       processData(filteredData);
 
-      try { if (document.getElementById('view-cohort').style.display === 'block' && typeof renderCohortHeatmap === 'function') { renderCohortHeatmap(filteredData, rawData); } } catch(e) { console.error(e); }
-      try { if (document.getElementById('view-executive2').style.display === 'block' && typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, rawData); } } catch(e) { console.error(e); }
+      try { if (document.getElementById('view-cohort').style.display === 'block' && typeof renderCohortHeatmap === 'function') { renderCohortHeatmap(filteredData, getScopedRawData()); } } catch(e) { console.error(e); }
+      try { if (document.getElementById('view-executive2').style.display === 'block' && typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, getScopedRawData()); } } catch(e) { console.error(e); }
       // InsightHub deliberately NOT re-rendered here - it has its own data source (see
       // loadInsightHubDataFromAppsScript/window.refreshInsightHub above), unrelated to this
       // CSV-driven filters/rawData pipeline.
-      try { if (document.getElementById('view-retention').style.display === 'block' && typeof renderRetention === 'function') { renderRetention(filteredData, rawData); } } catch(e) { console.error(e); }
-      try { if (document.getElementById('view-ai-analytics').style.display === 'block' && typeof renderAiAnalytics === 'function') { renderAiAnalytics(filteredData, rawData); } } catch(e) { console.error(e); }
+      try { if (document.getElementById('view-retention').style.display === 'block' && typeof renderRetention === 'function') { renderRetention(filteredData, getScopedRawData()); } } catch(e) { console.error(e); }
+      try { if (document.getElementById('view-ai-analytics').style.display === 'block' && typeof renderAiAnalytics === 'function') { renderAiAnalytics(filteredData, getScopedRawData()); } } catch(e) { console.error(e); }
       // หน้า Executive ใช้ execFilters แยกต่างหาก ไม่ได้อยู่ในลูป filteredData ด้านบน - ถ้าไม่เรียกตรงนี้ด้วย
       // การ Import Data/Load Sample ใหม่ตอนที่ค้างอยู่หน้า Executive อยู่แล้ว จะไม่รีเฟรชข้อมูลเลย (ค้าง
       // "No data available" ต่อไปจนกว่าจะสลับแท็บออกแล้วกลับเข้ามาใหม่)
@@ -1410,7 +1509,7 @@
     function computeAllTimeOverview() {
       const buyerOrders = new Map();
       let totalSales = 0, totalOrders = 0;
-      rawData.forEach(row => {
+      getScopedRawData().forEach(row => {
         if (!isSaleOrder(row)) return;
         if (!isProductActive(getNormalizedProduct(row))) return;
         const id = getCustomerUniqueId(row);
