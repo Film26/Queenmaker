@@ -176,22 +176,15 @@ function settingsApiDecideAccessRequest(id, decision, extra) {
   }));
 }
 
-// --- InsightHub Apps Script connection (Redis-backed, shared across the whole team -
-// see lib/insightHubConfigStore.js / api/insighthub/config.js) ---
-function settingsApiGetInsightHubConfig() {
-  return fetch('/api/insighthub/config', { credentials: 'same-origin' })
-    .then(res => { if (!res.ok) throw new Error('โหลดการตั้งค่า InsightHub ไม่สำเร็จ'); return res.json(); });
-}
-function settingsApiSaveInsightHubConfig(scriptUrl) {
-  return fetch('/api/insighthub/config', {
-    method: 'PUT',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ scriptUrl })
-  }).then(res => res.json().then(data => {
-    if (!res.ok) throw new Error(data.error || 'บันทึกไม่สำเร็จ');
-    return data;
-  }));
+// --- Export Log (Super Admin only) - backed by api/audit/log.js's GET branch (same file as the POST
+// that the dashboard's Export Data button calls before every download). No Demo Mode fallback:
+// only meaningful against the real backend.
+function settingsApiGetExportLog() {
+  return fetch('/api/audit/log?limit=500', { credentials: 'same-origin' })
+    .then(res => res.json().then(data => {
+      if (!res.ok) throw new Error(data.error || 'โหลดบันทึกการ Export ไม่สำเร็จ');
+      return data.entries || [];
+    }));
 }
 
 // --- Shared app state ---
@@ -309,8 +302,9 @@ function stgRenderAll(container) {
         <i class="fas fa-users-gear"></i> จัดการผู้ใช้งานระบบ
         ${(window.AppData.accessRequests || []).length > 0 ? `<span class="stg-tab-badge">${window.AppData.accessRequests.length}</span>` : ''}
       </button>
-      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'insighthub' ? 'active' : ''}" onclick="stgSwitchMainTab('insighthub')">
-        <i class="fas fa-plug-circle-bolt"></i> InsightHub
+      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'exportlog' ? 'active' : ''}" onclick="stgSwitchMainTab('exportlog')">
+        <i class="fas fa-file-export"></i> Export Log
+        ${(window.qmExportUnseen || 0) > 0 ? `<span class="stg-tab-badge" id="stg-exportlog-tab-badge">${window.qmExportUnseen}</span>` : ''}
       </button>
     </div>
 
@@ -336,24 +330,18 @@ function stgRenderAll(container) {
 
 function stgBuildMainTabBody(tab) {
   if (tab === 'users') return stgBuildUsersSection();
-  if (tab === 'insighthub') return stgBuildInsightHubSection();
+  if (tab === 'exportlog') return stgBuildExportLogSection();
   return stgBuildConfigSection();
 }
 
 window.stgSwitchMainTab = function(tab) {
   __settingsUi.mainTab = tab;
   const body = document.getElementById('stg-maintab-body');
-  const tabOrder = ['config', 'users', 'insighthub'];
+  const tabOrder = ['config', 'users', 'exportlog'];
   document.querySelectorAll('.stg-maintab-btn').forEach((b, i) => b.classList.toggle('active', tabOrder[i] === tab));
   if (!body) return;
-  if (tab === 'insighthub') {
-    // Connection URL / Advanced Config / Contact Status all live on the InsightHub Apps Script
-    // backend, not in window.AppData.config (which is preloaded up front for the other two
-    // tabs) - fetch fresh every time this tab is opened so it never shows stale values.
-    body.innerHTML = stgLoadingSkeleton();
-    stgLoadInsightHubSettingsData().then(() => {
-      if (__settingsUi.mainTab === 'insighthub') body.innerHTML = stgBuildMainTabBody(tab);
-    });
+  if (tab === 'exportlog') {
+    stgOpenExportLog();
     return;
   }
   if (tab === 'users') {
@@ -1001,287 +989,136 @@ window.stgCloseModal = function() {
 };
 
 // =====================================================
-// หมวดที่ 3: InsightHub - การเชื่อมต่อ Google Apps Script + สถานะการติดต่อ (Sales Note) +
-// Advanced Config (Loyalty Index / Admin Priority / Trend Visual / Refill Buffer)
-//
-// Unlike หมวดที่ 1/2 (Channel/SubChannel/.../Users, stored in Queenmaker's own Redis via
-// settingsApiGetConfig/settingsApiGetUsers), everything in this tab except the connection URL
-// itself lives on the user's own Google Sheet, read/written through window.InsightHubApi
-// (public/insighthub-api.js) - the InsightHub tab is a standalone system with its own data
-// source, see public/insighthub.js's file header comment. Only the connection URL is stored
-// centrally in Queenmaker's Redis (settingsApiGetInsightHubConfig/SaveInsightHubConfig above),
-// since it must be shared across the whole team rather than per-browser.
+// หมวดที่ 3: Export Log - บันทึกการ Export ไฟล์ข้อมูลออกจากระบบ
+// ทุกครั้งที่ Super Admin/Manager กดปุ่ม Export Data บนหน้า Dashboard ระบบจะบันทึกรายการ (ใคร/เมื่อไหร่/หน้าไหน/
+// Group และ Filter อะไร/กี่แถว/IP) ลงฐานข้อมูลก่อนดาวน์โหลด ถ้าบันทึกไม่สำเร็จจะไม่ให้ดาวน์โหลด
+// หน้านี้แค่อ่านรายการเหล่านั้นมาแสดง (ดูได้เฉพาะ Super Admin - เช็คซ้ำที่ฝั่งเซิร์ฟเวอร์ด้วย)
 // =====================================================
-let __stgStatusDraft = null;
+let __stgExportEntries = [];
+let __stgExportSeenBefore = null;
+let __stgExportFilter = { user: '', from: '', to: '' };
+let __stgExportError = '';
 
-// Fetches the connection URL + (if configured) status options + advanced config fresh from
-// their real sources - called every time this tab is opened (see stgSwitchMainTab) rather than
-// relying on whatever happened to be preloaded/cached, since none of that is preloaded like
-// window.AppData.config/users are.
-function stgLoadInsightHubSettingsData() {
-  __stgStatusDraft = null;
-  return settingsApiGetInsightHubConfig().then(cfg => {
-    window.AppData.insightHubScriptUrl = (cfg && cfg.scriptUrl) || '';
-    if (!window.AppData.insightHubScriptUrl) return null;
-    return Promise.all([
-      window.InsightHubApi ? window.InsightHubApi.getStatusOptions().catch(() => null) : null,
-      window.InsightHubApi ? window.InsightHubApi.getAppConfig().catch(() => null) : null,
-    ]).then(([statusResult, configResult]) => {
-      if (statusResult && Array.isArray(statusResult.options) && statusResult.options.length) {
-        window.AppData.statusOptions = statusResult.options;
-      }
-      if (configResult && configResult.config) {
-        window.AppData.appConfig = Object.assign({}, window.DEFAULT_APP_CONFIG, configResult.config);
-      }
-    });
+function stgLoadExportLog() {
+  __stgExportError = '';
+  return settingsApiGetExportLog().then(entries => {
+    __stgExportEntries = entries;
   }).catch(err => {
-    console.error('[Settings] โหลดการตั้งค่า InsightHub ไม่สำเร็จ', err);
+    console.error('[Settings] โหลดบันทึกการ Export ไม่สำเร็จ', err);
+    __stgExportEntries = [];
+    __stgExportError = err.message;
   });
 }
 
-function stgBuildInsightHubSection() {
-  const isSuperAdmin = !!(window.currentUser && window.currentUser.role === 'Super Admin');
-  const canEditShared = !!(window.currentUser && (window.currentUser.role === 'Super Admin' || window.currentUser.role === 'Manager'));
-  const currentUrl = window.AppData.insightHubScriptUrl || '';
+function stgExportDateKey(iso) {
+  return new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
+}
+
+function stgFilteredExportEntries() {
+  const f = __stgExportFilter;
+  return __stgExportEntries.filter(e => {
+    if (f.user && e.username !== f.user) return false;
+    const day = stgExportDateKey(e.ts);
+    if (f.from && day < f.from) return false;
+    if (f.to && day > f.to) return false;
+    return true;
+  });
+}
+
+function stgBuildExportLogSection() {
+  const me = (window.currentUser && window.currentUser.username) || '';
+  const seen = __stgExportSeenBefore;
+  const users = Array.from(new Set(__stgExportEntries.map(e => e.username))).sort();
+  const rows = stgFilteredExportEntries();
+
+  const rowsHtml = rows.map(e => {
+    const isNew = e.username !== me && (!seen || e.ts > seen);
+    const filters = Object.keys(e.filters || {}).filter(k => e.filters[k] && e.filters[k] !== 'All').map(k => k + ': ' + e.filters[k]).join(', ') || '-';
+    const when = new Date(e.ts).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', hour12: false });
+    return `
+      <tr>
+        <td style="white-space:nowrap;">${stgEscapeHtml(when)}${isNew ? ' <span class="stg-tab-badge">ใหม่</span>' : ''}</td>
+        <td><strong>${stgEscapeHtml(e.username)}</strong><br><span style="font-size:11px; color:#94a3b8;">${stgEscapeHtml(e.role)}</span></td>
+        <td>${stgEscapeHtml(e.page)}</td>
+        <td>${stgEscapeHtml(e.group || 'All')}</td>
+        <td style="font-size:12px;">${stgEscapeHtml(filters)}</td>
+        <td style="text-align:right;">${stgEscapeHtml(Number(e.rowCount || 0).toLocaleString())}</td>
+        <td style="font-size:12px;">${stgEscapeHtml(e.fileName)}</td>
+        <td style="font-size:12px;">${stgEscapeHtml(e.ip)}</td>
+      </tr>`;
+  }).join('');
 
   return `
     <div class="stg-card">
       <div class="stg-card-header">
-        <h3><i class="fas fa-plug"></i> การเชื่อมต่อ Google Apps Script</h3>
+        <h3><i class="fas fa-file-export"></i> บันทึกการ Export ไฟล์ออกจากระบบ</h3>
         <p style="font-size:12px; color:#7a665e; margin:4px 0 0 0;">
-          วาง URL ของ Web App ที่ deploy จาก google-apps-script/InsightHub-Code.gs (ลงท้ายด้วย /exec)
-          ค่านี้ใช้ร่วมกันทั้งทีม (บันทึกไว้ที่เซิร์ฟเวอร์ ไม่ใช่แค่เบราว์เซอร์นี้)
+          ทุกครั้งที่ Super Admin/Manager กด Export Data ระบบจะบันทึกไว้ที่นี่ก่อนดาวน์โหลดไฟล์ (แสดงล่าสุดไม่เกิน 500 รายการ)
         </p>
       </div>
-      ${isSuperAdmin ? `
-        <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
-          <input type="url" id="stg-insighthub-url" class="stg-input" placeholder="https://script.google.com/macros/s/XXXX/exec" value="${stgEscapeHtml(currentUrl)}">
-          <div style="display:flex; gap:8px;">
-            <button class="stg-btn stg-btn-primary" onclick="stgSaveInsightHubUrl()"><i class="fas fa-save"></i> บันทึก</button>
-            <button class="stg-btn stg-btn-ghost" onclick="stgTestInsightHubConnection()"><i class="fas fa-satellite-dish"></i> ทดสอบการเชื่อมต่อ</button>
-          </div>
-          <div id="stg-insighthub-status" style="font-size:12.5px;"></div>
-        </div>
-      ` : `
-        <div class="stg-form-group" style="margin-top:14px;">
-          <label>สถานะ</label>
-          <strong>${currentUrl ? 'เชื่อมต่อแล้ว' : 'ยังไม่ได้เชื่อมต่อ'}</strong>
-        </div>
-        <p style="color:#94a3b8; font-size:12px;">การตั้งค่าการเชื่อมต่อเป็นสิทธิ์ของ Super Admin เท่านั้น</p>
-      `}
-    </div>
 
-    ${!currentUrl ? '' : `
-    <div class="stg-card">
-      <div class="stg-card-header">
-        <h3><i class="fas fa-note-sticky"></i> จัดการสถานะการติดต่อ (Sales Note)</h3>
-        <p style="font-size:12px; color:#7a665e; margin:4px 0 0 0;">รายการสถานะที่แอดมินเลือกได้ตอนบันทึก Sales Note ในหน้าโปรไฟล์ลูกค้า (เลือกได้มากกว่า 1 รายการต่อครั้ง)</p>
+      <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
+        <label style="font-size:11px; color:#64748b;">ผู้ใช้
+          <select class="stg-input" style="min-width:160px;" onchange="stgSetExportFilter('user', this.value)">
+            <option value="">ทั้งหมด</option>
+            ${users.map(u => `<option value="${stgEscapeHtml(u)}" ${u === __stgExportFilter.user ? 'selected' : ''}>${stgEscapeHtml(u)}</option>`).join('')}
+          </select>
+        </label>
+        <label style="font-size:11px; color:#64748b;">ตั้งแต่วันที่
+          <input type="date" class="stg-input" value="${stgEscapeHtml(__stgExportFilter.from)}" onchange="stgSetExportFilter('from', this.value)">
+        </label>
+        <label style="font-size:11px; color:#64748b;">ถึงวันที่
+          <input type="date" class="stg-input" value="${stgEscapeHtml(__stgExportFilter.to)}" onchange="stgSetExportFilter('to', this.value)">
+        </label>
+        <button class="stg-btn stg-btn-ghost" onclick="stgReloadExportLog()"><i class="fas fa-rotate"></i> รีเฟรช</button>
+        <span style="font-size:12px; color:#7a665e; margin-left:auto;">${rows.length.toLocaleString()} รายการ</span>
       </div>
-      <div style="margin-top:16px;">
-        ${stgBuildStatusOptionsRows(canEditShared)}
-      </div>
-      ${canEditShared ? `
-        <div style="margin-top:8px; display:flex; gap:8px;">
-          <button class="stg-btn stg-btn-ghost" onclick="stgAddStatusRow()"><i class="fas fa-plus"></i> เพิ่มสถานะ</button>
-          <button class="stg-btn stg-btn-primary" onclick="stgSaveStatusOptions()"><i class="fas fa-save"></i> บันทึก</button>
-        </div>
-      ` : '<p style="color:#94a3b8; font-size:12px; margin-top:8px;">เฉพาะ Super Admin/Manager เท่านั้นที่แก้ไขได้</p>'}
-    </div>
 
-    ${canEditShared ? stgBuildAdvancedConfigCard() : ''}
-    `}
+      ${__stgExportError ? `<p style="color:#b91c1c; font-size:13px; margin-top:14px;">${stgEscapeHtml(__stgExportError)}</p>` : ''}
+
+      <div class="stg-table-wrapper" style="margin-top:14px;">
+        <table class="stg-table" style="min-width:880px;">
+          <thead>
+            <tr><th>เวลา</th><th>ผู้ใช้</th><th>หน้า</th><th>Group</th><th>Filter</th><th style="text-align:right;">จำนวนแถว</th><th>ไฟล์</th><th>IP</th></tr>
+          </thead>
+          <tbody>
+            ${rowsHtml || `<tr><td colspan="8" style="text-align:center; color:#94a3b8; padding:24px;">ยังไม่มีการ Export</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
   `;
 }
 
-function stgBuildStatusOptionsRows(canEdit) {
-  if (!__stgStatusDraft) {
-    __stgStatusDraft = (window.AppData.statusOptions && window.AppData.statusOptions.length) ? window.AppData.statusOptions.slice() : [];
-  }
-  if (__stgStatusDraft.length === 0) return '<p style="color:#94a3b8; font-size:13px;">ยังไม่มีสถานะ</p>';
-  return __stgStatusDraft.map((opt, i) => `
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-      <input type="text" class="stg-input" value="${stgEscapeHtml(opt)}" oninput="stgUpdateStatusDraft(${i}, this.value)" ${canEdit ? '' : 'disabled'}>
-      ${canEdit ? `<button class="stg-icon-btn" onclick="stgRemoveStatusRow(${i})" title="ลบ"><i class="fas fa-trash"></i></button>` : ''}
-    </div>
-  `).join('');
-}
-
-function stgRerenderInsightHubTab() {
+function stgRerenderExportLogTab() {
   const body = document.getElementById('stg-maintab-body');
-  if (body) body.innerHTML = stgBuildInsightHubSection();
+  if (body && __settingsUi.mainTab === 'exportlog') body.innerHTML = stgBuildExportLogSection();
 }
 
-window.stgUpdateStatusDraft = function(idx, value) {
-  if (!__stgStatusDraft) return;
-  __stgStatusDraft[idx] = value;
-};
-
-window.stgAddStatusRow = function() {
-  if (!__stgStatusDraft) __stgStatusDraft = [];
-  __stgStatusDraft.push('');
-  stgRerenderInsightHubTab();
-};
-
-window.stgRemoveStatusRow = function(idx) {
-  if (!__stgStatusDraft) return;
-  __stgStatusDraft.splice(idx, 1);
-  stgRerenderInsightHubTab();
-};
-
-window.stgSaveStatusOptions = function() {
-  const values = (__stgStatusDraft || []).map(s => (s || '').trim()).filter(Boolean);
-  if (values.length === 0) { stgToast('กรุณาใส่อย่างน้อย 1 สถานะ', 'error'); return; }
-  const requestUser = (window.currentUser && (window.currentUser.username || window.currentUser.name)) || '';
-  window.InsightHubApi.saveStatusOptions(requestUser, values.join('|')).then((result) => {
-    const saved = (result && result.options) || values;
-    window.AppData.statusOptions = saved;
-    __stgStatusDraft = saved.slice();
-    stgToast('บันทึกสถานะการติดต่อสำเร็จ', 'success');
-    stgRerenderInsightHubTab();
-  }).catch(err => {
-    console.error('[Settings] บันทึกสถานะการติดต่อไม่สำเร็จ', err);
-    stgToast('บันทึกไม่สำเร็จ: ' + err.message, 'error');
+// Loads the log, remembers what was already seen before this visit (so new rows can be tagged
+// "ใหม่"), then marks everything up to the newest entry as seen (clears the Settings menu badge).
+window.stgOpenExportLog = function() {
+  const body = document.getElementById('stg-maintab-body');
+  if (body) body.innerHTML = stgLoadingSkeleton();
+  __stgExportSeenBefore = typeof window.qmGetExportSeen === 'function' ? window.qmGetExportSeen() : null;
+  return stgLoadExportLog().then(() => {
+    stgRerenderExportLogTab();
+    if (__stgExportEntries.length && typeof window.qmMarkExportsSeen === 'function') window.qmMarkExportsSeen(__stgExportEntries[0].ts);
+    const tabBadge = document.getElementById('stg-exportlog-tab-badge');
+    if (tabBadge) tabBadge.remove();
   });
 };
 
-window.stgSaveInsightHubUrl = function() {
-  const input = document.getElementById('stg-insighthub-url');
-  const val = input ? input.value.trim() : '';
-  settingsApiSaveInsightHubConfig(val).then(saved => {
-    window.AppData.insightHubScriptUrl = saved.scriptUrl || '';
-    if (window.InsightHubApi) window.InsightHubApi.invalidateBaseUrlCache();
-    stgToast(val ? 'บันทึก Apps Script URL แล้ว' : 'ล้างค่า Apps Script URL แล้ว', 'success');
-    stgRerenderInsightHubTab();
-  }).catch(err => {
-    console.error('[Settings] บันทึก InsightHub URL ไม่สำเร็จ', err);
-    stgToast('บันทึกไม่สำเร็จ: ' + err.message, 'error');
+window.stgReloadExportLog = function() {
+  return stgLoadExportLog().then(() => {
+    stgRerenderExportLogTab();
+    if (__stgExportEntries.length && typeof window.qmMarkExportsSeen === 'function') window.qmMarkExportsSeen(__stgExportEntries[0].ts);
   });
 };
 
-window.stgTestInsightHubConnection = function() {
-  const statusEl = document.getElementById('stg-insighthub-status');
-  if (statusEl) { statusEl.textContent = 'กำลังทดสอบ...'; statusEl.style.color = '#7a665e'; }
-  if (window.InsightHubApi) window.InsightHubApi.invalidateBaseUrlCache();
-  Promise.resolve(window.InsightHubApi ? window.InsightHubApi.ping() : Promise.reject(new Error('InsightHubApi ยังไม่พร้อมใช้งาน'))).then(() => {
-    if (statusEl) { statusEl.textContent = '✔ เชื่อมต่อสำเร็จ'; statusEl.style.color = '#15803d'; }
-  }).catch(err => {
-    if (statusEl) { statusEl.textContent = '✘ ' + err.message; statusEl.style.color = '#b91c1c'; }
-  });
-};
-
-// --- Advanced Config: Loyalty Index / Admin Priority x Segment matrix / Trend Visual / Refill
-// Buffer - all backed by the generic Config_App sheet (google-apps-script/InsightHub-Code.gs's
-// handleGetAppConfig/handleSaveAppConfig), one row per key. Each of the 4 sub-sections saves
-// independently, same pattern as the reference app.
-function stgBuildAdvancedConfigCard() {
-  const appConfig = window.AppData.appConfig || window.DEFAULT_APP_CONFIG;
-  const SEGMENT1_KEYS = ["NEW", "ACTIVE", "RISK", "CHURN"];
-  const SEGMENT2_KEYS = ["NEW", "ACTIVE", "REFILL", "RISK", "CHURN"];
-  const PRIORITY_LEVELS = ["High", "Medium", "Low", "Win-back"];
-
-  return `
-    <div class="stg-card">
-      <div class="stg-card-header">
-        <h3><i class="fas fa-sliders"></i> ตั้งค่าเงื่อนไขระบบ (Advanced Config)</h3>
-      </div>
-
-      <div style="margin:16px 0 20px 0;">
-        <h4 style="font-size:13px; margin:0 0 8px 0;">Loyalty Index (จำนวนวันสะสม)</h4>
-        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:10px;">
-          <label style="font-size:11px; color:#64748b;">Seedling ถึง (วัน)
-            <input type="number" id="stg-cfg-loyalty-seedling" class="stg-input" value="${appConfig.loyaltyIndex.seedlingMaxDays}" min="0">
-          </label>
-          <label style="font-size:11px; color:#64748b;">Regular ถึง (วัน)
-            <input type="number" id="stg-cfg-loyalty-regular" class="stg-input" value="${appConfig.loyaltyIndex.regularMaxDays}" min="0">
-          </label>
-          <label style="font-size:11px; color:#64748b;">Veteran ถึง (วัน)
-            <input type="number" id="stg-cfg-loyalty-veteran" class="stg-input" value="${appConfig.loyaltyIndex.veteranMaxDays}" min="0">
-          </label>
-        </div>
-        <button class="stg-btn stg-btn-ghost" onclick="stgSaveInsightHubAppConfig('loyaltyIndex')"><i class="fas fa-save"></i> บันทึก Loyalty Index</button>
-      </div>
-
-      <div style="margin-bottom:20px; border-top:1px dashed #e2e8f0; padding-top:16px;">
-        <h4 style="font-size:13px; margin:0 0 8px 0;">Admin Priority × Segment</h4>
-        <p style="font-size:11.5px; color:#7a665e; margin-top:-4px;">แถว = Segment 1 (Standard Period), คอลัมน์ = Segment 2 (Dynamic Refill)</p>
-        <div class="stg-table-wrapper">
-          <table class="stg-table" style="min-width:560px;">
-            <thead><tr><th></th>${SEGMENT2_KEYS.map(s2 => `<th>${s2}</th>`).join('')}</tr></thead>
-            <tbody>
-              ${SEGMENT1_KEYS.map(s1 => `
-                <tr>
-                  <td style="font-weight:600;">${s1}</td>
-                  ${SEGMENT2_KEYS.map(s2 => {
-                    const key = s1 + '|' + s2;
-                    const val = appConfig.adminPriorityMatrix[key] || 'Win-back';
-                    return `<td><select class="stg-input stg-cfg-priority-cell" data-key="${key}">
-                      ${PRIORITY_LEVELS.map(lvl => `<option value="${lvl}" ${lvl === val ? 'selected' : ''}>${lvl}</option>`).join('')}
-                    </select></td>`;
-                  }).join('')}
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-        <button class="stg-btn stg-btn-ghost" style="margin-top:10px;" onclick="stgSaveInsightHubAppConfig('adminPriorityMatrix')"><i class="fas fa-save"></i> บันทึก Admin Priority</button>
-      </div>
-
-      <div style="margin-bottom:20px; border-top:1px dashed #e2e8f0; padding-top:16px;">
-        <h4 style="font-size:13px; margin:0 0 8px 0;">Trend Visual</h4>
-        <div style="display:flex; gap:20px; align-items:end; flex-wrap:wrap; margin-bottom:10px;">
-          <label style="font-size:11px; color:#64748b;">Neutral band (%)
-            <input type="number" id="stg-cfg-trend-band" class="stg-input" value="${appConfig.trendVisual.neutralBandPercent}" min="0" step="0.5" style="width:100px;">
-          </label>
-          <label style="font-size:12px; color:#334155; display:flex; align-items:center; gap:6px;">
-            <input type="checkbox" id="stg-cfg-trend-interpolate" ${appConfig.trendVisual.interpolateCurrentYear ? 'checked' : ''}>
-            Interpolate ปีปัจจุบันที่ยังไม่ครบปี
-          </label>
-        </div>
-        <button class="stg-btn stg-btn-ghost" onclick="stgSaveInsightHubAppConfig('trendVisual')"><i class="fas fa-save"></i> บันทึก Trend Visual</button>
-      </div>
-
-      <div style="border-top:1px dashed #e2e8f0; padding-top:16px;">
-        <h4 style="font-size:13px; margin:0 0 8px 0;">Refill Buffer</h4>
-        <p style="font-size:11.5px; color:#7a665e; margin-top:-4px;">ตัวคูณรอบเติมสินค้าที่คาดการณ์ (ค่าเริ่มต้น 1.1)</p>
-        <input type="number" id="stg-cfg-refill-buffer" class="stg-input" value="${appConfig.refillBuffer}" min="1" step="0.05" style="width:100px; margin-bottom:10px;">
-        <button class="stg-btn stg-btn-ghost" onclick="stgSaveInsightHubAppConfig('refillBuffer')"><i class="fas fa-save"></i> บันทึก Refill Buffer</button>
-      </div>
-    </div>
-  `;
-}
-
-window.stgSaveInsightHubAppConfig = function(key) {
-  let value;
-  if (key === 'loyaltyIndex') {
-    value = {
-      seedlingMaxDays: parseInt(document.getElementById('stg-cfg-loyalty-seedling').value, 10) || 45,
-      regularMaxDays: parseInt(document.getElementById('stg-cfg-loyalty-regular').value, 10) || 180,
-      veteranMaxDays: parseInt(document.getElementById('stg-cfg-loyalty-veteran').value, 10) || 365,
-    };
-  } else if (key === 'adminPriorityMatrix') {
-    value = {};
-    document.querySelectorAll('.stg-cfg-priority-cell').forEach(sel => { value[sel.dataset.key] = sel.value; });
-  } else if (key === 'trendVisual') {
-    value = {
-      neutralBandPercent: parseFloat(document.getElementById('stg-cfg-trend-band').value) || 0,
-      interpolateCurrentYear: document.getElementById('stg-cfg-trend-interpolate').checked,
-    };
-  } else if (key === 'refillBuffer') {
-    value = parseFloat(document.getElementById('stg-cfg-refill-buffer').value) || 1.1;
-  } else {
-    return;
-  }
-
-  const requestUser = (window.currentUser && (window.currentUser.username || window.currentUser.name)) || '';
-  window.InsightHubApi.saveAppConfig(requestUser, key, value).then(() => {
-    window.AppData.appConfig = window.AppData.appConfig || {};
-    window.AppData.appConfig[key] = value;
-    stgToast('บันทึกสำเร็จ', 'success');
-    if (typeof window.refreshInsightHub === 'function') window.refreshInsightHub();
-  }).catch(err => {
-    console.error('[Settings] บันทึก Advanced Config ไม่สำเร็จ', err);
-    stgToast('บันทึกไม่สำเร็จ: ' + err.message, 'error');
-  });
+window.stgSetExportFilter = function(key, value) {
+  __stgExportFilter[key] = value;
+  stgRerenderExportLogTab();
 };
 
 // --- Styles (injected once, mirrors kpisetting.js pattern) ---

@@ -110,15 +110,15 @@
         <!-- Customer InsightHub is its own separate, already-deployed system (insinghub.vercel.app,
              the Film26/Insinghub reference app itself - has its own Dashboard/Customer InsightHub/
              Settings) - Queenmaker just links out to it rather than embedding it in-page. The
-             in-page port (public/insighthub.js, public/insighthub-api.js, api/insighthub/config.js,
-             the Settings > InsightHub connection card) is still in the codebase but unused for now
-             in case this decision changes later. -->
+             in-page port (public/insighthub.js, public/insighthub-api.js) is still in the codebase but
+             unused for now in case this decision changes later. (Its Settings > InsightHub tab and
+             api/insighthub/config.js were removed - Settings now has an Export Log tab instead.) -->
         <li class="nav-item"><a href="https://insinghub.vercel.app" target="_blank" rel="noopener noreferrer" class="nav-link" id="side-insight"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-pie"></i>MUSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-ai-analytics" onclick="event.preventDefault(); switchTab('ai-analytics')"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-kpisetting" onclick="event.preventDefault(); switchTab('kpisetting')"><i class="fas fa-chart-line"></i>KPI SETTING</a></li>
-        <li class="nav-item"><a href="#" class="nav-link" id="side-settings" onclick="event.preventDefault(); switchTab('settings')"><i class="fas fa-cog"></i>SETTINGS</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" id="side-settings" onclick="event.preventDefault(); switchTab('settings')"><i class="fas fa-cog"></i>SETTINGS<span id="side-settings-badge" title="มีการ Export ข้อมูลใหม่ที่ยังไม่ได้ดู (Settings > Export Log)" style="display:none; margin-left:8px; background:#f59e0b; color:#fff; font-size:10.5px; font-weight:700; line-height:1; border-radius:999px; padding:3px 7px;"></span></a></li>
         <li class="nav-item" style="margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border-color);">
           <div style="display:flex; align-items:center; justify-content:center; gap:6px; padding: 4px 20px 0; font-size:11px; font-weight:600; letter-spacing:0.4px; color: var(--text-muted);">
             <i class="fas fa-crown" style="font-size:10px;"></i> Powered by Queenmaker
@@ -144,6 +144,9 @@
             <i class="fas fa-file-import"></i> Import Data
           </button>
           <input type="file" id="fileInput" accept=".csv" style="display: none;">
+          <button id="exportBtn" class="btn" onclick="exportCurrentView()" style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 8px;">
+            <i class="fas fa-file-export"></i> Export Data
+          </button>
           <a href="#" class="btn" id="logoutBtn" onclick="event.preventDefault(); doLogout();" style="background: #1e293b; color: #fff; text-decoration: none; border-radius: 20px; padding: 8px 20px; font-weight: 600;">Logout</a>
         </div>
       </header>
@@ -399,8 +402,146 @@
         if (sideSettingsItem && data.user.role !== 'Super Admin') {
           sideSettingsItem.closest('.nav-item').style.display = 'none';
         }
+        // Export Data is limited to Super Admin/Manager (also enforced by api/audit/log.js) - Sales Admin never sees the button
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) exportBtn.style.display = EXPORT_ROLES.indexOf(data.user.role) !== -1 ? 'flex' : 'none';
+        refreshExportBadge();
       }).catch(() => { /* transient network error - don't force logout */ });
     }
+
+    // --- Export Data: every export is recorded server-side (api/audit/log.js) BEFORE the file is
+    // generated/downloaded; if that record can't be saved, nothing is downloaded. Super Admin sees
+    // them in Settings > Export Log, and a badge on the SETTINGS menu counts exports by other people
+    // since the log was last opened (last-seen timestamp is kept per browser in localStorage).
+    const EXPORT_ROLES = ['Super Admin', 'Manager'];
+    const EXPORT_SEEN_KEY = 'qm_exportlog_seen';
+    const EXPORT_PAGE_LABELS = { overview: 'Overview', executive1: 'Executive', executive2: 'Migration', retention: 'Retention', cohort: 'Cohort Heatmap', 'ai-analytics': 'AI Analytics' };
+    window.qmExportUnseen = 0;
+    window.currentTabId = 'overview';
+
+    window.qmGetExportSeen = function () {
+      try { return localStorage.getItem(EXPORT_SEEN_KEY) || null; } catch (e) { return null; }
+    };
+    window.qmMarkExportsSeen = function (ts) {
+      try { localStorage.setItem(EXPORT_SEEN_KEY, ts); } catch (e) { /* storage blocked - badge just reappears next visit */ }
+      setExportUnseen(0);
+    };
+    function setExportUnseen(n) {
+      window.qmExportUnseen = n;
+      const badge = document.getElementById('side-settings-badge');
+      if (!badge) return;
+      badge.textContent = n;
+      badge.style.display = n > 0 ? 'inline-block' : 'none';
+    }
+    function refreshExportBadge() {
+      const u = window.currentUser;
+      if (!u || u.role !== 'Super Admin') return;
+      const seen = window.qmGetExportSeen();
+      fetch('/api/audit/log?countOnly=1' + (seen ? '&since=' + encodeURIComponent(seen) : ''), { credentials: 'same-origin' })
+        .then(res => res.ok ? res.json() : null)
+        .then(d => { if (d && typeof d.count === 'number') setExportUnseen(d.count); })
+        .catch(() => { /* transient - try again on the next 5 minute session check */ });
+    }
+
+    function buildOverviewSummaryRows() {
+      const rows = [['การ์ด', 'ตัวชี้วัด', 'ค่า', 'เทียบเดือนก่อนหน้า (MoM)', 'รายละเอียด MoM']];
+      document.querySelectorAll('#view-overview .overview-stat-card').forEach(card => {
+        const titleEl = card.querySelector('.overview-stat-card-title');
+        const title = titleEl ? titleEl.textContent.replace(/\s+/g, ' ').trim() : '';
+        card.querySelectorAll('.overview-stat-cell').forEach(cell => {
+          const label = cell.querySelector('.overview-stat-label');
+          const value = cell.querySelector('.overview-stat-value');
+          const mom = cell.querySelector('[id^="mom-"]');
+          rows.push([
+            title,
+            label ? label.textContent.trim() : '',
+            value ? value.textContent.trim() : '',
+            mom ? mom.textContent.replace(/\s+/g, ' ').trim() : '',
+            mom ? mom.title : ''
+          ]);
+        });
+      });
+      return rows;
+    }
+
+    function buildMonthlyExportRows() {
+      return availableMonths.map(m => {
+        const d = monthlyData[m];
+        let newCust = 0, retCust = 0;
+        d.buyers.forEach(id => {
+          if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === m) newCust++; else retCust++;
+        });
+        return {
+          'เดือน': m,
+          'ยอดขาย': Math.round(d.sales * 100) / 100,
+          'ออเดอร์': d.orders,
+          'ลูกค้า': d.buyers.size,
+          'ลูกค้าใหม่': newCust,
+          'ลูกค้าเก่า': retCust,
+          'AOV': d.orders > 0 ? Math.round(d.sales / d.orders * 100) / 100 : 0
+        };
+      });
+    }
+
+    async function exportCurrentView() {
+      const user = window.currentUser;
+      if (!user || EXPORT_ROLES.indexOf(user.role) === -1) { alert('เฉพาะ Super Admin และ Manager เท่านั้นที่ Export ข้อมูลได้'); return; }
+      const tab = window.currentTabId || 'overview';
+      const pageLabel = EXPORT_PAGE_LABELS[tab];
+      if (!pageLabel) { alert('หน้านี้ไม่มีข้อมูลให้ Export'); return; }
+      if (!rawData || rawData.length === 0) { alert('ยังไม่มีข้อมูล กรุณา Import Data ก่อน'); return; }
+
+      const isExec = tab === 'executive1';
+      const activeFilters = isExec ? execFilters : filters;
+      const orders = isExec ? computeFilteredData(execFilters) : filteredData;
+      if (!orders || orders.length === 0) { alert('ไม่มีข้อมูลตาม Filter ที่เลือก'); return; }
+
+      showLoading(true);
+      await new Promise(r => setTimeout(r, 30)); // let the loading overlay paint before the heavy work
+      try {
+        const wb = XLSX.utils.book_new();
+        const sheetNames = [];
+        const addSheet = (ws, name) => { XLSX.utils.book_append_sheet(wb, ws, name); sheetNames.push(name); };
+
+        if (tab === 'overview') {
+          addSheet(XLSX.utils.aoa_to_sheet(buildOverviewSummaryRows()), 'Summary');
+          addSheet(XLSX.utils.json_to_sheet(buildMonthlyExportRows()), 'Monthly');
+        } else {
+          Array.from(document.querySelectorAll('#view-' + tab + ' table')).slice(0, 8).forEach((t, i) => {
+            addSheet(XLSX.utils.table_to_sheet(t), (pageLabel + ' ' + (i + 1)).slice(0, 31));
+          });
+        }
+        addSheet(XLSX.utils.json_to_sheet(orders), 'Orders');
+
+        const group = activeFilters.Group || 'All';
+        const dateTag = new Date().toISOString().slice(0, 10);
+        const fileName = ('Queenmaker_' + pageLabel.replace(/\s+/g, '') + '_' + group + '_' + dateTag + '.xlsx').replace(/[^\w฀-๿.-]+/g, '-');
+        const usedFilters = {};
+        Object.keys(activeFilters).forEach(k => {
+          if (k !== 'KPI' && activeFilters[k] && activeFilters[k] !== 'All') usedFilters[k] = activeFilters[k];
+        });
+
+        let logged = false;
+        try {
+          const res = await fetch('/api/audit/log', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'data_export', detail: { page: pageLabel, group, filters: usedFilters, rowCount: orders.length, sheets: sheetNames, fileName } })
+          });
+          logged = res.ok;
+        } catch (e) { logged = false; }
+        if (!logged) { alert('บันทึกประวัติการ Export ไม่สำเร็จ จึงยังไม่ดาวน์โหลดไฟล์ กรุณาลองใหม่อีกครั้ง'); return; }
+
+        XLSX.writeFile(wb, fileName);
+      } catch (err) {
+        console.error(err);
+        alert('Export ไม่สำเร็จ');
+      } finally {
+        showLoading(false);
+      }
+    }
+    window.exportCurrentView = exportCurrentView;
 
     function doLogout() {
       fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).finally(() => {
@@ -563,6 +704,7 @@
 
     // --- Navigation & UI Control ---
     function switchTab(tabId) {
+      window.currentTabId = tabId;
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.view-content').forEach(view => view.style.display = 'none');
       document.getElementById('view-overview').style.display = 'none';

@@ -27,9 +27,9 @@ app.put('/api/users', usersHandler);
 // vercel.json's rewrite of this path to /api/users?resource=access-requests.
 app.get('/api/access-requests', (req, res) => { req.query.resource = 'access-requests'; usersHandler(req, res); });
 app.post('/api/access-requests', (req, res) => { req.query.resource = 'access-requests'; usersHandler(req, res); });
-app.post('/api/audit/log', require('./api/audit/log'));
-app.get('/api/discord/config', require('./api/discord/config'));
-app.put('/api/discord/config', require('./api/discord/config'));
+const auditLogHandler = require('./api/audit/log');
+app.get('/api/audit/log', auditLogHandler);
+app.post('/api/audit/log', auditLogHandler);
 app.get('/api/notes', require('./api/notes/index'));
 app.put('/api/notes', require('./api/notes/index'));
 app.get('/api/notes/status-options', require('./api/notes/status-options'));
