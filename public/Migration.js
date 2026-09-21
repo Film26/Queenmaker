@@ -101,7 +101,7 @@ function renderExecutive2(filteredData, rawData) {
         const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
         const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
         const sc = getExec2Group(row);
-        const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+        const dateStr = window.getRowDateStr(row);
         if (!id || !dateStr) return;
         const d = parseD(dateStr);
         if (!d) return;
@@ -121,7 +121,7 @@ function renderExecutive2(filteredData, rawData) {
   // month as a meaningful snapshot instead of a whole-year sum (percentages skew badly over a full year).
   const rowMonthStr = (row) => {
     const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-    const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
+    const dateStr = window.getRowDateStr(row);
     const d = parseD(dateStr);
     return d ? `${d.y}-${String(d.m).padStart(2, '0')}` : '';
   };
@@ -143,6 +143,7 @@ function renderExecutive2(filteredData, rawData) {
 
     if (!agg[sc]) {
       agg[sc] = { 
+        rows: [], 
         revenue: 0, 
         orders: 0, 
         uniqueBuyers: new Set(), 
@@ -154,16 +155,17 @@ function renderExecutive2(filteredData, rawData) {
     
     const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
     const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
-    const dateStr = getVal(row, ['วันที่สร้าง', 'วันที่โอนเงิน', 'OrderDate', 'Date', 'วันที่']);
-    const revenueStr = getVal(row, ['ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-    
-    if (!id || !dateStr) return;
+    const dateStr = window.getRowDateStr(row);
+
+    if (!dateStr) return;
     const d = parseD(dateStr);
     if (!d) return;
-    
-    const rev = parseFloat((revenueStr || '0').toString().replace(/,/g, ''));
-    agg[sc].revenue += isNaN(rev) ? 0 : rev;
-    agg[sc].orders += 1;
+
+    // ยอดขาย/ออเดอร์ต่อ Sub Channel คำนวณผ่าน Calculation Layer กลาง (window.calculateMetrics) หลังวนครบทุกแถว -
+    // เดิมหน้านี้ใช้รายชื่อคอลัมน์ยอดขายคนละชุดกับหน้า Overview (ไม่มี 'ราคาขาย' นำหน้า) และตัดแถวที่ไม่มีตัวตนลูกค้าออก
+    // ทำให้ยอดรวมไม่ตรงกับหน้าอื่น ตอนนี้ใช้คอลัมน์/สูตรเดียวกันทั้งระบบ
+    agg[sc].rows.push(row);
+    if (!id) return;
     agg[sc].uniqueBuyers.add(id);
 
     // Global New vs Retained
@@ -194,6 +196,9 @@ function renderExecutive2(filteredData, rawData) {
   // Convert to array and calculate metrics
   const results = Object.keys(agg).map(sc => {
     const data = agg[sc];
+    const M = window.calculateMetrics(data.rows);
+    data.revenue = M.totalSales;
+    data.orders = M.totalOrders;
     const buyers = data.uniqueBuyers.size;
     const newCust = data.newGlobalBuyers.size;
     const newToSub = data.newToSubBuyers.size;

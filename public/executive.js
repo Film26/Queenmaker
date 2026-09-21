@@ -3,6 +3,7 @@ function renderExecutive1(filteredData, rawData) {
   const container = document.getElementById('view-executive1');
 
   if (!filteredData || filteredData.length === 0) {
+    window.qmLastExec = null;
     container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">No data available. Please adjust filters or load data.</div>';
     return;
   }
@@ -316,7 +317,7 @@ function renderExecutive1(filteredData, rawData) {
   filteredData.forEach(row => {
     const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
     const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
-    const dateStr = getVal(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+    const dateStr = window.getRowDateStr(row);
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
     if (!d || !withinCutoff(d)) return;
@@ -325,21 +326,26 @@ function renderExecutive1(filteredData, rawData) {
     }
   });
   // Aggregate data by month
+  // ยอดขาย/ออเดอร์/AOV/SPH คำนวณผ่าน Calculation Layer กลาง (window.calculateMetrics ใน dashboard.html) ที่เดียวกับหน้า
+  // Overview - แถวจึงถูกจัดเข้าเดือนก่อน (นับทุกแถวที่มีวันที่อ่านได้ แม้ระบุตัวลูกค้าไม่ได้) แล้วส่งเข้า calculateMetrics
+  // ส่วน set ลูกค้า (retained/new/migration) ด้านล่างนับเฉพาะแถวที่ระบุตัวลูกค้าได้
+  const monthRows = {};
+  for (let m = 1; m <= 12; m++) monthRows[m] = [];
+  const allRows = [];
   filteredData.forEach(row => {
     const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
     const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
-    const dateStr = getVal(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-    const revenueStr = getVal(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']);
+    const dateStr = window.getRowDateStr(row);
 
-    if (!id || !dateStr) return;
+    if (!dateStr) return;
     const d = parseD(dateStr);
     if (!d || !withinCutoff(d)) return;
 
     const m = d.m;
     if (m >= 1 && m <= 12) {
-      const rev = parseFloat((revenueStr || '0').toString().replace(/,/g, ''));
-      agg[m].revenue += isNaN(rev) ? 0 : rev;
-      agg[m].orders += 1;
+      monthRows[m].push(row);
+      allRows.push(row);
+      if (!id) return;
       agg[m].uniqueBuyers.add(id);
       // Check Retained vs New Global based on globalFirstPurchase
       if (globalFirstPurchase[id]) {
@@ -370,28 +376,34 @@ function renderExecutive1(filteredData, rawData) {
     }
   });
   // Calculate Totals
+  const totalM = window.calculateMetrics(allRows);
   const total = {
-    revenue: 0,
-    orders: 0,
+    revenue: totalM.totalSales,
+    orders: totalM.totalOrders,
     uniqueBuyers: new Set(),
     retainedBuyers: new Set(),
     newGlobalBuyers: new Set(),
     newToSubBuyers: new Set()
   };
   for (let m = 1; m <= 12; m++) {
-    total.revenue += agg[m].revenue;
-    total.orders += agg[m].orders;
+    const M = window.calculateMetrics(monthRows[m]);
+    agg[m].metrics = M;
+    agg[m].revenue = M.totalSales;
+    agg[m].orders = M.totalOrders;
     agg[m].uniqueBuyers.forEach(id => total.uniqueBuyers.add(id));
     agg[m].retainedBuyers.forEach(id => total.retainedBuyers.add(id));
     agg[m].newGlobalBuyers.forEach(id => total.newGlobalBuyers.add(id));
     agg[m].newToSubBuyers.forEach(id => total.newToSubBuyers.add(id));
   }
+  window.qmLastExec = { monthCutoff, totals: { sales: totalM.totalSales, orders: totalM.totalOrders, customers: totalM.uniqueCustomers, aov: totalM.aov, sph: totalM.spendingPerHead } };
   // Formatting helpers
-  const fmtNum = (num) => (Number(num) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
-  const fmtDec = (num) => (Number(num) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const fmtPct = (num) => ((Number(num) || 0) * 100).toFixed(1) + '%';
-  const fmtMoney = (num) => '฿' + fmtNum(num);
-  const getSafely = (a, b) => b === 0 ? 0 : a / b;
+  // ค่าที่คำนวณไม่ได้ (ตัวหารเป็น 0 = ไม่มีข้อมูล) แสดง N/A ไม่แสดง 0/NaN - ปัดเศษเฉพาะตอนแสดงผลเท่านั้น
+  const isNA = (num) => num === null || num === undefined || typeof num !== 'number' || !Number.isFinite(num);
+  const fmtNum = (num) => isNA(num) ? 'N/A' : num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  const fmtDec = (num) => isNA(num) ? 'N/A' : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtPct = (num) => isNA(num) ? 'N/A' : (num * 100).toFixed(1) + '%';
+  const fmtMoney = (num) => isNA(num) ? 'N/A' : '฿' + fmtNum(num);
+  const getSafely = (a, b) => b === 0 ? null : a / b;
 
   // Metrics Array Construction (per-month series, index 0 = Jan ... 11 = Dec, index 12 = Total Year)
   const revArr = [], ordArr = [], aovArr = [], ubArr = [], freqArr = [], sphArr = [], retArr = [], newGArr = [], newGShrArr = [], migArr = [], migRtArr = [];
@@ -431,10 +443,10 @@ function renderExecutive1(filteredData, rawData) {
 
     revArr.push(r);
     ordArr.push(o);
-    aovArr.push(getSafely(r, o));
+    aovArr.push(agg[m].metrics.aov);
     ubArr.push(u);
-    freqArr.push(getSafely(o, u));
-    sphArr.push(getSafely(r, u));
+    freqArr.push(agg[m].metrics.ordersPerCustomer);
+    sphArr.push(agg[m].metrics.spendingPerHead);
     retArr.push(ret);
     newGArr.push(newG);
     newGShrArr.push(getSafely(newG, u));
@@ -445,10 +457,10 @@ function renderExecutive1(filteredData, rawData) {
   const rT = total.revenue, oT = total.orders, uT = total.uniqueBuyers.size;
   revArr.push(rT);
   ordArr.push(oT);
-  aovArr.push(getSafely(rT, oT));
+  aovArr.push(totalM.aov);
   ubArr.push(uT);
-  freqArr.push(getSafely(oT, uT));
-  sphArr.push(getSafely(rT, uT));
+  freqArr.push(totalM.ordersPerCustomer);
+  sphArr.push(totalM.spendingPerHead);
   retArr.push(total.retainedBuyers.size);
   newGArr.push(total.newGlobalBuyers.size);
   newGShrArr.push(getSafely(total.newGlobalBuyers.size, uT));
@@ -471,7 +483,9 @@ function renderExecutive1(filteredData, rawData) {
   }
   if (latestM === 0) latestM = 12;
 
-  const buildSparkline = (values, color) => {
+  const buildSparkline = (rawValues, color) => {
+    // เดือนที่คำนวณไม่ได้ (null = ไม่มีข้อมูล) ใช้ 0 เฉพาะตอนวาดเส้น sparkline เท่านั้น - ตัวเลขที่แสดงเป็น N/A
+    const values = rawValues ? rawValues.map(v => (typeof v === 'number' && Number.isFinite(v)) ? v : 0) : rawValues;
     if (!values || values.length < 2) return '';
     const w = 110, h = 34, pad = 3;
     const max = Math.max(...values);
@@ -493,7 +507,7 @@ function renderExecutive1(filteredData, rawData) {
   const buildTrend = (arr) => {
     const cur = arr[latestM - 1];
     const prev = latestM >= 2 ? arr[latestM - 2] : null;
-    if (prev === null || prev === undefined || prev === 0 || cur === undefined) {
+    if (prev === null || prev === undefined || prev === 0 || cur === undefined || cur === null) {
       return '<span class="kpi-card-trend flat"><span class="arrow">&#9644;</span> n/a MoM</span>';
     }
     const pct = ((cur - prev) / prev) * 100;
@@ -507,9 +521,9 @@ function renderExecutive1(filteredData, rawData) {
     { label: 'YTD Buyer', sub: 'ลูกค้าจริง YTD (คน)', value: fmtNum(total.uniqueBuyers.size), arr: ubArr, color: '#334155', labelColor: '#0f172a' },
     { label: 'New Customers', sub: 'ลูกค้าใหม่ YTD (คน)', value: fmtNum(total.newGlobalBuyers.size), arr: newGArr, color: '#00BCD4', labelColor: '#0e7490' },
     { label: 'Old Customers', sub: 'ลูกค้าเก่า YTD (คน)', value: fmtNum(total.retainedBuyers.size), arr: retArr, color: '#334155', labelColor: '#0f172a' },
-    { label: 'YTD AOV', sub: 'ยอดต่อบิลเฉลี่ย (บาท)', value: fmtMoney(getSafely(total.revenue, total.orders)), arr: aovArr, color: '#65A30D', labelColor: '#3f6212' },
-    { label: 'YTD SPH', sub: 'ยอดเฉลี่ยต่อคน (บาท)', value: fmtMoney(getSafely(total.revenue, total.uniqueBuyers.size)), arr: sphArr, color: '#84CC16', labelColor: '#4d7c0f' },
-    { label: 'Repeat Purchase', sub: 'การซื้อซ้ำ (ครั้ง)', value: fmtDec(getSafely(total.orders, total.uniqueBuyers.size)), arr: freqArr, color: '#4F46E5' }
+    { label: 'YTD AOV', sub: 'ยอดต่อบิลเฉลี่ย (บาท)', value: fmtMoney(totalM.aov), arr: aovArr, color: '#65A30D', labelColor: '#3f6212' },
+    { label: 'YTD SPH', sub: 'ยอดเฉลี่ยต่อคน (บาท)', value: fmtMoney(totalM.spendingPerHead), arr: sphArr, color: '#84CC16', labelColor: '#4d7c0f' },
+    { label: 'Repeat Purchase', sub: 'การซื้อซ้ำ (ครั้ง)', value: fmtDec(totalM.ordersPerCustomer), arr: freqArr, color: '#4F46E5' }
   ];
 
   let kpiHtml = '<div class="kpi-card-row">';
@@ -630,6 +644,6 @@ function renderExecutive1(filteredData, rawData) {
   }
 
   html += `</tbody></table></div>`;
-  html += `<div class="exec-table-footnote"><i class="fas fa-circle-info"></i> หมายเหตุ: ตัวเลขทั้งหมดเป็นผลรวมในแต่ละเดือน ยอดรวมทั้งปีอาจมีความคลาดเคลื่อนจากการปัดเศษ</div>`;
+  html += `<div class="exec-table-footnote"><i class="fas fa-circle-info"></i> หมายเหตุ: ตัวเลขทั้งหมดเป็นผลรวมในแต่ละเดือน Total Year คำนวณจากข้อมูลทั้งปีโดยตรง (Buyers/AOV/SPH นับลูกค้าและออเดอร์แบบไม่ซ้ำทั้งปี จึงไม่เท่ากับผลรวมหรือค่าเฉลี่ยของรายเดือน) ตัวเลขปัดเศษเฉพาะตอนแสดงผล</div>`;
   container.innerHTML = html;
 }

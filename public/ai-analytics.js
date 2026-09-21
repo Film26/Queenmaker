@@ -100,7 +100,7 @@ function renderAiAnalytics(filteredData, rawData) {
   (rawData || []).forEach(row => {
     if (window.isSaleOrder && !window.isSaleOrder(row)) return;
     const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
-    const dateStr = getVal(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+    const dateStr = window.getRowDateStr(row);
     if (!id || !dateStr) return;
     const d = parseD(dateStr);
     if (!d) return;
@@ -114,25 +114,24 @@ function renderAiAnalytics(filteredData, rawData) {
 
   filteredData.forEach(row => {
     const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
-    const dateStr = getVal(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-    const revenueStr = getVal(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-    if (!id || !dateStr) return;
+    const dateStr = window.getRowDateStr(row);
+    if (!dateStr) return;
     const d = parseD(dateStr);
     if (!d) return;
-    const rev = parseFloat(revenueStr.toString().replace(/,/g, '')) || 0;
     const mStr = d.str;
 
-    if (!monthAgg[mStr]) monthAgg[mStr] = { revenue: 0, orders: 0, buyers: new Set() };
-    monthAgg[mStr].revenue += rev;
-    monthAgg[mStr].orders += 1;
-    monthAgg[mStr].buyers.add(id);
+    // ยอดขาย/ออเดอร์คำนวณผ่าน Calculation Layer กลาง (window.calculateMetrics) หลังวนครบทุกแถว (ดูด้านล่าง) - แถวที่
+    // ระบุตัวลูกค้าไม่ได้ยังนับเป็นยอดขาย ส่วนชุดลูกค้า (buyers/newG/newSub) นับเฉพาะแถวที่มี id
+    if (!monthAgg[mStr]) monthAgg[mStr] = { revenue: 0, orders: 0, buyers: new Set(), rows: [] };
+    monthAgg[mStr].rows.push(row);
 
     const sc = getSubChannel(row);
     if (!chAgg[mStr]) chAgg[mStr] = {};
-    if (!chAgg[mStr][sc]) chAgg[mStr][sc] = { revenue: 0, orders: 0, buyers: new Set(), newG: new Set(), newSub: new Set() };
+    if (!chAgg[mStr][sc]) chAgg[mStr][sc] = { revenue: 0, orders: 0, buyers: new Set(), newG: new Set(), newSub: new Set(), rows: [] };
     const c = chAgg[mStr][sc];
-    c.revenue += rev;
-    c.orders += 1;
+    c.rows.push(row);
+    if (!id) return;
+    monthAgg[mStr].buyers.add(id);
     c.buyers.add(id);
 
     // ลูกค้าใหม่ระดับ Global: เดือนแรกที่ซื้อ (ของลูกค้าคนนั้น ในข้อมูลทั้งหมด) ตรงกับเดือนนี้
@@ -142,6 +141,17 @@ function renderAiAnalytics(filteredData, rawData) {
     // Migration (New-to-Sub): เดือนแรกที่ซื้อ "ในช่องทางนี้" ตรงกับเดือนนี้ แต่ไม่ใช่ลูกค้าใหม่ระดับ Global
     const scKey = id + '_' + sc;
     if (scFirstPurchase[scKey] === d.val && !c.newG.has(id)) c.newSub.add(id);
+  });
+
+  Object.keys(monthAgg).forEach(mStr => {
+    const M = window.calculateMetrics(monthAgg[mStr].rows);
+    monthAgg[mStr].revenue = M.totalSales;
+    monthAgg[mStr].orders = M.totalOrders;
+    Object.keys(chAgg[mStr] || {}).forEach(sc => {
+      const CM = window.calculateMetrics(chAgg[mStr][sc].rows);
+      chAgg[mStr][sc].revenue = CM.totalSales;
+      chAgg[mStr][sc].orders = CM.totalOrders;
+    });
   });
 
   const monthKeys = Object.keys(monthAgg).sort();

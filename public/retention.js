@@ -252,7 +252,7 @@ function renderRetention(filteredData, rawData) {
   const saleOrders = filteredData.filter(row => {
     if (!window.isSaleOrder(row)) return false;
     if (!monthCutoff) return true;
-    const dateStr = window.getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+    const dateStr = window.getRowDateStr(row);
     const d = parseD(dateStr);
     if (!d) return true;
     if (cutoffYear && d.y.toString() !== cutoffYear) return false;
@@ -268,7 +268,7 @@ function renderRetention(filteredData, rawData) {
   // Identify Repeat Purchases
   const repeatOrders = saleOrders.filter(row => {
     const id = window.getCustomerUniqueId(row);
-    const dateStr = window.getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+    const dateStr = window.getRowDateStr(row);
     if (!id || !dateStr) return false;
     const d = parseD(dateStr);
     if (!d) return false;
@@ -283,8 +283,7 @@ function renderRetention(filteredData, rawData) {
   repeatOrders.forEach(row => {
     const id = window.getCustomerUniqueId(row);
     if (id) repeatBuyers.add(id);
-    const revStr = window.getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-    const rev = parseFloat(revStr.replace(/,/g, ''));
+    const rev = window.getRowRevenue(row);
     if (!isNaN(rev)) repeatRevenue += rev;
   });
 
@@ -302,7 +301,7 @@ function renderRetention(filteredData, rawData) {
   }
 
   repeatOrders.forEach(row => {
-    const dateStr = window.getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+    const dateStr = window.getRowDateStr(row);
     if (!dateStr) return;
     const d = parseD(dateStr);
     if (!d || d.m < 1 || d.m > 12) return;
@@ -311,8 +310,7 @@ function renderRetention(filteredData, rawData) {
     const parsedProds = parseProductsFromRow(row);
     const totalQty = parsedProds.reduce((sum, p) => sum + p.qty, 0) || 1;
     
-    const revStr = window.getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-    const orderRev = parseFloat(revStr.replace(/,/g, '')) || 0;
+    const orderRev = window.getRowRevenueOrZero(row);
 
     parsedProds.forEach(p => {
       const pRevenue = orderRev * (p.qty / totalQty);
@@ -365,8 +363,7 @@ function renderRetention(filteredData, rawData) {
   repeatOrders.forEach(row => {
     const channel = window.getNormalizedSubChannel ? window.getNormalizedSubChannel(row) : 'Other';
 
-    const revStr = window.getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-    const rev = parseFloat(revStr.replace(/,/g, ''));
+    const rev = window.getRowRevenue(row);
 
     if (!channelMap[channel]) {
       channelMap[channel] = { name: channel, count: 0, revenue: 0 };

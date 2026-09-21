@@ -195,6 +195,7 @@
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-KPI" onclick="toggleKpiCompare()"><i class="fas fa-toggle-off" id="icon-KPI"></i> KPI Compare: <span id="lbl-KPI">Off</span></button>
           </div>
+          <div class="filter-dropdown"><button class="filter-btn-new" id="btn-DataCheck" onclick="toggleDataCheck()" title="กระทบยอดตัวเลขกับไฟล์ต้นทาง"><span class="dc-dot" style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#94a3b8;"></span> Data Check</button></div>
           <button id="clearFiltersBtn" class="clear-filters-btn" onclick="clearFilters()">Clear Filters</button>
         </div>
         <!-- Filter ของหน้า Executive แยกต่างหากจาก .filters-bar ด้านบนโดยสิ้นเชิง (คนละ state คนละ element)
@@ -233,7 +234,9 @@
             <button class="filter-btn-new" id="btn-Exec-Admin" onclick="toggleFilter('menu-Exec-Admin')">Admin: <span id="lbl-Exec-Admin">-</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Exec-Admin" class="filter-content"></div>
           </div>
+          <div class="filter-dropdown"><button class="filter-btn-new" id="btn-Exec-DataCheck" onclick="toggleDataCheck()" title="กระทบยอดตัวเลขกับไฟล์ต้นทาง"><span class="dc-dot" style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#94a3b8;"></span> Data Check</button></div>
         </div>
+        <div id="dataCheckPanel" style="display:none; background:#fff; border-radius:12px; padding:16px 20px; margin-bottom:20px; box-shadow:0 4px 15px rgba(0,0,0,0.05); max-height:70vh; overflow:auto;"></div>
         <div id="view-overview">
           <div id="overview-empty-state" style="display:none; text-align:center; padding:60px 20px; color:#999; font-size:15px; background:#fff; border-radius:16px; margin-bottom:25px;">
             <i class="fas fa-inbox" style="font-size:32px; display:block; margin-bottom:12px; color:#ccc;"></i>
@@ -627,7 +630,7 @@
       getScopedRawData().forEach(row => {
         if (!isSaleOrder(row)) return;
         const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+        const dateStr = window.getRowDateStr(row);
         if (!id || !dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
@@ -822,7 +825,7 @@
       const momLabel = '<span style="font-size:9px; font-weight:800; letter-spacing:0.5px;">MoM</span> ';
       el.title = opts.title || '';
       // โหมด pts ค่าเดิมเป็น 0 ได้จริง (Repeat Rate 0% เดือนก่อน) จึงถือว่า "ไม่มีข้อมูล" เฉพาะเมื่อเป็น null
-      const noPrev = opts.asPoints ? (previous === null || previous === undefined) : (!previous || previous === 0);
+      const noPrev = !isFiniteNum(current) || (opts.asPoints ? !isFiniteNum(previous) : (!isFiniteNum(previous) || previous === 0));
       if (noPrev) {
         el.innerHTML = momLabel + '-'; el.className = 'kpi-change-new neutral'; return;
       }
@@ -849,39 +852,26 @@
     // เดือน ม.ค. เทียบกับ ธ.ค. ปีก่อนได้แม้เลือก Year เป็นปีเดียวอยู่ ลูกค้าใหม่ใช้ globalFirstPurchase ชุดเดียวกับการ์ด
     function computeMonthlyStats(monthStrs) {
       const src = computeFilteredData(Object.assign({}, filters, { Year: 'All' }));
-      const acc = {};
-      monthStrs.forEach(ms => { acc[ms] = { sales: 0, orders: 0, buyerOrders: new Map() }; });
+      const rowsByMonth = {};
+      monthStrs.forEach(ms => { rowsByMonth[ms] = []; });
       src.forEach(row => {
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-        const d = dateStr ? parseDate(dateStr) : null;
-        if (!d || !acc[d.str]) return;
-        const a = acc[d.str];
-        const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-        a.sales += parseFloat(revenueStr.toString().replace(/,/g, '').trim()) || 0;
-        a.orders++;
-        const id = getCustomerUniqueId(row);
-        if (id) a.buyerOrders.set(id, (a.buyerOrders.get(id) || 0) + 1);
+        const d = parseDate(window.getRowDateStr(row));
+        if (d && rowsByMonth[d.str]) rowsByMonth[d.str].push(row);
       });
       const out = {};
       monthStrs.forEach(ms => {
-        const a = acc[ms];
-        const buyers = a.buyerOrders.size;
-        let newCust = 0, repeatBuyers = 0;
-        a.buyerOrders.forEach((cnt, id) => {
+        const M = calculateMetrics(rowsByMonth[ms]);
+        let newCust = 0;
+        M.customerOrders.forEach((cnt, id) => {
           if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === ms) newCust++;
-          if (cnt >= 2) repeatBuyers++;
         });
         out[ms] = {
-          newCust, orders: a.orders, sales: a.sales,
-          aov: a.orders > 0 ? a.sales / a.orders : 0,
-          sph: buyers > 0 ? a.sales / buyers : 0,
-          repeat: buyers > 0 ? a.orders / buyers : 0,
-          repeatRate: buyers > 0 ? (repeatBuyers / buyers) * 100 : 0
+          newCust, orders: M.totalOrders, sales: M.totalSales,
+          aov: M.aov, sph: M.spendingPerHead, repeat: M.ordersPerCustomer, repeatRate: M.repeatRate
         };
       });
       return out;
     }
-
     // badge เทียบ % กับเป้าหมายจากหน้า KPI Setting (แยกจาก updateChangeUI เดิมที่เทียบเดือนก่อนหน้า) - แปะไว้
     // ใต้ตัวเลขในแต่ละ cell ของการ์ด "ภาพรวมทั้งหมด"/"สรุปปีล่าสุด (YTD)" ผ่าน class .overview-stat-target
     // และใช้ป้าย "KPI" แยกให้เห็นว่าเป็นคนละความหมายกับ badge เทียบเดือนก่อนหน้า
@@ -889,7 +879,7 @@
       const el = document.getElementById(elId);
       if (!el) return;
       const kpiLabel = '<span style="font-size:9px; font-weight:800; letter-spacing:0.5px;">KPI</span> ';
-      if (!target || target === 0) {
+      if (!target || target === 0 || !isFiniteNum(current)) {
         el.innerHTML = kpiLabel + '-';
         el.className = 'overview-stat-target kpi-target-badge neutral';
         return;
@@ -943,7 +933,11 @@
       const phoneDigits = phone ? phone.toString().replace(/\D/g, '') : '';
       const isPlaceholderPhone = !phoneDigits || phoneDigits.length < 9 || /^0+$/.test(phoneDigits) || phone.toString().trim().toLowerCase() === 'xxxxxxx';
       if (!isPlaceholderPhone) {
-        return phoneDigits;
+        // ตัดรหัสประเทศ 66 และเลข 0 นำหน้า เพื่อให้เบอร์เดียวกันที่พิมพ์ต่างรูปแบบ (0899866746 / 899866746 ที่ชีตตัดเลข 0 ทิ้ง / +66 89 986 6746)
+        // ถูกนับเป็นลูกค้าคนเดียวกัน
+        let national = phoneDigits;
+        if (national.length >= 11 && national.indexOf('66') === 0) national = national.slice(2);
+        return national.replace(/^0+/, '');
       }
       const addr = getRowValue(row, ['ที่อยู่ (ลูกค้า)', 'ที่อยู่', 'Address', 'address']);
       if (addr) {
@@ -975,11 +969,148 @@
           d = p0; m = p1; y = p2;
           if (y < 2000) y += 2000;
         }
-        if (y > 2500) y -= 543; 
+        if (y > 2500) y -= 543;
+        // เดือน/วันที่เป็นไปไม่ได้ (เช่น เดือน 13 จากไฟล์ที่ใช้รูปแบบ mm/dd) = วันที่ผิดรูปแบบ ไม่ใช้ตีความเงียบๆ
+        // - แถวนี้จะถูกนับเป็น "วันที่อ่านไม่ได้" ใน Data Check แทนที่จะไปสร้างเดือนที่ไม่มีจริง
+        if (m < 1 || m > 12 || d < 1 || d > 31) return null;
         return { y, m, d, str: `${y}-${m.toString().padStart(2, '0')}` };
       }
       return null;
     }
+
+    // ==========================================================================
+    // Calculation Layer กลาง - ทุก KPI/กราฟ/ตาราง (Overview, Executive, Migration, AI Analytics ฯลฯ) ต้องเรียก
+    // calculateMetrics(rows) ตัวเดียวกันนี้ ห้ามคำนวณยอดขาย/จำนวนออเดอร์/จำนวนลูกค้า/AOV/SPH ด้วยสูตรของตัวเอง
+    //   Filtered Dataset (rows) -> Total Sales -> Orders -> Unique Customers -> AOV -> Spending per Head
+    // - Total Sales      = ผลรวมยอดขายของทุกแถวใน rows (ค่าจริง ไม่ปัดเศษ)
+    // - Orders           = ถ้าไฟล์มีคอลัมน์ Order ID (ชื่อหัวคอลัมน์ตรงตัวตาม ORDER_ID_KEYS เท่านั้น ไม่เดา) นับ Order ID
+    //                      ที่ไม่ซ้ำ (แถวที่ Order ID ว่างนับแถวละ 1 ออเดอร์) ถ้าไม่มีคอลัมน์นี้ = 1 แถว 1 ออเดอร์
+    // - Unique Customers = จำนวน getCustomerUniqueId() ที่ไม่ซ้ำ (เบอร์โทรที่ใช้งานได้ก่อน -> ที่อยู่ -> Customer ID -> ชื่อ)
+    // - AOV              = Total Sales / Orders            (ไม่มีออเดอร์ = null แสดงเป็น N/A)
+    // - Spending per Head= Total Sales / Unique Customers  (ไม่มีลูกค้า = null แสดงเป็น N/A)
+    // การปัดเศษทำเฉพาะตอนแสดงผลเท่านั้น (formatCurrency ฯลฯ) ห้ามปัดก่อนนำไปคำนวณ
+    // ==========================================================================
+    const DATE_KEYS = ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่'];
+    const REVENUE_KEYS = ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน'];
+    // Order ID จับด้วยชื่อหัวคอลัมน์ "ตรงตัว" (ไม่ใช้ includes) เพราะถ้าเดาผิดคอลัมน์จะนับจำนวนออเดอร์ผิดทั้งระบบ
+    const ORDER_ID_KEYS = ['Order ID', 'OrderID', 'Order No', 'Order Number', 'Order Code', 'Transaction ID', 'Bill No', 'Invoice No', 'เลขที่ออเดอร์', 'เลขที่คำสั่งซื้อ', 'เลขที่บิล', 'เลขที่ใบสั่งซื้อ', 'เลขออเดอร์', 'รหัสออเดอร์', 'หมายเลขคำสั่งซื้อ'];
+
+    // กติกาสำรองเมื่อคอลัมน์ Order type ว่าง: หมายเหตุที่มีคำเหล่านี้ (จับแบบ includes ทั้งข้อความ) ไม่นับเป็นยอดขาย
+    const NON_SALE_KEYWORDS = ['ของขวัญวันเกิด', 'ของขวัญปีใหม่', 'เคลม', 'ของแถม', 'แจก', 'sample', 'replace', 'คืนเงิน', 'rerund', 'refund'];
+    window.NON_SALE_KEYWORDS = NON_SALE_KEYWORDS;
+
+    function getRowDateStr(row) { return getRowValue(row, DATE_KEYS); }
+
+    // แปลงยอดขายจากข้อความเป็นตัวเลข (รองรับ , ช่องว่าง ฿ บาท THB และ (1,200) = ติดลบ) - อ่านไม่ได้/ว่าง = NaN
+    // (ผู้เรียกต้องตัดสินใจเอง ไม่แปลงเป็น 0 เงียบๆ เพื่อให้ตรวจพบข้อมูลผิดได้ - ดู Data Check)
+    function parseMoney(v) {
+      if (typeof v === 'number') return Number.isFinite(v) ? v : NaN;
+      if (v === null || v === undefined) return NaN;
+      let s = v.toString().trim();
+      if (s === '') return NaN;
+      let neg = false;
+      if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
+      s = s.replace(/[฿\s,]/g, '').replace(/(บาท|thb|baht)$/i, '');
+      if (!/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(s)) return NaN;
+      const n = parseFloat(s);
+      return neg ? -n : n;
+    }
+    function getRowRevenue(row) { return parseMoney(getRowValue(row, REVENUE_KEYS)); }
+    // ยอดขายสำหรับใช้บวกรวม: อ่านไม่ได้ = 0 (แถวนั้นถูกรายงานแยกใน Data Check ว่า "ยอดขายอ่านค่าไม่ได้")
+    function getRowRevenueOrZero(row) { const v = getRowRevenue(row); return Number.isNaN(v) ? 0 : v; }
+
+    function findExactColumnKey(row, candidates) {
+      if (!row) return '';
+      const clean = s => s.toString().toLowerCase().replace(/[^a-z0-9฀-๿]/g, '');
+      const want = candidates.map(clean);
+      const keys = Object.keys(row);
+      for (let i = 0; i < keys.length; i++) {
+        if (want.indexOf(clean(keys[i])) !== -1) return keys[i];
+      }
+      return '';
+    }
+    let __orderIdColCache = { src: null, key: '' };
+    function getOrderIdColumnKey() {
+      if (!rawData || rawData.length === 0) return '';
+      if (__orderIdColCache.src !== rawData) __orderIdColCache = { src: rawData, key: findExactColumnKey(rawData[0], ORDER_ID_KEYS) };
+      return __orderIdColCache.key;
+    }
+    function getOrderId(row) {
+      const k = getOrderIdColumnKey();
+      return k && row ? (row[k] === undefined || row[k] === null ? '' : row[k].toString().trim()) : '';
+    }
+
+    function calculateMetrics(rows) {
+      const hasOrderCol = !!getOrderIdColumnKey();
+      const seenOrders = new Set();
+      const customerOrders = new Map();
+      let totalSales = 0, totalOrders = 0;
+      const quality = { rows: 0, invalidRevenueRows: 0, negativeRevenueRows: 0, rowsWithoutCustomer: 0, salesWithoutCustomer: 0, rowsWithoutOrderId: 0, duplicateOrderRows: 0 };
+
+      (rows || []).forEach(row => {
+        quality.rows++;
+        const rev = getRowRevenue(row);
+        const revValue = Number.isNaN(rev) ? 0 : rev;
+        if (Number.isNaN(rev)) quality.invalidRevenueRows++;
+        else if (rev < 0) quality.negativeRevenueRows++;
+        totalSales += revValue;
+
+        let isNewOrder = true;
+        if (hasOrderCol) {
+          const oid = getOrderId(row);
+          if (oid) {
+            if (seenOrders.has(oid)) { isNewOrder = false; quality.duplicateOrderRows++; }
+            else seenOrders.add(oid);
+          } else {
+            quality.rowsWithoutOrderId++;
+          }
+        }
+        if (isNewOrder) totalOrders++;
+
+        const id = getCustomerUniqueId(row);
+        if (id) {
+          customerOrders.set(id, (customerOrders.get(id) || 0) + (isNewOrder ? 1 : 0));
+        } else {
+          quality.rowsWithoutCustomer++;
+          quality.salesWithoutCustomer += revValue;
+        }
+      });
+
+      const uniqueCustomers = customerOrders.size;
+      let repeatCustomers = 0;
+      customerOrders.forEach(c => { if (c >= 2) repeatCustomers++; });
+      return {
+        totalSales, totalOrders, uniqueCustomers,
+        aov: totalOrders > 0 ? totalSales / totalOrders : null,
+        spendingPerHead: uniqueCustomers > 0 ? totalSales / uniqueCustomers : null,
+        ordersPerCustomer: uniqueCustomers > 0 ? totalOrders / uniqueCustomers : null,
+        repeatCustomers,
+        repeatRate: uniqueCustomers > 0 ? (repeatCustomers / uniqueCustomers) * 100 : null,
+        customerOrders,
+        orderIdColumn: hasOrderCol ? getOrderIdColumnKey() : '',
+        quality
+      };
+    }
+
+    // --- รูปแบบแสดงผล: ค่าที่คำนวณไม่ได้ (null/NaN/Infinity) แสดง N/A เสมอ ไม่แสดง 0 หรือ NaN ---
+    function isFiniteNum(v) { return typeof v === 'number' && Number.isFinite(v); }
+    function fmtCurrencyOrNA(v) { return isFiniteNum(v) ? formatCurrency(v) : 'N/A'; }
+    function fmtIntOrNA(v) { return isFiniteNum(v) ? v.toLocaleString() : 'N/A'; }
+    function fmtFixedOrNA(v, digits) { return isFiniteNum(v) ? v.toFixed(digits) : 'N/A'; }
+    // ค่าเต็ม (ไม่ปัด) ไว้ในป้าย tooltip ของตัวเลขบนการ์ด เพื่อตรวจกับต้นทางได้ตรงๆ
+    function exactMoneyText(v) { return isFiniteNum(v) ? '฿' + v.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A'; }
+    function setMetricText(elId, text, exactTitle) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      el.textContent = text;
+      el.title = exactTitle || '';
+    }
+
+    window.DATE_KEYS = DATE_KEYS; window.REVENUE_KEYS = REVENUE_KEYS; window.ORDER_ID_KEYS = ORDER_ID_KEYS;
+    window.getRowDateStr = getRowDateStr; window.parseMoney = parseMoney;
+    window.getRowRevenue = getRowRevenue; window.getRowRevenueOrZero = getRowRevenueOrZero;
+    window.getOrderId = getOrderId; window.getOrderIdColumnKey = getOrderIdColumnKey; window.findExactColumnKey = findExactColumnKey;
+    window.calculateMetrics = calculateMetrics;
 
     function isSaleOrder(row) {
       if (!row) return false;
@@ -995,13 +1126,11 @@
         return ot.toUpperCase() === 'SALE';
       }
       const remark = getRowValue(row, ['หมายเหตุ', 'Remark']);
-      const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-      const revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim());
+      const revenue = getRowRevenue(row);
       if (isNaN(revenue) || revenue <= 0) return false;
       
-      const nonSaleKeywords = ['ของขวัญวันเกิด', 'ของขวัญปีใหม่', 'เคลม', 'ของแถม', 'แจก', 'sample', 'replace', 'คืนเงิน', 'rerund', 'refund'];
       const upperRemark = remark.toUpperCase();
-      for (let kw of nonSaleKeywords) {
+      for (let kw of NON_SALE_KEYWORDS) {
         if (upperRemark.includes(kw.toUpperCase())) return false;
       }
       return true;
@@ -1352,7 +1481,7 @@
     function populateExecYearMenu() {
       const yearsSet = new Set();
       getScopedRawData().forEach(row => {
-        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
+        const dateStr = window.getRowDateStr(row);
         if (!dateStr) return;
         const d = parseDate(dateStr);
         if (d) yearsSet.add(d.y.toString());
@@ -1370,7 +1499,7 @@
     function populateExecMonthMenu() {
       const monthsSet = new Set();
       getScopedRawData().forEach(row => {
-        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
+        const dateStr = window.getRowDateStr(row);
         if (!dateStr) return;
         const d = parseDate(dateStr);
         if (d && d.y.toString() === execFilters.Year) monthsSet.add(d.str);
@@ -1444,6 +1573,7 @@
     function applyExecFilters() {
       const execFilteredData = computeFilteredData(execFilters);
       if (typeof renderExecutive1 === 'function') { renderExecutive1(execFilteredData, getScopedRawData()); }
+      if (typeof window.scheduleDataCheck === 'function') window.scheduleDataCheck();
     }
 
     // อัปเดตแบบเรียลไทม์: หน้า Settings ยิง 'appDataChanged' ทุกครั้งที่ เพิ่ม/แก้ไข/ลบ/เปลี่ยนสถานะ
@@ -1467,7 +1597,7 @@
     function populateYearMenu() {
       const yearsSet = new Set();
       getScopedRawData().forEach(row => {
-        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
+        const dateStr = window.getRowDateStr(row);
         if (!dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
@@ -1494,7 +1624,7 @@
     function populateMonthMenu(selectedYear) {
       const monthsSet = new Set();
       getScopedRawData().forEach(row => {
-        const dateStr = getRowValue(row, ['OrderDate', 'วันที่โอนเงิน', 'วันที่สร้าง', 'Date', 'วันที่']);
+        const dateStr = window.getRowDateStr(row);
         if (!dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
@@ -1577,7 +1707,7 @@
     function computeFilteredData(sourceFilters) {
       return rawData.filter(row => {
         if (!isSaleOrder(row)) return false;
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
+        const dateStr = window.getRowDateStr(row);
         if (!dateStr) return false;
         const d = parseDate(dateStr);
         if (!d) return false;
@@ -1633,6 +1763,7 @@
 
       } finally {
         __scrollBox.scrollTop = __savedScrollTop;
+        if (typeof window.scheduleDataCheck === 'function') window.scheduleDataCheck();
       }
     }
 
@@ -1651,31 +1782,25 @@
       if (!data || data.length === 0) { renderEmpty(); return; }
       setOverviewEmptyState(false);
 
+      // จัดแถวเข้าเดือนก่อน แล้วให้ Calculation Layer (calculateMetrics) คำนวณยอดขาย/ออเดอร์/ลูกค้าของแต่ละเดือน
+      // ยอดขาย/ออเดอร์นับทุกแถวที่เป็นการขายจริงและมีวันที่ที่อ่านได้ ไม่ขึ้นกับว่าระบุตัวลูกค้าได้หรือไม่ (แถวที่ไม่มี
+      // เบอร์/ที่อยู่/ชื่อเลยยังเป็นยอดขายจริง) ส่วนจำนวนลูกค้า (buyers) นับเฉพาะแถวที่ระบุตัวลูกค้าได้
       data.forEach(row => {
         if (!isSaleOrder(row)) return;
-        const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-        const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-        
-        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
-        const admin = getNormalizedAdmin(row);
-        
-        // ยอดขาย/จำนวนออเดอร์นับทุกแถวที่เป็นการขายจริงและมีวันที่ ไม่ขึ้นกับว่าระบุตัวลูกค้าได้หรือไม่ (แถวที่ไม่มี
-        // เบอร์/ที่อยู่/ชื่อเลย ยังเป็นยอดขายจริง ถ้าตัดทิ้งจะทำให้ Sum ยอดขาย/AOV ต่ำกว่าไฟล์ โดยเฉพาะปีเก่าที่เบอร์
-        // ถูกมาสก์) ส่วนจำนวนลูกค้า (buyers) นับเฉพาะแถวที่มี id
+        const dateStr = window.getRowDateStr(row);
         if (!dateStr) return;
         const d = parseDate(dateStr);
         if (!d) return;
-        const revenue = parseFloat(revenueStr.toString().replace(/,/g, '').trim()) || 0;
+        const revenue = getRowRevenueOrZero(row);
+        const channel = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
+        const admin = getNormalizedAdmin(row);
         const mStr = d.str;
 
         if (!monthlyData[mStr]) {
-          monthlyData[mStr] = { sales: 0, orders: 0, buyers: new Set(), channels: {}, admins: {}, year: d.y };
+          monthlyData[mStr] = { sales: 0, orders: 0, buyers: new Set(), channels: {}, admins: {}, year: d.y, rows: [], metrics: null };
         }
-        let m = monthlyData[mStr];
-        m.sales += revenue;
-        m.orders++;
-        if (id) m.buyers.add(id);
+        const m = monthlyData[mStr];
+        m.rows.push(row);
         if (!m.channels[channel]) m.channels[channel] = 0;
         m.channels[channel] += revenue;
         // แถวที่ไม่มีชื่อแอดมินจริง (admin === 'Unknown') ไม่เอาเข้ากราฟ Admin เลย - ไม่มีคือไม่มี ไม่ต้องมีแท่ง
@@ -1684,6 +1809,14 @@
           if (!m.admins[admin]) m.admins[admin] = 0;
           m.admins[admin] += revenue;
         }
+      });
+      Object.keys(monthlyData).forEach(ms => {
+        const m = monthlyData[ms];
+        const M = calculateMetrics(m.rows);
+        m.metrics = M;
+        m.sales = M.totalSales;
+        m.orders = M.totalOrders;
+        m.buyers = new Set(M.customerOrders.keys());
       });
       availableMonths = Object.keys(monthlyData).sort();
       renderDashboard();
@@ -1695,53 +1828,43 @@
       '09': 'กันยายน', '10': 'ตุลาคม', '11': 'พฤศจิกายน', '12': 'ธันวาคม'
     };
 
+    const OVERVIEW_METRIC_IDS = ['all-total-cust', 'all-total-orders', 'all-sales', 'all-aov', 'all-sph', 'all-repeat', 'all-repeat-rate', 'ytd-new', 'ytd-orders', 'ytd-sales', 'ytd-aov', 'ytd-sph', 'ytd-repeat', 'ytd-repeat-rate'];
+
+    // ไม่มีข้อมูลตาม Filter = แสดง N/A (ไม่แสดง 0 ที่ทำให้เข้าใจผิดว่าไม่มีการขาย) และไม่ให้เกิด NaN/Infinity
     function renderEmpty() {
       setOverviewEmptyState(true);
-      const currencyIds = ['all-sales', 'all-aov', 'all-sph', 'ytd-sales', 'ytd-aov', 'ytd-sph'];
-      const countIds = ['all-total-cust', 'all-total-orders', 'ytd-new', 'ytd-orders'];
-      const decimalIds = ['all-repeat', 'ytd-repeat'];
-      const percentIds = ['all-repeat-rate', 'ytd-repeat-rate'];
-      currencyIds.forEach(id => { const el = document.getElementById('val-' + id); if (el) el.textContent = '฿0'; });
-      countIds.forEach(id => { const el = document.getElementById('val-' + id); if (el) el.textContent = '0'; });
-      decimalIds.forEach(id => { const el = document.getElementById('val-' + id); if (el) el.textContent = '0.00'; });
-      percentIds.forEach(id => { const el = document.getElementById('val-' + id); if (el) el.textContent = '0%'; });
-      ['ytd-new', 'ytd-orders', 'ytd-sales', 'ytd-aov', 'ytd-sph', 'ytd-repeat', 'ytd-repeat-rate'].forEach(id => updateChangeUI('mom-' + id, 0, 0));
+      OVERVIEW_METRIC_IDS.forEach(id => setMetricText('val-' + id, 'N/A', ''));
+      window.qmLastOverview = null;
+      ['ytd-new', 'ytd-orders', 'ytd-sales', 'ytd-aov', 'ytd-sph', 'ytd-repeat', 'ytd-repeat-rate'].forEach(id => updateChangeUI('mom-' + id, null, null));
       Object.values(charts).forEach(c => { if(c && c.data) { c.data.labels = []; c.update(); } });
+      if (typeof window.scheduleDataCheck === 'function') window.scheduleDataCheck();
     }
 
     // ==========================================
-    // 📊 การ์ด "ภาพรวมทั้งหมด (ทุกปี)" - ยอดสะสมจากข้อมูลที่ Import ทั้งหมด ไม่ผูกกับ Filter ใดๆ เลย
-    // (ต่างจาก filteredData/monthlyData ด้านล่างที่ผูกกับ Year/Channel/Product/ฯลฯ ที่เลือกอยู่)
+    // 📊 การ์ด "ภาพรวมทั้งหมด (ทุกปี)" - ยอดสะสมทุกปีของชุดข้อมูลที่ผ่าน Filter ทุกตัวยกเว้น Year/Month (ตามชื่อการ์ดที่ระบุว่า
+    // "ทุกปี") กล่าวคือ Group/Channel/SubChannel/Product/Sub Product/Admin ที่เลือกอยู่มีผลกับการ์ดนี้เหมือนกับ KPI/กราฟอื่น -
+    // ไม่ใช่ใช้ข้อมูลคนละชุดกับที่ Filter ไว้ (ต่างจากเดิมที่การ์ดนี้ไม่ตาม Filter ใดเลยนอกจาก Group)
     // ==========================================
+    function getGroupScopeRows() {
+      return getScopedRawData().filter(row =>
+        isSaleOrder(row) && isProductActive(getNormalizedProduct(row)) && !!parseDate(window.getRowDateStr(row))
+      );
+    }
+    function getAllTimeRows() {
+      return computeFilteredData(Object.assign({}, filters, { Year: 'All' }));
+    }
     function computeAllTimeOverview() {
-      const buyerOrders = new Map();
-      let totalSales = 0, totalOrders = 0;
-      getScopedRawData().forEach(row => {
-        if (!isSaleOrder(row)) return;
-        if (!isProductActive(getNormalizedProduct(row))) return;
-        const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-        if (!dateStr) return;
-        if (!parseDate(dateStr)) return;
-        const revenueStr = getRowValue(row, ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน']) || '0';
-        totalSales += parseFloat(revenueStr.toString().replace(/,/g, '').trim()) || 0;
-        totalOrders++;
-        if (id) buyerOrders.set(id, (buyerOrders.get(id) || 0) + 1);
-      });
-      const totalCust = buyerOrders.size;
-      let repeatBuyers = 0;
-      buyerOrders.forEach(c => { if (c >= 2) repeatBuyers++; });
+      const M = calculateMetrics(getAllTimeRows());
       return {
-        totalSales, totalOrders, totalCust,
-        aov: totalOrders > 0 ? totalSales / totalOrders : 0,
-        sph: totalCust > 0 ? totalSales / totalCust : 0,
-        repeat: totalCust > 0 ? totalOrders / totalCust : 0,
-        repeatRate: totalCust > 0 ? (repeatBuyers / totalCust) * 100 : 0
+        totalSales: M.totalSales, totalOrders: M.totalOrders, totalCust: M.uniqueCustomers,
+        aov: M.aov, sph: M.spendingPerHead, repeat: M.ordersPerCustomer, repeatRate: M.repeatRate,
+        metrics: M
       };
     }
+    window.getAllTimeRows = getAllTimeRows; window.getGroupScopeRows = getGroupScopeRows;
 
     // ==========================================
-    // 🛠️ ปรับปรุงความแม่นยำในการนับยอดสะสมของลูกค้าในระบบ Dashboard
+    // 🛠️ การ์ด YTD / All-time / กราฟ ทั้งหมดคำนวณผ่าน calculateMetrics() (Calculation Layer กลาง) จาก Dataset เดียวกัน
     // ==========================================
     function renderDashboard() {
       if (availableMonths.length === 0) { renderEmpty(); return; }
@@ -1752,80 +1875,74 @@
       const idx = availableMonths.indexOf(selectedMonthStr);
       const curr = monthlyData[selectedMonthStr];
       const currYear = curr.year;
-      let ytdSales = 0, ytdOrders = 0, ytdBuyers = new Set(), ytdNew = 0;
+      const ytdRows = [];
+      let ytdNew = 0;
       availableMonths.forEach(m => {
-        if (monthlyData[m].year === currYear && m <= selectedMonthStr) {
-          ytdSales += monthlyData[m].sales;
-          ytdOrders += monthlyData[m].orders;
-          monthlyData[m].buyers.forEach(id => ytdBuyers.add(id));
-          monthlyData[m].buyers.forEach(id => {
+        const md = monthlyData[m];
+        if (md.year === currYear && m <= selectedMonthStr) {
+          for (let i = 0; i < md.rows.length; i++) ytdRows.push(md.rows[i]);
+          md.buyers.forEach(id => {
             if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === m) ytdNew++;
           });
         }
       });
-      // ใช้เติมการ์ด "สรุปปีล่าสุด (YTD)" ด้านบน (Repeat/Repeat Rate% นับเฉพาะออเดอร์ในช่วง YTD ของปีนี้)
-      const ytdAov = ytdOrders > 0 ? ytdSales / ytdOrders : 0;
-      const ytdSph = ytdBuyers.size > 0 ? ytdSales / ytdBuyers.size : 0;
-      const ytdRepeat = ytdBuyers.size > 0 ? ytdOrders / ytdBuyers.size : 0;
-      let ytdBuyerOrderCounts = new Map();
-      filteredData.forEach(row => {
-        const id = getCustomerUniqueId(row);
-        const dateStr = getRowValue(row, ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่']);
-        if (!id || !dateStr) return;
-        const d = parseDate(dateStr);
-        if (d && d.y === currYear && d.str <= selectedMonthStr) {
-          ytdBuyerOrderCounts.set(id, (ytdBuyerOrderCounts.get(id) || 0) + 1);
-        }
-      });
-      let ytdRepeatBuyers = 0;
-      ytdBuyerOrderCounts.forEach(c => { if (c >= 2) ytdRepeatBuyers++; });
-      const ytdRepeatRate = ytdBuyers.size > 0 ? (ytdRepeatBuyers / ytdBuyers.size) * 100 : 0;
+      // การ์ด "สรุปปีล่าสุด (YTD)" = เดือนม.ค. ถึงเดือนที่เลือก (Month filter หรือเดือนล่าสุดที่มีข้อมูล) ของปีนั้น
+      const ytd = calculateMetrics(ytdRows);
+      const ytdSales = ytd.totalSales, ytdOrders = ytd.totalOrders;
+      const ytdAov = ytd.aov, ytdSph = ytd.spendingPerHead;
+      const ytdRepeat = ytd.ordersPerCustomer, ytdRepeatRate = ytd.repeatRate;
 
       // เทียบเดือนที่เลือก (Month filter หรือเดือนล่าสุด) กับเดือนก่อนหน้า - ค่ารายเดือน ไม่ใช่ YTD สะสม
       const prevMonthStr = getPrevMonthStr(selectedMonthStr);
       const momStats = computeMonthlyStats([selectedMonthStr, prevMonthStr]);
       const momCur = momStats[selectedMonthStr], momPrev = momStats[prevMonthStr];
       const momTitle = (label, fmt, key) => 'เทียบเดือนก่อนหน้า (' + selectedMonthStr + ' vs ' + prevMonthStr + ') - ' + label + ': ' + fmt(momCur[key]) + ' vs ' + fmt(momPrev[key]);
-      const fmtInt = v => Math.round(v).toLocaleString();
-      const fmt2 = v => v.toFixed(2);
-      const fmtPct = v => v.toFixed(1) + '%';
+      const fmtPct = v => isFiniteNum(v) ? v.toFixed(1) + '%' : 'N/A';
       [
-        ['ytd-new', 'newCust', 'ลูกค้าใหม่', fmtInt],
-        ['ytd-orders', 'orders', 'ออเดอร์', fmtInt],
-        ['ytd-sales', 'sales', 'ยอดขาย', formatCurrency],
-        ['ytd-aov', 'aov', 'AOV', formatCurrency],
-        ['ytd-sph', 'sph', 'SPH', formatCurrency],
-        ['ytd-repeat', 'repeat', 'Repeat', fmt2]
+        ['ytd-new', 'newCust', 'ลูกค้าใหม่', fmtIntOrNA],
+        ['ytd-orders', 'orders', 'ออเดอร์', fmtIntOrNA],
+        ['ytd-sales', 'sales', 'ยอดขาย', fmtCurrencyOrNA],
+        ['ytd-aov', 'aov', 'AOV', fmtCurrencyOrNA],
+        ['ytd-sph', 'sph', 'SPH', fmtCurrencyOrNA],
+        ['ytd-repeat', 'repeat', 'Repeat', v => fmtFixedOrNA(v, 2)]
       ].forEach(([id, key, label, fmt]) => {
         updateChangeUI('mom-' + id, momCur[key], momPrev[key], { title: momTitle(label, fmt, key) });
       });
-      updateChangeUI('mom-ytd-repeat-rate', momCur.repeatRate, momPrev.orders > 0 ? momPrev.repeatRate : null, { asPoints: true, title: momTitle('Repeat Rate', fmtPct, 'repeatRate') });
+      updateChangeUI('mom-ytd-repeat-rate', momCur.repeatRate, momPrev.repeatRate, { asPoints: true, title: momTitle('Repeat Rate', fmtPct, 'repeatRate') });
 
       // ==========================================
       // 📊 การ์ด "สรุปปีล่าสุด (YTD)" ด้านบน - ผูกกับ Filter ที่เลือกอยู่ (Year/Month/Channel/ฯลฯ)
       // ตัวเลขทั้งหมดคำนวณจาก filteredData/monthlyData ที่ผ่าน filter ด้านบนแล้วทั้งสิ้น
+      // ตัวเลขบนการ์ดปัดเศษเป็นบาทเต็มเฉพาะตอนแสดง - เอาเมาส์ชี้ที่ตัวเลขเพื่อดูค่าเต็ม 2 ตำแหน่ง
       // ==========================================
       const ytdYearLabelEl = document.getElementById('ytd-year-label');
       if (ytdYearLabelEl) ytdYearLabelEl.textContent = currYear;
-      document.getElementById('val-ytd-new').textContent = ytdNew.toLocaleString() + ' คน';
-      document.getElementById('val-ytd-orders').textContent = ytdOrders.toLocaleString();
-      document.getElementById('val-ytd-sales').textContent = formatCurrency(ytdSales);
-      document.getElementById('val-ytd-aov').textContent = formatCurrency(ytdAov);
-      document.getElementById('val-ytd-sph').textContent = formatCurrency(ytdSph);
-      document.getElementById('val-ytd-repeat').textContent = ytdRepeat.toFixed(2);
-      document.getElementById('val-ytd-repeat-rate').textContent = ytdRepeatRate.toFixed(1) + '%';
+      setMetricText('val-ytd-new', ytdNew.toLocaleString() + ' คน', '');
+      setMetricText('val-ytd-orders', fmtIntOrNA(ytdOrders), '');
+      setMetricText('val-ytd-sales', fmtCurrencyOrNA(ytdSales), exactMoneyText(ytdSales));
+      setMetricText('val-ytd-aov', fmtCurrencyOrNA(ytdAov), exactMoneyText(ytdAov));
+      setMetricText('val-ytd-sph', fmtCurrencyOrNA(ytdSph), exactMoneyText(ytdSph));
+      setMetricText('val-ytd-repeat', fmtFixedOrNA(ytdRepeat, 2), '');
+      setMetricText('val-ytd-repeat-rate', isFiniteNum(ytdRepeatRate) ? ytdRepeatRate.toFixed(1) + '%' : 'N/A', '');
 
       // ==========================================
-      // 📊 การ์ด "ภาพรวมทั้งหมด (ทุกปี)" ด้านบน - ไม่ผูกกับ Filter ใดๆ เลย (ยอดสะสมทั้งหมดของข้อมูลที่ Import)
+      // 📊 การ์ด "ภาพรวมทั้งหมด (ทุกปี)" ด้านบน - ยอดสะสมทุกปี ตาม Filter ทุกตัวยกเว้น Year/Month (ดู getAllTimeRows)
       // ==========================================
       const allTime = computeAllTimeOverview();
-      document.getElementById('val-all-total-cust').textContent = allTime.totalCust.toLocaleString();
-      document.getElementById('val-all-total-orders').textContent = allTime.totalOrders.toLocaleString();
-      document.getElementById('val-all-sales').textContent = formatCurrency(allTime.totalSales);
-      document.getElementById('val-all-aov').textContent = formatCurrency(allTime.aov);
-      document.getElementById('val-all-sph').textContent = formatCurrency(allTime.sph);
-      document.getElementById('val-all-repeat').textContent = allTime.repeat.toFixed(2);
-      document.getElementById('val-all-repeat-rate').textContent = allTime.repeatRate.toFixed(1) + '%';
+      const noAll = allTime.totalOrders === 0;
+      // ค่าจริง (ไม่ปัดเศษ) ที่แสดงบนการ์ดล่าสุด - ให้ Data Check ใช้เทียบกับการคำนวณอิสระ
+      window.qmLastOverview = {
+        selectedMonthStr, currYear,
+        ytd: { sales: ytd.totalSales, orders: ytd.totalOrders, customers: ytd.uniqueCustomers, aov: ytd.aov, sph: ytd.spendingPerHead },
+        allTime: { sales: allTime.totalSales, orders: allTime.totalOrders, customers: allTime.totalCust, aov: allTime.aov, sph: allTime.sph }
+      };
+      setMetricText('val-all-total-cust', noAll ? 'N/A' : allTime.totalCust.toLocaleString(), '');
+      setMetricText('val-all-total-orders', noAll ? 'N/A' : allTime.totalOrders.toLocaleString(), '');
+      setMetricText('val-all-sales', noAll ? 'N/A' : fmtCurrencyOrNA(allTime.totalSales), noAll ? '' : exactMoneyText(allTime.totalSales));
+      setMetricText('val-all-aov', fmtCurrencyOrNA(allTime.aov), exactMoneyText(allTime.aov));
+      setMetricText('val-all-sph', fmtCurrencyOrNA(allTime.sph), exactMoneyText(allTime.sph));
+      setMetricText('val-all-repeat', fmtFixedOrNA(allTime.repeat, 2), '');
+      setMetricText('val-all-repeat-rate', isFiniteNum(allTime.repeatRate) ? allTime.repeatRate.toFixed(1) + '%' : 'N/A', '');
 
       // ==========================================
       // 🎯 badge เทียบเป้าหมาย KPI Setting (ใต้ตัวเลขในแต่ละ cell) ควบคุมด้วยปุ่ม KPI Compare
@@ -2022,5 +2139,6 @@
   <script src="kpisetting.js?v=2"></script>
   <script src="api-client.js?v=1"></script>
   <script src="settings.js?v=2"></script>
+  <script src="datacheck.js?v=1"></script>
 </body>
 </html>
