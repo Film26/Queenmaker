@@ -143,7 +143,7 @@
           <button id="importBtn" class="btn" style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
             <i class="fas fa-file-import"></i> Import Data
           </button>
-          <input type="file" id="fileInput" accept=".csv" style="display: none;">
+          <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display: none;">
           <button id="exportBtn" class="btn" onclick="exportCurrentView()" style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 8px;">
             <i class="fas fa-file-export"></i> Export Data
           </button>
@@ -276,33 +276,33 @@
             </div>
 
             <div class="overview-stat-card">
-              <div class="overview-stat-card-title"><i class="fas fa-calendar-check"></i> สรุปปีล่าสุด (YTD <span id="ytd-year-label">-</span>)</div>
+              <div class="overview-stat-card-title"><i class="fas fa-calendar-check"></i> <span id="ytd-card-title">สรุปปีล่าสุด (YTD <span id="ytd-year-label">-</span>)</span></div>
               <div class="overview-stat-row">
                 <div class="overview-stat-cell">
-                  <div class="overview-stat-label">ลูกค้าใหม่ปีนี้</div>
+                  <div class="overview-stat-label" id="lbl-ytd-new">ลูกค้าใหม่ปีนี้</div>
                   <div class="overview-stat-value" id="val-ytd-new">0</div>
                   <div><span class="kpi-change-new neutral" id="mom-ytd-new" style="margin-top:6px;">-</span></div>
                   <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-new" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
-                  <div class="overview-stat-label">ออเดอร์ YTD</div>
+                  <div class="overview-stat-label" id="lbl-ytd-orders">ออเดอร์ YTD</div>
                   <div class="overview-stat-value" id="val-ytd-orders">0</div>
                   <div><span class="kpi-change-new neutral" id="mom-ytd-orders" style="margin-top:6px;">-</span></div>
                 </div>
                 <div class="overview-stat-cell">
-                  <div class="overview-stat-label">ยอดขาย YTD</div>
+                  <div class="overview-stat-label" id="lbl-ytd-sales">ยอดขาย YTD</div>
                   <div class="overview-stat-value" id="val-ytd-sales">฿0</div>
                   <div><span class="kpi-change-new neutral" id="mom-ytd-sales" style="margin-top:6px;">-</span></div>
                   <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-sales" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
-                  <div class="overview-stat-label">AOV YTD</div>
+                  <div class="overview-stat-label" id="lbl-ytd-aov">AOV YTD</div>
                   <div class="overview-stat-value" id="val-ytd-aov">฿0</div>
                   <div><span class="kpi-change-new neutral" id="mom-ytd-aov" style="margin-top:6px;">-</span></div>
                   <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-aov" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
                 </div>
                 <div class="overview-stat-cell">
-                  <div class="overview-stat-label">SPH YTD</div>
+                  <div class="overview-stat-label" id="lbl-ytd-sph">SPH YTD</div>
                   <div class="overview-stat-value" id="val-ytd-sph">฿0</div>
                   <div><span class="kpi-change-new neutral" id="mom-ytd-sph" style="margin-top:6px;">-</span></div>
                   <span class="overview-stat-target kpi-target-badge" id="kpi-target-ytd-sph" style="display:none;" title="เทียบกับเป้าหมายจากหน้า KPI Setting">-</span>
@@ -638,6 +638,99 @@
       });
     }
 
+    // --- นำแถวข้อมูลเข้าระบบ (ใช้ร่วมกันทั้งไฟล์ CSV และ Excel) ---
+    function ingestRows(rows) {
+      try {
+        for (let k in keyCache) delete keyCache[k];
+        window.userCohorts = null;
+        window.scFirstPurchase = null;
+
+        rawData = (rows || []).filter(row => {
+          if (!row) return false;
+          return Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
+        });
+
+        refreshGroupMenus();
+        precomputeGlobalFirstPurchases();
+        // เรียกตรงๆ ทุกครั้งที่ import (ไม่ใช่แค่ครั้งแรก) เพื่อให้ตัวเลือก Filter ทั้งหมด
+        // (Year/Month/Channel/SubChannel/Product/SubProduct/Admin) รีเฟรชตามไฟล์ที่ import เข้ามาใหม่เสมอ
+        // - ถ้าปล่อยให้ applyFilters() ตัดสินใจเอง (เช็คว่า menu-Year ว่างไหม) จะรีเฟรชแค่ตอน import ครั้งแรก
+        // ครั้งถัดๆ ไปตัวเลือกจะค้างเป็นของไฟล์เก่าทั้งที่ข้อมูลเปลี่ยนไปแล้ว
+        populateDropdowns();
+        applyFilters();
+      } catch (err) {
+        console.error(err);
+        alert('เกิดข้อผิดพลาดในการประมวลผลข้อมูล');
+      }
+    }
+
+    // --- อ่านไฟล์ Excel (.xlsx/.xls) เป็นแถวข้อมูลหน้าตาเดียวกับที่ PapaParse ให้ (หัวคอลัมน์ = key, ค่าเป็นข้อความ) ---
+    // - ชีตที่เลือก: ชีตที่แถวหัวมีทั้งคอลัมน์ยอดขายและวันที่ (ถ้ามีหลายชีตเลือกชีตที่มีแถวมากที่สุด) ไม่มีเลยใช้ชีตแรก
+    // - เซลล์วันที่ (รูปแบบวันที่ใน Excel) แปลงเป็นข้อความ วัน/เดือน/ปี ตรงๆ จากเลขวันที่ ไม่ผ่านรูปแบบแสดงผลของเครื่อง
+    //   จึงไม่สลับวัน-เดือน; เซลล์ตัวเลข (ยอดขาย ฯลฯ) ใช้ค่าจริงเต็มความละเอียด ไม่ใช่ข้อความที่จัดรูปแบบ/ปัดเศษ
+    // - เบอร์โทรที่ Excel เก็บเป็นตัวเลข (เลข 0 นำหน้าหาย) ไม่เป็นปัญหา เพราะ getCustomerUniqueId ตัดเลข 0 นำหน้าก่อนเทียบอยู่แล้ว
+    function excelCellText(cell) {
+      if (!cell || cell.v === undefined || cell.v === null || cell.t === 'e') return '';
+      if (cell.t === 'n' && cell.z && XLSX.SSF.is_date(cell.z)) {
+        const d = XLSX.SSF.parse_date_code(cell.v);
+        return d ? d.d + '/' + d.m + '/' + d.y : '';
+      }
+      if (cell.t === 'b') return cell.v ? 'TRUE' : 'FALSE';
+      return String(cell.v);
+    }
+    function excelSheetHeaders(ws) {
+      if (!ws || !ws['!ref']) return [];
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      const headers = [];
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        headers.push(excelCellText(ws[XLSX.utils.encode_cell({ r: range.s.r, c: col })]).trim());
+      }
+      return headers;
+    }
+    function readExcelRows(arrayBuffer) {
+      const wb = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array', cellNF: true, cellText: false });
+      const clean = s => s.toLowerCase().replace(/[^a-z0-9\u0e00-\u0e7f]/g, '');
+      const hasAny = (headers, keys) => keys.some(k => headers.some(h => h && clean(h).indexOf(clean(k)) !== -1));
+      let best = null;
+      wb.SheetNames.forEach(name => {
+        const ws = wb.Sheets[name];
+        const headers = excelSheetHeaders(ws);
+        if (!hasAny(headers, REVENUE_KEYS) || !hasAny(headers, DATE_KEYS)) return;
+        const rowCount = XLSX.utils.decode_range(ws['!ref']).e.r;
+        if (!best || rowCount > best.rowCount) best = { name, rowCount };
+      });
+      if (!best) throw new Error('ไม่พบชีตที่มีทั้งคอลัมน์ยอดขายและวันที่ (เช่น Net Sales / OrderDate)');
+      const sheetName = best.name;
+      const ws = wb.Sheets[sheetName];
+      if (!ws || !ws['!ref']) throw new Error('ไม่พบข้อมูลในไฟล์ Excel');
+      console.info('[Import] อ่านชีต "' + sheetName + '" จากไฟล์ Excel (' + wb.SheetNames.length + ' ชีต)');
+
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      const headers = excelSheetHeaders(ws);
+      // ชื่อหัวคอลัมน์ซ้ำ ตั้งชื่อต่อท้าย _1, _2 เหมือน PapaParse (เช่น Admin Name / Admin Name_1)
+      const seen = {};
+      const keys = headers.map(h => {
+        if (!h) return '';
+        if (seen[h] === undefined) { seen[h] = 0; return h; }
+        seen[h]++;
+        return h + '_' + seen[h];
+      });
+      const rows = [];
+      for (let r = range.s.r + 1; r <= range.e.r; r++) {
+        const row = {};
+        let hasValue = false;
+        for (let i = 0; i < keys.length; i++) {
+          if (!keys[i]) continue;
+          const v = excelCellText(ws[XLSX.utils.encode_cell({ r, c: range.s.c + i })]);
+          if (v !== '') hasValue = true;
+          row[keys[i]] = v;
+        }
+        if (hasValue) rows.push(row);
+      }
+      if (rows.length === 0) throw new Error('ไม่พบแถวข้อมูลในชีต "' + sheetName + '"');
+      return rows;
+    }
+
     // --- DOMContentLoaded Section ---
     window.addEventListener('DOMContentLoaded', () => {
       checkSessionOrRedirect();
@@ -653,40 +746,39 @@
       if (fileInput) {
         fileInput.addEventListener('change', (e) => {
           const file = e.target.files[0];
-          if (file) {
-            showLoading(true);
-            Papa.parse(file, {
-              header: true,
-              skipEmptyLines: true, 
-              complete: (results) => {
+          if (!file) return;
+          const ext = (file.name.split('.').pop() || '').toLowerCase();
+          showLoading(true);
+          if (ext === 'xlsx' || ext === 'xls') {
+            const reader = new FileReader();
+            reader.onerror = () => { showLoading(false); alert('อ่านไฟล์ Excel ไม่สำเร็จ'); };
+            reader.onload = () => {
+              // ให้ overlay "กำลังโหลด" แสดงก่อนเริ่มงานหนัก (อ่านไฟล์ Excel ขนาดใหญ่ใช้เวลาหลายวินาที)
+              setTimeout(() => {
                 try {
-                  for (let k in keyCache) delete keyCache[k];
-                  window.userCohorts = null;
-                  window.scFirstPurchase = null;
-                  
-                  rawData = results.data.filter(row => {
-                    if (!row) return false;
-                    return Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
-                  });
-
-                  refreshGroupMenus();
-                  precomputeGlobalFirstPurchases();
-                  // เรียกตรงๆ ทุกครั้งที่ import (ไม่ใช่แค่ครั้งแรก) เพื่อให้ตัวเลือก Filter ทั้งหมด
-                  // (Year/Month/Channel/SubChannel/Product/SubProduct/Admin) รีเฟรชตามไฟล์ที่ import เข้ามาใหม่เสมอ
-                  // - ถ้าปล่อยให้ applyFilters() ตัดสินใจเอง (เช็คว่า menu-Year ว่างไหม) จะรีเฟรชแค่ตอน import ครั้งแรก
-                  // ครั้งถัดๆ ไปตัวเลือกจะค้างเป็นของไฟล์เก่าทั้งที่ข้อมูลเปลี่ยนไปแล้ว
-                  populateDropdowns();
-                  applyFilters();
+                  ingestRows(readExcelRows(reader.result));
                 } catch (err) {
                   console.error(err);
-                  alert('เกิดข้อผิดพลาดในการประมวลผลข้อมูล');
+                  alert('อ่านไฟล์ Excel ไม่สำเร็จ: ' + (err && err.message ? err.message : err));
                 } finally {
-                  showLoading(false); 
+                  showLoading(false);
                 }
+              }, 30);
+            };
+            reader.readAsArrayBuffer(file);
+          } else {
+            Papa.parse(file, {
+              header: true,
+              skipEmptyLines: true,
+              complete: (results) => {
+                try { ingestRows(results.data); }
+                catch (err) { console.error(err); alert('เกิดข้อผิดพลาดในการประมวลผลข้อมูล'); }
+                finally { showLoading(false); }
               },
               error: (err) => { console.error(err); showLoading(false); alert('Error parsing CSV'); }
             });
           }
+          e.target.value = '';
         });
       }
 
@@ -1872,18 +1964,21 @@
       const idx = availableMonths.indexOf(selectedMonthStr);
       const curr = monthlyData[selectedMonthStr];
       const currYear = curr.year;
+      // เลือก Month = การ์ดสรุปแสดงเฉพาะเดือนนั้นเดือนเดียว (เช่น 2022-11 = ออเดอร์ของเดือน พ.ย. 2022 เท่านั้น)
+      // ไม่เลือก Month (All) = สะสม YTD ตั้งแต่ ม.ค. ถึงเดือนล่าสุดที่มีข้อมูลของปีนั้น
+      const monthMode = filters.Month !== 'All';
       const ytdRows = [];
       let ytdNew = 0;
       availableMonths.forEach(m => {
         const md = monthlyData[m];
-        if (md.year === currYear && m <= selectedMonthStr) {
+        const inWindow = monthMode ? (m === selectedMonthStr) : (md.year === currYear && m <= selectedMonthStr);
+        if (inWindow) {
           for (let i = 0; i < md.rows.length; i++) ytdRows.push(md.rows[i]);
           md.buyers.forEach(id => {
             if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === m) ytdNew++;
           });
         }
       });
-      // การ์ด "สรุปปีล่าสุด (YTD)" = เดือนม.ค. ถึงเดือนที่เลือก (Month filter หรือเดือนล่าสุดที่มีข้อมูล) ของปีนั้น
       const ytd = calculateMetrics(ytdRows);
       const ytdSales = ytd.totalSales, ytdOrders = ytd.totalOrders;
       const ytdAov = ytd.aov, ytdSph = ytd.spendingPerHead;
@@ -1912,8 +2007,12 @@
       // ตัวเลขทั้งหมดคำนวณจาก filteredData/monthlyData ที่ผ่าน filter ด้านบนแล้วทั้งสิ้น
       // ตัวเลขบนการ์ดปัดเศษเป็นบาทเต็มเฉพาะตอนแสดง - เอาเมาส์ชี้ที่ตัวเลขเพื่อดูค่าเต็ม 2 ตำแหน่ง
       // ==========================================
-      const ytdYearLabelEl = document.getElementById('ytd-year-label');
-      if (ytdYearLabelEl) ytdYearLabelEl.textContent = currYear;
+      const titleEl = document.getElementById('ytd-card-title');
+      if (titleEl) titleEl.innerHTML = monthMode ? 'สรุปเดือน <span id="ytd-year-label">' + selectedMonthStr + '</span>' : 'สรุปปีล่าสุด (YTD <span id="ytd-year-label">' + currYear + '</span>)';
+      [['lbl-ytd-new', 'ลูกค้าใหม่เดือนนี้', 'ลูกค้าใหม่ปีนี้'], ['lbl-ytd-orders', 'ออเดอร์เดือนนี้', 'ออเดอร์ YTD'], ['lbl-ytd-sales', 'ยอดขายเดือนนี้', 'ยอดขาย YTD'], ['lbl-ytd-aov', 'AOV เดือนนี้', 'AOV YTD'], ['lbl-ytd-sph', 'SPH เดือนนี้', 'SPH YTD']].forEach(([id, monthText, ytdText]) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = monthMode ? monthText : ytdText;
+      });
       setMetricText('val-ytd-new', ytdNew.toLocaleString() + ' คน', '');
       setMetricText('val-ytd-orders', fmtIntOrNA(ytdOrders), '');
       setMetricText('val-ytd-sales', fmtCurrencyOrNA(ytdSales), exactMoneyText(ytdSales));
@@ -1951,7 +2050,8 @@
       kpiTargetList.forEach(([elId, current, target]) => {
         const el = document.getElementById(elId);
         if (!el) return;
-        if (filters.KPI === 'On') {
+        // เป้าหมายใน KPI Setting เป็นเป้ารายปี (YTD) จึงไม่เทียบกับตัวเลขรายเดือนตอนเลือก Month
+        if (filters.KPI === 'On' && !(monthMode && elId.indexOf('kpi-target-ytd-') === 0)) {
           el.style.display = 'inline-flex';
           updateKpiTargetUI(elId, current, target);
         } else {
