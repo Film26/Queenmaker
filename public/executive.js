@@ -395,12 +395,12 @@ function renderExecutive1(filteredData, rawData) {
     agg[m].newToSubBuyers.forEach(id => total.newToSubBuyers.add(id));
   }
   // Formatting helpers
-  // ค่าที่คำนวณไม่ได้ (ตัวหารเป็น 0 = ไม่มีข้อมูล) แสดง N/A ไม่แสดง 0/NaN - ปัดเศษเฉพาะตอนแสดงผลเท่านั้น
+  // ค่าที่คำนวณไม่ได้ (ตัวหารเป็น 0 = ไม่มีข้อมูล) แสดง - ไม่แสดง 0/NaN - ปัดเศษเฉพาะตอนแสดงผลเท่านั้น
   const isNA = (num) => num === null || num === undefined || typeof num !== 'number' || !Number.isFinite(num);
-  const fmtNum = (num) => isNA(num) ? 'N/A' : num.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  const fmtDec = (num) => isNA(num) ? 'N/A' : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const fmtPct = (num) => isNA(num) ? 'N/A' : (num * 100).toFixed(1) + '%';
-  const fmtMoney = (num) => isNA(num) ? 'N/A' : '฿' + fmtNum(num);
+  const fmtNum = (num) => isNA(num) ? '-' : num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  const fmtDec = (num) => isNA(num) ? '-' : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtPct = (num) => isNA(num) ? '-' : (num * 100).toFixed(1) + '%';
+  const fmtMoney = (num) => isNA(num) ? '-' : '฿' + fmtNum(num);
   const getSafely = (a, b) => b === 0 ? null : a / b;
 
   // Metrics Array Construction (per-month series, index 0 = Jan ... 11 = Dec, index 12 = Total Year)
@@ -411,9 +411,39 @@ function renderExecutive1(filteredData, rawData) {
   const cumAllCustArr = [];
   {
     const selectedYear = (window.execFilters && window.execFilters.Year) ? String(window.execFilters.Year) : '';
+    // เลือก Filter ตัวใดตัวหนึ่ง (Group/Channel/SubChannel/Product/SubProduct/Admin เช่น FBP) -> ลูกค้าสะสมต้องนับเฉพาะ
+    // คนที่เคยซื้อภายใต้ตัวเลือกนั้น (ข้ามปี ไม่รีเซ็ต) ไม่ใช่ลูกค้าทั้งระบบ - หาวันซื้อครั้งแรก "ภายใต้ Filter ที่เลือก"
+    // จาก rawData ทุกปี (Year/Month ไม่นำมากรองตรงนี้) ส่วนตอนเลือก All ครบทุกตัว ใช้ globalFirstPurchase เดิมทุกอย่าง
+    // (ผลลัพธ์ไม่เปลี่ยน) เงื่อนไขแถวตรงกับ computeFilteredData ใน dashboard.html เพื่อให้ Buyers เป็นส่วนหนึ่งของ All Customer เสมอ
+    const ef = window.execFilters || {};
+    const isPicked = (v) => !!v && v !== 'All';
+    const scopeActive = ['Group', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].some(k => isPicked(ef[k]));
+    let cumFirstPurchase = globalFirstPurchase;
+    if (scopeActive) {
+      const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
+      cumFirstPurchase = {};
+      (rawData || []).forEach(row => {
+        if (window.isSaleOrder && !window.isSaleOrder(row)) return;
+        if (window.isProductActive && !window.isProductActive(window.getNormalizedProduct(row))) return;
+        if (isPicked(ef.Group) && window.getNormalizedGroup(row) !== ef.Group) return;
+        if (isPicked(ef.Channel) && window.getNormalizedChannel(getVal(row, ['ช่องทาง', 'Channel']), row) !== ef.Channel) return;
+        if (isPicked(ef.SubChannel) && window.getNormalizedSubChannel(row) !== ef.SubChannel) return;
+        if (isPicked(ef.Product) && window.getNormalizedProduct(row) !== ef.Product) return;
+        if (isPicked(ef.SubProduct) && window.getNormalizedSubProduct(row) !== ef.SubProduct) return;
+        if (isPicked(ef.Admin) && window.getNormalizedAdmin(row) !== ef.Admin) return;
+        const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+        const dateStr = window.getRowDateStr(row);
+        if (!id || !dateStr) return;
+        const d = parseD(dateStr);
+        if (!d) return;
+        if (!cumFirstPurchase[id] || d.val < cumFirstPurchase[id].val) {
+          cumFirstPurchase[id] = { val: d.val, monthStr: `${d.y}-${String(d.m).padStart(2, '0')}` };
+        }
+      });
+    }
     if (selectedYear) {
-      const firstPurchaseMonths = Object.keys(globalFirstPurchase)
-        .map(id => globalFirstPurchase[id].monthStr)
+      const firstPurchaseMonths = Object.keys(cumFirstPurchase)
+        .map(id => cumFirstPurchase[id].monthStr)
         .sort();
       let ptr = 0;
       for (let m = 1; m <= 12; m++) {
@@ -482,7 +512,7 @@ function renderExecutive1(filteredData, rawData) {
   if (latestM === 0) latestM = 12;
 
   const buildSparkline = (rawValues, color) => {
-    // เดือนที่คำนวณไม่ได้ (null = ไม่มีข้อมูล) ใช้ 0 เฉพาะตอนวาดเส้น sparkline เท่านั้น - ตัวเลขที่แสดงเป็น N/A
+    // เดือนที่คำนวณไม่ได้ (null = ไม่มีข้อมูล) ใช้ 0 เฉพาะตอนวาดเส้น sparkline เท่านั้น - ตัวเลขที่แสดงเป็น -
     const values = rawValues ? rawValues.map(v => (typeof v === 'number' && Number.isFinite(v)) ? v : 0) : rawValues;
     if (!values || values.length < 2) return '';
     const w = 110, h = 34, pad = 3;
@@ -506,7 +536,7 @@ function renderExecutive1(filteredData, rawData) {
     const cur = arr[latestM - 1];
     const prev = latestM >= 2 ? arr[latestM - 2] : null;
     if (prev === null || prev === undefined || prev === 0 || cur === undefined || cur === null) {
-      return '<span class="kpi-card-trend flat"><span class="arrow">&#9644;</span> n/a MoM</span>';
+      return '<span class="kpi-card-trend flat"><span class="arrow">&#9644;</span> - MoM</span>';
     }
     const pct = ((cur - prev) / prev) * 100;
     const cls = pct > 0.05 ? 'up' : pct < -0.05 ? 'down' : 'flat';
