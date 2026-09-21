@@ -3,7 +3,6 @@ function renderExecutive1(filteredData, rawData) {
   const container = document.getElementById('view-executive1');
 
   if (!filteredData || filteredData.length === 0) {
-    window.qmLastExec = null;
     container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">No data available. Please adjust filters or load data.</div>';
     return;
   }
@@ -395,7 +394,6 @@ function renderExecutive1(filteredData, rawData) {
     agg[m].newGlobalBuyers.forEach(id => total.newGlobalBuyers.add(id));
     agg[m].newToSubBuyers.forEach(id => total.newToSubBuyers.add(id));
   }
-  window.qmLastExec = { monthCutoff, totals: { sales: totalM.totalSales, orders: totalM.totalOrders, customers: totalM.uniqueCustomers, aov: totalM.aov, sph: totalM.spendingPerHead } };
   // Formatting helpers
   // ค่าที่คำนวณไม่ได้ (ตัวหารเป็น 0 = ไม่มีข้อมูล) แสดง N/A ไม่แสดง 0/NaN - ปัดเศษเฉพาะตอนแสดงผลเท่านั้น
   const isNA = (num) => num === null || num === undefined || typeof num !== 'number' || !Number.isFinite(num);

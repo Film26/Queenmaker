@@ -195,7 +195,6 @@
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-KPI" onclick="toggleKpiCompare()"><i class="fas fa-toggle-off" id="icon-KPI"></i> KPI Compare: <span id="lbl-KPI">Off</span></button>
           </div>
-          <div class="filter-dropdown"><button class="filter-btn-new" id="btn-DataCheck" onclick="toggleDataCheck()" title="กระทบยอดตัวเลขกับไฟล์ต้นทาง"><span class="dc-dot" style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#94a3b8;"></span> Data Check</button></div>
           <button id="clearFiltersBtn" class="clear-filters-btn" onclick="clearFilters()">Clear Filters</button>
         </div>
         <!-- Filter ของหน้า Executive แยกต่างหากจาก .filters-bar ด้านบนโดยสิ้นเชิง (คนละ state คนละ element)
@@ -234,9 +233,7 @@
             <button class="filter-btn-new" id="btn-Exec-Admin" onclick="toggleFilter('menu-Exec-Admin')">Admin: <span id="lbl-Exec-Admin">-</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Exec-Admin" class="filter-content"></div>
           </div>
-          <div class="filter-dropdown"><button class="filter-btn-new" id="btn-Exec-DataCheck" onclick="toggleDataCheck()" title="กระทบยอดตัวเลขกับไฟล์ต้นทาง"><span class="dc-dot" style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#94a3b8;"></span> Data Check</button></div>
         </div>
-        <div id="dataCheckPanel" style="display:none; background:#fff; border-radius:12px; padding:16px 20px; margin-bottom:20px; box-shadow:0 4px 15px rgba(0,0,0,0.05); max-height:70vh; overflow:auto;"></div>
         <div id="view-overview">
           <div id="overview-empty-state" style="display:none; text-align:center; padding:60px 20px; color:#999; font-size:15px; background:#fff; border-radius:16px; margin-bottom:25px;">
             <i class="fas fa-inbox" style="font-size:32px; display:block; margin-bottom:12px; color:#ccc;"></i>
@@ -997,7 +994,6 @@
 
     // กติกาสำรองเมื่อคอลัมน์ Order type ว่าง: หมายเหตุที่มีคำเหล่านี้ (จับแบบ includes ทั้งข้อความ) ไม่นับเป็นยอดขาย
     const NON_SALE_KEYWORDS = ['ของขวัญวันเกิด', 'ของขวัญปีใหม่', 'เคลม', 'ของแถม', 'แจก', 'sample', 'replace', 'คืนเงิน', 'rerund', 'refund'];
-    window.NON_SALE_KEYWORDS = NON_SALE_KEYWORDS;
 
     function getRowDateStr(row) { return getRowValue(row, DATE_KEYS); }
 
@@ -1106,10 +1102,9 @@
       el.title = exactTitle || '';
     }
 
-    window.DATE_KEYS = DATE_KEYS; window.REVENUE_KEYS = REVENUE_KEYS; window.ORDER_ID_KEYS = ORDER_ID_KEYS;
     window.getRowDateStr = getRowDateStr; window.parseMoney = parseMoney;
     window.getRowRevenue = getRowRevenue; window.getRowRevenueOrZero = getRowRevenueOrZero;
-    window.getOrderId = getOrderId; window.getOrderIdColumnKey = getOrderIdColumnKey; window.findExactColumnKey = findExactColumnKey;
+   
     window.calculateMetrics = calculateMetrics;
 
     function isSaleOrder(row) {
@@ -1573,7 +1568,6 @@
     function applyExecFilters() {
       const execFilteredData = computeFilteredData(execFilters);
       if (typeof renderExecutive1 === 'function') { renderExecutive1(execFilteredData, getScopedRawData()); }
-      if (typeof window.scheduleDataCheck === 'function') window.scheduleDataCheck();
     }
 
     // อัปเดตแบบเรียลไทม์: หน้า Settings ยิง 'appDataChanged' ทุกครั้งที่ เพิ่ม/แก้ไข/ลบ/เปลี่ยนสถานะ
@@ -1763,7 +1757,6 @@
 
       } finally {
         __scrollBox.scrollTop = __savedScrollTop;
-        if (typeof window.scheduleDataCheck === 'function') window.scheduleDataCheck();
       }
     }
 
@@ -1834,10 +1827,8 @@
     function renderEmpty() {
       setOverviewEmptyState(true);
       OVERVIEW_METRIC_IDS.forEach(id => setMetricText('val-' + id, 'N/A', ''));
-      window.qmLastOverview = null;
       ['ytd-new', 'ytd-orders', 'ytd-sales', 'ytd-aov', 'ytd-sph', 'ytd-repeat', 'ytd-repeat-rate'].forEach(id => updateChangeUI('mom-' + id, null, null));
       Object.values(charts).forEach(c => { if(c && c.data) { c.data.labels = []; c.update(); } });
-      if (typeof window.scheduleDataCheck === 'function') window.scheduleDataCheck();
     }
 
     // ==========================================
@@ -1845,23 +1836,29 @@
     // "ทุกปี") กล่าวคือ Group/Channel/SubChannel/Product/Sub Product/Admin ที่เลือกอยู่มีผลกับการ์ดนี้เหมือนกับ KPI/กราฟอื่น -
     // ไม่ใช่ใช้ข้อมูลคนละชุดกับที่ Filter ไว้ (ต่างจากเดิมที่การ์ดนี้ไม่ตาม Filter ใดเลยนอกจาก Group)
     // ==========================================
-    function getGroupScopeRows() {
-      return getScopedRawData().filter(row =>
-        isSaleOrder(row) && isProductActive(getNormalizedProduct(row)) && !!parseDate(window.getRowDateStr(row))
-      );
-    }
     function getAllTimeRows() {
       return computeFilteredData(Object.assign({}, filters, { Year: 'All' }));
     }
+    // แจ้งใน Console (ไม่มี UI) เมื่อพบข้อมูลต้นทางที่ทำให้ตัวเลขอาจไม่ตรง - ยอดขายว่าง/อ่านไม่ได้ (นับ 0), ยอดติดลบ, แถวที่ระบุลูกค้าไม่ได้
+    let __issueSig = '';
+    function warnDataIssues(M) {
+      const q = M.quality;
+      const sig = [rawData.length, q.invalidRevenueRows, q.negativeRevenueRows, q.rowsWithoutCustomer, q.duplicateOrderRows].join('|');
+      if (sig === __issueSig) return;
+      __issueSig = sig;
+      if (q.invalidRevenueRows || q.negativeRevenueRows || q.rowsWithoutCustomer || q.duplicateOrderRows) {
+        console.warn('[Data] ข้อมูลต้นทางที่ควรตรวจสอบ:', { ยอดขายว่างหรืออ่านไม่ได้: q.invalidRevenueRows, ยอดขายติดลบ: q.negativeRevenueRows, ระบุลูกค้าไม่ได้: q.rowsWithoutCustomer, OrderIDซ้ำ: q.duplicateOrderRows });
+      }
+    }
     function computeAllTimeOverview() {
       const M = calculateMetrics(getAllTimeRows());
+      warnDataIssues(M);
       return {
         totalSales: M.totalSales, totalOrders: M.totalOrders, totalCust: M.uniqueCustomers,
         aov: M.aov, sph: M.spendingPerHead, repeat: M.ordersPerCustomer, repeatRate: M.repeatRate,
         metrics: M
       };
     }
-    window.getAllTimeRows = getAllTimeRows; window.getGroupScopeRows = getGroupScopeRows;
 
     // ==========================================
     // 🛠️ การ์ด YTD / All-time / กราฟ ทั้งหมดคำนวณผ่าน calculateMetrics() (Calculation Layer กลาง) จาก Dataset เดียวกัน
@@ -1930,12 +1927,6 @@
       // ==========================================
       const allTime = computeAllTimeOverview();
       const noAll = allTime.totalOrders === 0;
-      // ค่าจริง (ไม่ปัดเศษ) ที่แสดงบนการ์ดล่าสุด - ให้ Data Check ใช้เทียบกับการคำนวณอิสระ
-      window.qmLastOverview = {
-        selectedMonthStr, currYear,
-        ytd: { sales: ytd.totalSales, orders: ytd.totalOrders, customers: ytd.uniqueCustomers, aov: ytd.aov, sph: ytd.spendingPerHead },
-        allTime: { sales: allTime.totalSales, orders: allTime.totalOrders, customers: allTime.totalCust, aov: allTime.aov, sph: allTime.sph }
-      };
       setMetricText('val-all-total-cust', noAll ? 'N/A' : allTime.totalCust.toLocaleString(), '');
       setMetricText('val-all-total-orders', noAll ? 'N/A' : allTime.totalOrders.toLocaleString(), '');
       setMetricText('val-all-sales', noAll ? 'N/A' : fmtCurrencyOrNA(allTime.totalSales), noAll ? '' : exactMoneyText(allTime.totalSales));
@@ -2139,6 +2130,5 @@
   <script src="kpisetting.js?v=2"></script>
   <script src="api-client.js?v=1"></script>
   <script src="settings.js?v=2"></script>
-  <script src="datacheck.js?v=1"></script>
 </body>
 </html>
