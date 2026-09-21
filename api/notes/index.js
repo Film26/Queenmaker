@@ -12,7 +12,7 @@ module.exports = async function handler(req, res) {
   if (!sessionUser) return res.status(401).json({ error: 'Not authenticated' });
 
   if (req.method === 'GET') {
-    const notes = await notesStore.loadNotes();
+    const notes = await notesStore.loadNotes(sessionUser.orgId);
     return res.status(200).json(notes);
   }
 
@@ -20,6 +20,7 @@ module.exports = async function handler(req, res) {
     try {
       const { customerKey, customerName, note, statuses } = req.body || {};
       const saved = await notesStore.upsertNote({
+        orgId: sessionUser.orgId,
         customerKey,
         customerName,
         note,

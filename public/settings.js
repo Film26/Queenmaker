@@ -1,5 +1,8 @@
 // public/settings.js
 
+// Older versions kept the Settings lists in this localStorage key (per browser, shared by every
+// account using that browser). They now live on the server per organization (/api/config); this
+// key is only read once, by settingsMaybeImportLegacy(), to offer carrying that data over.
 const SETTINGS_STORAGE_KEY = 'qm_settings_v1';
 
 const SETTINGS_CATEGORIES = [
@@ -123,15 +126,32 @@ function settingsSaveLocal(state) {
 
 // --- Async API layer: เรียก CrmApi จริงถ้ามี ไม่งั้น fallback เป็น Demo Mode (localStorage) ---
 function settingsApiGetConfig() {
-  if (window.CrmApi && typeof window.CrmApi.getConfig === 'function') {
-    return Promise.resolve(window.CrmApi.getConfig());
+  if (window.CrmApi && typeof window.CrmApi.getConfigState === 'function') {
+    return Promise.resolve(window.CrmApi.getConfigState()).then(settingsResolveConfig);
   }
   return Promise.resolve(settingsLoadLocal().config);
 }
 
+// Every category the org has saved comes from the server as-is; a category it never saved falls
+// back to the built-in demo list only for the default organization (state.useDemoDefaults) and
+// to an empty list for every other org, so a new customer never starts with someone else's names.
+function settingsResolveConfig(state) {
+  const saved = (state && state.config) || {};
+  const defaults = (state && state.useDemoDefaults) ? settingsDefaultState().config : {};
+  const out = {};
+  SETTINGS_CATEGORIES.forEach(c => {
+    out[c.key] = Array.isArray(saved[c.key]) ? saved[c.key] : (defaults[c.key] || []);
+  });
+  return out;
+}
+
 function settingsApiSaveConfig(category, items) {
   if (window.CrmApi && typeof window.CrmApi.saveConfig === 'function') {
-    return Promise.resolve(window.CrmApi.saveConfig(category, items));
+    // Send every category (not just the edited one) so lists still showing built-in defaults get
+    // saved with stable ids the first time anything is saved, same as the old localStorage save.
+    const full = Object.assign({}, window.AppData.config);
+    full[category] = items;
+    return Promise.resolve(window.CrmApi.saveConfig(full)).then(() => items);
   }
   const state = settingsLoadLocal();
   state.config[category] = items;
@@ -259,6 +279,42 @@ function stgToast(message, type) {
   }, 2600);
 }
 
+// Offers to carry the lists an older version saved in this browser over to the signed-in
+// organization. Only when the org has nothing saved yet, and only after asking - that local copy
+// may have been made by a different account that used this browser, so it is never applied silently.
+// The local copy is removed either way: nothing reads it anymore. Resolves true if something was imported.
+async function settingsMaybeImportLegacy() {
+  if (!window.CrmApi || typeof window.CrmApi.getConfigState !== 'function') return false;
+  let legacy = null;
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    legacy = raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return false;
+  }
+  if (!legacy || !legacy.config) return false;
+
+  let imported = false;
+  try {
+    const state = await window.CrmApi.getConfigState();
+    const orgHasSettings = state && state.config && Object.keys(state.config).length > 0;
+    if (!orgHasSettings) {
+      const importable = {};
+      SETTINGS_CATEGORIES.forEach(c => { if (Array.isArray(legacy.config[c.key])) importable[c.key] = legacy.config[c.key]; });
+      if (Object.keys(importable).length > 0 &&
+          confirm('พบค่า Settings (Channel / Product / Admin ฯลฯ) ที่เคยบันทึกไว้ในเบราว์เซอร์นี้ (ระบบเวอร์ชันเก่า)\n\nต้องการนำมาใช้เป็นค่าขององค์กรนี้หรือไม่?\n- ตกลง: นำเข้าและบันทึกลงระบบทันที\n- ยกเลิก: ไม่ใช้ค่านั้น\n\nไม่ว่าเลือกแบบใด ค่าเก่าในเบราว์เซอร์จะถูกลบออก')) {
+        await window.CrmApi.saveConfig(importable);
+        imported = true;
+      }
+    }
+  } catch (e) {
+    console.error('[Settings] นำเข้าค่าเดิมไม่สำเร็จ', e);
+    return false; // keep the local copy so the offer comes back next time
+  }
+  try { localStorage.removeItem(SETTINGS_STORAGE_KEY); } catch (e) { /* storage blocked - nothing to clear */ }
+  return imported;
+}
+
 // --- Entry point (called by dashboard.html switchTab('settings')) ---
 function renderSettings() {
   const container = document.getElementById('view-settings');
@@ -267,11 +323,14 @@ function renderSettings() {
   stgInjectStyles();
   container.innerHTML = stgLoadingSkeleton();
 
-  Promise.all([settingsApiGetConfig(), settingsApiGetUsers(), settingsApiGetAccessRequests().catch(() => [])]).then(([config, users, accessRequests]) => {
+  let importedLegacy = false;
+  settingsMaybeImportLegacy().then(r => { importedLegacy = !!r; }, () => {}).then(() => Promise.all([settingsApiGetConfig(), settingsApiGetUsers(), settingsApiGetAccessRequests().catch(() => [])])).then(([config, users, accessRequests]) => {
     window.AppData.config = config;
     window.AppData.users = users;
     window.AppData.accessRequests = accessRequests;
     stgRenderAll(container);
+    // tell the Dashboard (Product/SubProduct mapping, filters) only now that AppData holds the imported lists
+    if (importedLegacy) stgNotifyChange('config', { source: 'legacy-import' });
   }).catch(err => {
     console.error('[Settings] โหลดข้อมูลไม่สำเร็จ', err);
     container.innerHTML = `<div class="stg-card"><p style="color:#b91c1c;">โหลดข้อมูลการตั้งค่าไม่สำเร็จ กรุณาลองใหม่อีกครั้ง</p></div>`;

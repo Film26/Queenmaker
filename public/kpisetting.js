@@ -1,6 +1,9 @@
 // public/kpisetting.js
 
-const KPI_STORAGE_KEY = 'qm_kpi_setting_v1';
+// KPI targets now live on the server, one set per organization (GET/PUT/DELETE /api/kpi).
+// This key is only read once, to offer importing what an older version saved in this browser
+// (it was shared by every account that used the browser, which is why it's no longer trusted).
+const KPI_LEGACY_STORAGE_KEY = 'qm_kpi_setting_v1';
 const KPI_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function kpiDefaultState() {
@@ -36,22 +39,43 @@ function kpiDefaultState() {
   };
 }
 
-function kpiLoadState() {
+// รวมกับค่า default กันกรณีโครงสร้างเก่าขาดฟิลด์ใหม่
+function kpiNormalizeState(parsed) {
+  if (!parsed || typeof parsed !== 'object') return kpiDefaultState();
+  const def = kpiDefaultState();
+  return Object.assign(def, parsed, {
+    customerSetting: Object.assign(def.customerSetting, parsed.customerSetting),
+    customerMonthly: Object.assign(def.customerMonthly, parsed.customerMonthly),
+    crm: Object.assign(def.crm, parsed.crm)
+  });
+}
+
+// อ่านค่า KPI ขององค์กรที่ล็อกอินอยู่จาก server (server ดูองค์กรจาก session เอง ไม่รับจาก client)
+// คืน null ถ้ายังไม่เคยบันทึก - โยน error ถ้าโหลดไม่สำเร็จ
+async function kpiFetchSavedState() {
+  const res = await fetch('/api/kpi', { credentials: 'same-origin' });
+  if (!res.ok) throw new Error('โหลด KPI Setting ไม่สำเร็จ (' + res.status + ')');
+  const body = await res.json();
+  return body && body.data ? kpiNormalizeState(body.data) : null;
+}
+
+// เฉพาะ Super Admin / Manager ที่แก้เป้า KPI ได้ (ตรงกับที่ /api/kpi บังคับที่ฝั่ง server)
+function kpiCanEdit() {
+  const role = window.currentUser && window.currentUser.role;
+  return role === 'Super Admin' || role === 'Manager';
+}
+
+function kpiReadLegacyLocalState() {
   try {
-    const raw = localStorage.getItem(KPI_STORAGE_KEY);
-    if (!raw) return kpiDefaultState();
-    const parsed = JSON.parse(raw);
-    // รวมกับค่า default กันกรณีโครงสร้างเก่าขาดฟิลด์ใหม่
-    const def = kpiDefaultState();
-    return Object.assign(def, parsed, {
-      customerSetting: Object.assign(def.customerSetting, parsed.customerSetting),
-      customerMonthly: Object.assign(def.customerMonthly, parsed.customerMonthly),
-      crm: Object.assign(def.crm, parsed.crm)
-    });
+    const raw = localStorage.getItem(KPI_LEGACY_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
   } catch (e) {
-    console.error('[KPI Setting] โหลดข้อมูลที่บันทึกไว้ไม่สำเร็จ', e);
-    return kpiDefaultState();
+    return null;
   }
+}
+
+function kpiClearLegacyLocalState() {
+  try { localStorage.removeItem(KPI_LEGACY_STORAGE_KEY); } catch (e) { /* storage blocked - nothing to clear */ }
 }
 
 function kpiFormatNum(n) {
@@ -123,7 +147,7 @@ window.handleKpiCustomerPaste = function(event, type0, m0) {
   });
 };
 
-function renderKpiSetting() {
+async function renderKpiSetting() {
   const container = document.getElementById('view-kpisetting');
   if (!container) return;
 
@@ -297,7 +321,29 @@ function renderKpiSetting() {
     document.head.appendChild(style);
   }
 
-  window.__kpiState = kpiLoadState();
+  container.innerHTML = '<p style="color:#6b7280;">กำลังโหลด KPI Setting...</p>';
+
+  let state = null;
+  try {
+    state = await kpiFetchSavedState();
+  } catch (e) {
+    console.error('[KPI Setting]', e);
+    container.innerHTML = '<p style="color:#b91c1c;">โหลด KPI Setting ไม่สำเร็จ กรุณารีเฟรชหน้านี้แล้วลองอีกครั้ง</p>';
+    return;
+  }
+
+  // ยังไม่มีค่าที่บันทึกไว้ของ organization นี้ แต่เบราว์เซอร์นี้อาจมีค่าที่เวอร์ชันเก่าเคยเก็บไว้ -
+  // ไม่ดึงเข้ามาเองโดยอัตโนมัติ เพราะค่านั้นอาจเป็นของบัญชีอื่นที่เคยใช้เบราว์เซอร์เดียวกัน
+  if (!state && kpiCanEdit()) {
+    const legacy = kpiReadLegacyLocalState();
+    if (legacy) {
+      const useIt = confirm('พบค่า KPI Setting ที่เคยบันทึกไว้ในเบราว์เซอร์นี้ (ระบบเวอร์ชันเก่า)\n\nต้องการนำมาใช้เป็นค่าขององค์กรนี้หรือไม่?\n- ตกลง: นำมาแสดงในหน้านี้ (ต้องกด "บันทึก" เพื่อเก็บลงระบบ)\n- ยกเลิก: ไม่ใช้ค่านั้น\n\nไม่ว่าเลือกแบบใด ค่าเก่าในเบราว์เซอร์จะถูกลบออก');
+      if (useIt) state = kpiNormalizeState(legacy);
+      kpiClearLegacyLocalState();
+    }
+  }
+
+  window.__kpiState = state || kpiDefaultState();
   kpiRenderAll(container);
 }
 
@@ -329,8 +375,9 @@ function kpiRenderAll(container) {
         </div>
       </div>
       <div class="kpiset-header-actions">
+        ${kpiCanEdit() ? `
         <button class="kpiset-btn kpiset-btn-reset" onclick="resetKpiSettings()"><i class="fas fa-undo"></i> ล้างค่าทั้งหมด</button>
-        <button class="kpiset-btn kpiset-btn-save" onclick="saveKpiSettings()"><i class="fas fa-save"></i> บันทึก</button>
+        <button class="kpiset-btn kpiset-btn-save" onclick="saveKpiSettings()"><i class="fas fa-save"></i> บันทึก</button>` : '<span style="color:#9ca3af;font-size:13px;">ดูได้อย่างเดียว - เฉพาะ Super Admin / Manager ที่แก้เป้า KPI ได้</span>'}
       </div>
     </div>
     <div class="kpiset-saved-note">${savedNote}</div>
@@ -595,9 +642,11 @@ function kpiCollectStateFromDom() {
 }
 
 // ส่งค่าไปยังคลัง window.kpiSettingsData ที่หน้า CRM Dashboard ใช้ (ปุ่ม KPI Compare + การ์ด 10 ใบ)
-// ใช้ร่วมกันทั้งตอนกดบันทึก และตอนโหลดไฟล์ครั้งแรก (preload จาก localStorage)
+// ใช้ร่วมกันทั้งตอนกดบันทึก และตอนโหลดหน้าครั้งแรก (preload จาก /api/kpi)
 function kpiApplyStateToGlobalSettings(state) {
-  window.kpiSettingsData = window.kpiSettingsData || {};
+  // เริ่มจากศูนย์ทุกครั้ง (ไม่ต่อยอดจากค่าเดิม) เพื่อให้ค่าที่ล้าง/ไม่ได้ตั้ง กลายเป็น "ไม่มีเป้า" จริงๆ
+  // ไม่ค้างค่าจากการโหลดครั้งก่อน
+  window.kpiSettingsData = { salesYTD: 0, totalCust: 0, newCustYTD: 0 };
 
   const onlineRow = (state.byChannel || []).find(r => (r.name || '').trim().toLowerCase() === 'online') || (state.byChannel || [])[0];
   if (onlineRow) {
@@ -605,7 +654,7 @@ function kpiApplyStateToGlobalSettings(state) {
     window.kpiSettingsData.monthlyOnlineSales = onlineRow.values.map(v => v || 0); // เป้าต่อเดือน ใช้คำนวณ YTD-to-date และการ์ดยอดขายรายเดือน
   }
 
-  if (state.crm && state.crm.totalCustomers) window.kpiSettingsData.totalCust = state.crm.totalCustomers;
+  window.kpiSettingsData.totalCust = (state.crm && state.crm.totalCustomers) || 0;
   window.kpiSettingsData.aov = (state.crm && state.crm.aov) || 0;
   window.kpiSettingsData.sph = (state.crm && state.crm.sph) || 0;
   // Frequency เป้าหมาย = SPH/AOV เหมือนสูตร auto ในหน้านี้
@@ -618,19 +667,29 @@ function kpiApplyStateToGlobalSettings(state) {
   }
 }
 
-window.saveKpiSettings = function() {
+window.saveKpiSettings = async function() {
+  if (!kpiCanEdit()) { alert('เฉพาะ Super Admin / Manager ที่แก้ KPI Setting ได้'); return; }
   const state = kpiCollectStateFromDom();
-  state.savedAt = new Date().toISOString();
 
+  let saved;
   try {
-    localStorage.setItem(KPI_STORAGE_KEY, JSON.stringify(state));
+    const res = await fetch('/api/kpi', {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state)
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || ('HTTP ' + res.status));
+    saved = kpiNormalizeState(body.data);
   } catch (e) {
     console.error('[KPI Setting] บันทึกไม่สำเร็จ', e);
-    alert('บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+    alert('บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง\n' + e.message);
     return;
   }
 
-  kpiApplyStateToGlobalSettings(state);
+  window.__kpiState = saved;
+  kpiApplyStateToGlobalSettings(saved);
 
   const container = document.getElementById('view-kpisetting');
   if (container) kpiRenderAll(container);
@@ -638,23 +697,39 @@ window.saveKpiSettings = function() {
   alert('บันทึก KPI Setting สำเร็จ');
 };
 
-window.resetKpiSettings = function() {
-  if (!confirm('ต้องการล้างค่า KPI Setting ทั้งหมดหรือไม่?')) return;
-  localStorage.removeItem(KPI_STORAGE_KEY);
+window.resetKpiSettings = async function() {
+  if (!kpiCanEdit()) { alert('เฉพาะ Super Admin / Manager ที่แก้ KPI Setting ได้'); return; }
+  if (!confirm('ต้องการล้างค่า KPI Setting ทั้งหมดขององค์กรหรือไม่?')) return;
+
+  try {
+    const res = await fetch('/api/kpi', { method: 'DELETE', credentials: 'same-origin' });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || ('HTTP ' + res.status));
+    }
+  } catch (e) {
+    console.error('[KPI Setting] ล้างค่าไม่สำเร็จ', e);
+    alert('ล้างค่าไม่สำเร็จ กรุณาลองใหม่อีกครั้ง\n' + e.message);
+    return;
+  }
+
   window.__kpiState = kpiDefaultState();
+  kpiApplyStateToGlobalSettings(window.__kpiState);
   const container = document.getElementById('view-kpisetting');
   if (container) kpiRenderAll(container);
 };
 
-// โหลดค่าที่บันทึกไว้ (ถ้ามี) เข้า window.kpiSettingsData ทันทีตอนไฟล์นี้ถูกโหลด
+// โหลดค่าที่ organization นี้บันทึกไว้ (ถ้ามี) เข้า window.kpiSettingsData ตอนเปิดหน้า
 // เพื่อให้หน้า CRM Dashboard / Insight Hub ใช้ค่าที่ตั้งไว้ได้แม้ยังไม่เคยเปิดหน้า KPI Setting ในเซสชันนี้
-(function kpiPreloadSettings() {
+// ถ้ายังไม่เคยบันทึก (หรือโหลดไม่สำเร็จ) จะเป็นค่าเริ่มต้น "ไม่มีเป้า" (0) ซึ่งหน้า Dashboard แสดงเป็น "KPI -"
+(async function kpiPreloadSettings() {
   try {
-    const raw = localStorage.getItem(KPI_STORAGE_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
-    if (parsed) kpiApplyStateToGlobalSettings(parsed);
+    const state = await kpiFetchSavedState();
+    if (!state) return;
+    kpiApplyStateToGlobalSettings(state);
+    // ข้อมูลอาจ Import เสร็จไปก่อนที่ค่า KPI จะโหลดมาถึง - วาดการ์ดใหม่ให้ badge ใช้เป้าที่ถูกต้อง
+    if (typeof rawData !== 'undefined' && rawData.length > 0 && typeof applyFilters === 'function') applyFilters();
   } catch (e) {
-    // ไม่มีข้อมูลเก่าหรือข้อมูลเสีย ใช้ค่า default ต่อไป
+    // ยังไม่ได้ล็อกอิน / เครือข่ายขัดข้อง: ใช้ค่าเริ่มต้นต่อไป (ไม่มีเป้า)
   }
 })();

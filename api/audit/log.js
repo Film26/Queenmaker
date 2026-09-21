@@ -42,10 +42,10 @@ module.exports = async function handler(req, res) {
     try {
       if (req.query && req.query.countOnly) {
         const since = req.query.since && !isNaN(Date.parse(req.query.since)) ? new Date(req.query.since).toISOString() : null;
-        return res.status(200).json({ count: await auditLog.countExportsByOthers(since, sessionUser.id) });
+        return res.status(200).json({ count: await auditLog.countExportsByOthers(since, sessionUser.id, sessionUser.orgId) });
       }
       const limit = Math.max(1, Math.min(parseInt(req.query && req.query.limit, 10) || 200, 500));
-      return res.status(200).json({ entries: await auditLog.listExports(limit) });
+      return res.status(200).json({ entries: await auditLog.listExports(limit, sessionUser.orgId) });
     } catch (e) {
       console.error('[audit/log] GET failed:', e.message);
       return res.status(500).json({ error: 'โหลดบันทึกการ Export ไม่สำเร็จ' });
@@ -66,7 +66,7 @@ module.exports = async function handler(req, res) {
 
   try {
     await auditLog.append(Object.assign(
-      { type: 'data_export', userId: sessionUser.id, username: sessionUser.username, role: sessionUser.role, ip: getClientIp(req) },
+      { type: 'data_export', orgId: sessionUser.orgId, userId: sessionUser.id, username: sessionUser.username, role: sessionUser.role, ip: getClientIp(req) },
       sanitizeExportDetail(detail)
     ), { strict: true });
   } catch (e) {

@@ -613,11 +613,12 @@
     let charts = {};
     const keyCache = {};
 
-    // 💡 คลังสำหรับรับค่าตัวเลขที่ Manual พิมพ์มาจากหน้า KPI SETTING (เมื่อกดบันทึกแล้วส่งค่ามาใส่ที่นี่ได้เลย)
+    // 💡 คลังสำหรับรับค่าเป้า KPI ขององค์กรจากหน้า KPI SETTING (kpisetting.js โหลดจาก /api/kpi แล้วส่งค่ามาใส่ที่นี่)
+    // ค่าเริ่มต้นเป็น 0 = "ยังไม่มีเป้า" (badge แสดงเป็น "KPI -") - ห้ามใส่ตัวเลขตั้งต้นที่นี่ เพราะทุกองค์กรจะเห็นเป็นเป้าของตัวเอง
     window.kpiSettingsData = {
-      salesYTD: 5000000,   // เป้าหมายยอดขาย YTD (บาท)
-      totalCust: 10000,    // เป้าหมาย Total Customer (คน)
-      newCustYTD: 3000     // เป้าหมาย YTD New Customers (คน)
+      salesYTD: 0,   // เป้าหมายยอดขาย YTD (บาท)
+      totalCust: 0,  // เป้าหมาย Total Customer (คน)
+      newCustYTD: 0  // เป้าหมาย YTD New Customers (คน)
     };
 
     function precomputeGlobalFirstPurchases() {
@@ -2227,8 +2228,8 @@
   <script src="insighthub-api.js?v=1"></script>
   <script src="insighthub.js?v=16"></script>
   <script src="retention.js?v=1"></script>
-  <script src="kpisetting.js?v=2"></script>
-  <script src="api-client.js?v=1"></script>
-  <script src="settings.js?v=2"></script>
+  <script src="kpisetting.js?v=3"></script>
+  <script src="api-client.js?v=2"></script>
+  <script src="settings.js?v=3"></script>
 </body>
 </html>

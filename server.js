@@ -30,6 +30,13 @@ app.post('/api/access-requests', (req, res) => { req.query.resource = 'access-re
 const auditLogHandler = require('./api/audit/log');
 app.get('/api/audit/log', auditLogHandler);
 app.post('/api/audit/log', auditLogHandler);
+const kpiHandler = require('./api/kpi/index');
+app.get('/api/kpi', kpiHandler);
+app.put('/api/kpi', kpiHandler);
+app.delete('/api/kpi', kpiHandler);
+const configHandler = require('./api/config/index');
+app.get('/api/config', configHandler);
+app.put('/api/config', configHandler);
 app.get('/api/notes', require('./api/notes/index'));
 app.put('/api/notes', require('./api/notes/index'));
 app.get('/api/notes/status-options', require('./api/notes/status-options'));

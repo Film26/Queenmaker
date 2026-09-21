@@ -13,7 +13,7 @@ module.exports = async function handler(req, res) {
   if (!sessionUser) return res.status(401).json({ error: 'Not authenticated' });
 
   if (req.method === 'GET') {
-    const options = await statusOptionsStore.loadStatusOptions();
+    const options = await statusOptionsStore.loadStatusOptions(sessionUser.orgId);
     return res.status(200).json(options);
   }
 
@@ -23,7 +23,7 @@ module.exports = async function handler(req, res) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     try {
-      const options = await statusOptionsStore.saveStatusOptions(req.body);
+      const options = await statusOptionsStore.saveStatusOptions(req.body, sessionUser.orgId);
       await auditLog.append({ type: 'status_options_updated', userId: sessionUser.id, username: sessionUser.username, ip: getClientIp(req), count: options.length });
       return res.status(200).json(options);
     } catch (e) {

@@ -26,7 +26,7 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    const users = await userStore.loadUsers();
+    const users = await userStore.loadUsersByOrg(sessionUser.orgId);
     return res.status(200).json(users.map(userStore.sanitize));
   }
 
@@ -34,7 +34,7 @@ module.exports = async function handler(req, res) {
   // pattern (stgSaveUserModal / stgToggleUserActive / stgDeleteUser) - no client rewrite needed.
   if (req.method === 'PUT') {
     try {
-      const users = await userStore.syncUsers(Array.isArray(req.body) ? req.body : []);
+      const users = await userStore.syncUsers(Array.isArray(req.body) ? req.body : [], sessionUser.orgId);
       await auditLog.append({ type: 'users_updated', userId: sessionUser.id, username: sessionUser.username, ip: getClientIp(req), count: users.length });
       return res.status(200).json(users);
     } catch (e) {
@@ -50,7 +50,7 @@ module.exports = async function handler(req, res) {
 // either approves (creates the real user via userStore.createUser) or rejects.
 async function handleAccessRequests(req, res, sessionUser) {
   if (req.method === 'GET') {
-    const list = await accessRequestStore.listPending();
+    const list = await accessRequestStore.listPending(sessionUser.orgId);
     return res.status(200).json(list);
   }
 
@@ -62,7 +62,7 @@ async function handleAccessRequests(req, res, sessionUser) {
 
     try {
       if (decision === 'reject') {
-        const request = await accessRequestStore.decide(id, 'rejected', sessionUser.id);
+        const request = await accessRequestStore.decide(id, 'rejected', sessionUser.id, sessionUser.orgId);
         await auditLog.append({ type: 'access_request_rejected', userId: sessionUser.id, username: request.email, ip: getClientIp(req) });
         return res.status(200).json({ ok: true });
       }
@@ -70,14 +70,14 @@ async function handleAccessRequests(req, res, sessionUser) {
       // approve: create the real user first and only mark the request decided once that
       // succeeds, so a failure (e.g. that email got added another way in the meantime)
       // leaves the request pending instead of "approved" with no matching user.
-      const pending = await accessRequestStore.listPending();
+      const pending = await accessRequestStore.listPending(sessionUser.orgId);
       const request = pending.find(r => r.id === id);
       if (!request) return res.status(404).json({ error: 'ไม่พบคำขอนี้ หรือถูกดำเนินการไปแล้ว' });
       if (!role) return res.status(400).json({ error: 'กรุณาเลือก Role' });
       if (role === 'Sales Admin' && !adminName) return res.status(400).json({ error: 'กรุณาเลือกชื่อแอดมิน (Admin Name) สำหรับ Sales Admin' });
 
-      const newUser = await userStore.createUser({ username: request.email, name: request.name || request.email, role, adminName });
-      await accessRequestStore.decide(id, 'approved', sessionUser.id);
+      const newUser = await userStore.createUser({ username: request.email, name: request.name || request.email, role, adminName, orgId: sessionUser.orgId });
+      await accessRequestStore.decide(id, 'approved', sessionUser.id, sessionUser.orgId);
       await auditLog.append({ type: 'access_request_approved', userId: sessionUser.id, username: newUser.username, role, ip: getClientIp(req) });
       return res.status(200).json(newUser);
     } catch (e) {

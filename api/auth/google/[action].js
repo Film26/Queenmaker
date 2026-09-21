@@ -15,6 +15,7 @@
 const crypto = require('crypto');
 const userStore = require('../../../lib/userStore');
 const accessRequestStore = require('../../../lib/accessRequestStore');
+const orgStore = require('../../../lib/orgStore');
 const auditLog = require('../../../lib/auditLog');
 const { createSessionCookie, createStateCookie, getStateFromRequest, clearStateCookie } = require('../../../lib/session');
 const { getClientIp } = require('../../../lib/reqUtils');
@@ -141,8 +142,9 @@ async function handleCallback(req, res) {
     if (!user) {
       const already = await accessRequestStore.findPendingByEmail(email);
       if (!already) {
-        await accessRequestStore.create(email, claims.name || email);
-        await auditLog.append({ type: 'access_request_created', username: email, ip });
+        const orgId = await orgStore.resolveOrgIdForEmail(email);
+        await accessRequestStore.create(email, claims.name || email, orgId);
+        await auditLog.append({ type: 'access_request_created', orgId, username: email, ip });
       }
       return deny('access_request_pending');
     }
