@@ -61,7 +61,14 @@
       display: flex; flex-direction: column; height: 360px;
     }
     .chart-title { font-size: 14px; font-weight: 700; color: #333; margin-bottom: 15px; text-align: center; }
+    .chart-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 15px; }
     .chart-container { flex-grow: 1; position: relative; width: 100%; }
+    .chart-mom-badge { font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
+    .chart-mom-badge.up { color: #198754; background: rgba(25,135,84,0.1); }
+    .chart-mom-badge.down { color: #dc3545; background: rgba(220,53,69,0.1); }
+    .chart-mom-badge.neutral { color: #6c757d; background: rgba(108,117,125,0.1); }
+    .chart-pct-toggle { font-size: 11.5px; font-weight: 700; padding: 4px 12px; border-radius: 20px; border: 1px solid #cbd5e1; background: #fff; color: #64748b; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s, border-color .15s; }
+    .chart-pct-toggle.active { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
     /* Tabs Styling */
     .tabs-container { margin-bottom: 20px; display: flex; gap: 10px; }
     .tab-btn { background-color: #fff; border: 1px solid #ddd; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; color: #555; }
@@ -330,17 +337,32 @@
             </div>
             
             <div class="chart-box grid-span-1">
-              <div class="chart-title" style="color:#d95f1d;">ลูกค้าเก่า vs ลูกค้าใหม่</div>
+              <div class="chart-title-row">
+                <div class="chart-title" style="color:#d95f1d; margin-bottom:0;">ลูกค้าเก่า vs ลูกค้าใหม่</div>
+                <button type="button" class="chart-pct-toggle" id="proportion-toggle-retnew" onclick="toggleRetNewProportion()">Proportion</button>
+              </div>
               <div class="chart-container"><canvas id="chart-ret-new-stacked"></canvas></div>
             </div>
 
             <div class="chart-box grid-span-1">
-              <div class="chart-title">ลูกค้าใหม่ (คน)</div>
+              <div class="chart-title-row">
+                <div class="chart-title" style="margin-bottom:0;">ลูกค้าใหม่ (คน)</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="chart-mom-badge neutral" id="mom-badge-new">-</span>
+                  <button type="button" class="chart-pct-toggle active" id="pct-toggle-new" onclick="toggleChartPctChange('newCust')">% Change</button>
+                </div>
+              </div>
               <div class="chart-container"><canvas id="chart-new"></canvas></div>
             </div>
-            
+
             <div class="chart-box grid-span-1">
-              <div class="chart-title">ลูกค้าเก่า (คน)</div>
+              <div class="chart-title-row">
+                <div class="chart-title" style="margin-bottom:0;">ลูกค้าเก่า (คน)</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="chart-mom-badge neutral" id="mom-badge-ret">-</span>
+                  <button type="button" class="chart-pct-toggle active" id="pct-toggle-ret" onclick="toggleChartPctChange('retCust')">% Change</button>
+                </div>
+              </div>
               <div class="chart-container"><canvas id="chart-ret"></canvas></div>
             </div>
 
@@ -608,10 +630,15 @@
     };
 
     let monthlyData = {};
-    let globalFirstPurchase = {}; 
+    let globalFirstPurchase = {};
     let availableMonths = [];
     let charts = {};
     const keyCache = {};
+
+    // ข้อมูลดิบ (จำนวนคน) ของกราฟ "ลูกค้าเก่า vs ลูกค้าใหม่" เก็บไว้แยกต่างหาก เพื่อคำนวณ
+    // สลับไปมาระหว่างมุมมองจำนวนคนจริง กับ 100% Proportion ได้โดยไม่ต้อง re-fetch/re-filter ข้อมูล
+    let retNewRetainedRaw = [], retNewNewRaw = [];
+    let retNewProportionMode = false;
 
     // 💡 คลังสำหรับรับค่าเป้า KPI ขององค์กรจากหน้า KPI SETTING (kpisetting.js โหลดจาก /api/kpi แล้วส่งค่ามาใส่ที่นี่)
     // ค่าเริ่มต้นเป็น 0 = "ยังไม่มีเป้า" (badge แสดงเป็น "KPI -") - ห้ามใส่ตัวเลขตั้งต้นที่นี่ เพราะทุกองค์กรจะเห็นเป็นเป้าของตัวเอง
@@ -2074,9 +2101,12 @@
       });
       
       if(charts.sales) { charts.sales.data.labels = trendMonths; charts.sales.data.datasets[0].data = salesData; charts.sales.update(); }
-      if(charts.retNew) { charts.retNew.data.labels = trendMonths; charts.retNew.data.datasets[0].data = retCustArr; charts.retNew.data.datasets[1].data = newCustArr; charts.retNew.update(); }
+      retNewRetainedRaw = retCustArr; retNewNewRaw = newCustArr;
+      if(charts.retNew) { charts.retNew.data.labels = trendMonths; applyRetNewProportionMode(); charts.retNew.update(); }
       if(charts.newCust) { charts.newCust.data.labels = trendMonths; charts.newCust.data.datasets[0].data = newCustArr; charts.newCust.update(); }
       if(charts.retCust) { charts.retCust.data.labels = trendMonths; charts.retCust.data.datasets[0].data = retCustArr; charts.retCust.update(); }
+      updateMomBadge('mom-badge-new', newCustArr);
+      updateMomBadge('mom-badge-ret', retCustArr);
       
       const channelColors = { 'Facebook': '#1877f2', 'Line': '#06c755', 'Instagram': '#1e40af', 'CRM': '#d95f1d', 'Other': '#9ca3af', 'Tiktok': '#ff0050', 'Shopee': '#ff5722', 'Lazada': '#1a1446', 'Call': '#71717a' };
       const channels = Object.keys(curr.channels).sort((a,b) => curr.channels[b] - curr.channels[a]).slice(0,5);
@@ -2134,10 +2164,15 @@
     };
     // Label ค่าล่าสุด (เดือนปัจจุบัน) ไว้ที่ปลายเส้นเสมอ ให้เห็นตัวเลขเด่นๆ ได้ทันทีโดยไม่ต้อง hover -
     // ตาม anti-pattern ห้ามใส่ label ทุกจุด (รก อ่านยาก) จึงใส่แค่จุดสุดท้ายพอ ส่วนจุดอื่นดูผ่าน tooltip
+    // (ยกเว้นตอนเปิด "% Change" ที่กราฟ ลูกค้าใหม่/ลูกค้าเก่า จะโชว์ label % ทุกจุดแทน ผ่าน pctChangeLabelPlugin)
+    const chartPctChangeState = { newCust: true, retCust: true };
+    const PCT_CHANGE_CANVAS_KEY = { 'chart-new': 'newCust', 'chart-ret': 'retCust' };
     const lineEndLabelPlugin = {
       id: 'lineEndLabel',
       afterDatasetsDraw(chart) {
         if (chart.config.type !== 'line') return;
+        const pctKey = PCT_CHANGE_CANVAS_KEY[chart.canvas.id];
+        if (pctKey && chartPctChangeState[pctKey]) return;
         const { ctx } = chart;
         chart.data.datasets.forEach((dataset, i) => {
           const meta = chart.getDatasetMeta(i);
@@ -2156,6 +2191,87 @@
         });
       }
     };
+    // Label % เปลี่ยนแปลงเทียบเดือนก่อนหน้า ไว้เหนือทุกจุดของกราฟ (เปิด/ปิดได้ผ่านปุ่ม "% Change" บนหัวกราฟ) -
+    // ใช้กับกราฟ ลูกค้าใหม่ (คน) / ลูกค้าเก่า (คน) เท่านั้น อิงข้อมูลตาม PCT_CHANGE_CANVAS_KEY ด้านบน
+    function momPercent(cur, prev) {
+      if (cur === undefined || cur === null || prev === undefined || prev === null) return null;
+      if (prev === 0) return cur === 0 ? 0 : null;
+      return ((cur - prev) / prev) * 100;
+    }
+    const pctChangeLabelPlugin = {
+      id: 'pctChangeLabel',
+      afterDatasetsDraw(chart) {
+        const pctKey = PCT_CHANGE_CANVAS_KEY[chart.canvas.id];
+        if (!pctKey || !chartPctChangeState[pctKey]) return;
+        const dataset = chart.data.datasets[0];
+        const meta = chart.getDatasetMeta(0);
+        if (!dataset || !meta || meta.hidden || !meta.data.length) return;
+        const { ctx } = chart;
+        ctx.save();
+        ctx.font = '700 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        dataset.data.forEach((val, i) => {
+          if (i === 0) return;
+          const pct = momPercent(val, dataset.data[i - 1]);
+          const point = meta.data[i];
+          if (pct === null || !point) return;
+          ctx.fillStyle = pct > 0.05 ? '#198754' : pct < -0.05 ? '#dc3545' : '#6c757d';
+          ctx.fillText((pct > 0 ? '+' : '') + pct.toFixed(1) + '%', point.x, point.y - 10);
+        });
+        ctx.restore();
+      }
+    };
+    function toggleChartPctChange(key) {
+      chartPctChangeState[key] = !chartPctChangeState[key];
+      const btn = document.getElementById(key === 'newCust' ? 'pct-toggle-new' : 'pct-toggle-ret');
+      if (btn) btn.classList.toggle('active', chartPctChangeState[key]);
+      const chart = key === 'newCust' ? charts.newCust : charts.retCust;
+      if (chart) chart.update();
+    }
+    function updateMomBadge(elId, arr) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      const n = arr ? arr.length : 0;
+      const pct = n >= 2 ? momPercent(arr[n - 1], arr[n - 2]) : null;
+      if (pct === null) { el.textContent = '-'; el.className = 'chart-mom-badge neutral'; return; }
+      const cls = pct > 0.05 ? 'up' : pct < -0.05 ? 'down' : 'neutral';
+      el.className = 'chart-mom-badge ' + cls;
+      el.textContent = (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
+    }
+
+    // สลับกราฟ "ลูกค้าเก่า vs ลูกค้าใหม่" ระหว่างจำนวนคนจริง กับสัดส่วน 100% ต่อเดือน (100% Stacked Bar) -
+    // แปลงข้อมูลจาก retNewRetainedRaw/retNewNewRaw เท่านั้น ไม่แตะข้อมูลดิบ เพื่อสลับกลับได้โดยไม่ต้องคำนวณใหม่
+    function applyRetNewProportionMode() {
+      if (!charts.retNew) return;
+      if (retNewProportionMode) {
+        const retPct = [], newPct = [];
+        retNewRetainedRaw.forEach((ret, i) => {
+          const total = ret + (retNewNewRaw[i] || 0);
+          const r = total > 0 ? Math.round((ret / total) * 100) : 0;
+          retPct.push(r); newPct.push(total > 0 ? 100 - r : 0);
+        });
+        charts.retNew.data.datasets[0].data = retPct;
+        charts.retNew.data.datasets[1].data = newPct;
+        charts.retNew.options.scales.y.max = 100;
+        charts.retNew.options.scales.y.ticks = { callback: (v) => v + '%' };
+      } else {
+        charts.retNew.data.datasets[0].data = retNewRetainedRaw;
+        charts.retNew.data.datasets[1].data = retNewNewRaw;
+        delete charts.retNew.options.scales.y.max;
+        charts.retNew.options.scales.y.ticks = {};
+      }
+    }
+    function toggleRetNewProportion() {
+      retNewProportionMode = !retNewProportionMode;
+      const btn = document.getElementById('proportion-toggle-retnew');
+      if (btn) {
+        btn.classList.toggle('active', retNewProportionMode);
+        btn.textContent = retNewProportionMode ? 'Showing 100% Proportion' : 'Proportion';
+      }
+      applyRetNewProportionMode();
+      if (charts.retNew) charts.retNew.update();
+    }
 
     const datalabelsPlugin = {
       id: 'datalabels',
@@ -2168,7 +2284,8 @@
           meta.data.forEach((bar, index) => {
             const val = dataset.data[index]; if (val === 0 || !val) return;
             const isSales = chart.canvas.id === 'chart-sales' || chart.canvas.id === 'chart-admin' || chart.canvas.id === 'chart-channel';
-            let displayVal = isSales ? '฿' + val.toLocaleString('th-TH', {minimumFractionDigits: 0, maximumFractionDigits: 0}) : val.toLocaleString('th-TH');
+            const isRetNewProportion = chart.canvas.id === 'chart-ret-new-stacked' && retNewProportionMode;
+            let displayVal = isRetNewProportion ? Math.round(val) + '%' : isSales ? '฿' + val.toLocaleString('th-TH', {minimumFractionDigits: 0, maximumFractionDigits: 0}) : val.toLocaleString('th-TH');
             let x = bar.x, y = bar.y; ctx.fillStyle = '#ffffff'; 
             if (chart.config.type === 'doughnut') {
               const arc = bar; const centerAngle = arc.startAngle + (arc.endAngle - arc.startAngle) / 2; const rangeFromCenter = arc.innerRadius + (arc.outerRadius - arc.innerRadius) / 2;
@@ -2194,10 +2311,10 @@
       Chart.defaults.font.family = 'Inter'; Chart.defaults.color = '#777';
       const commonOpts = { maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } }, layout: { padding: { top: 25, bottom: 15, left: 20, right: 20 } } };
       charts.sales = new Chart(document.getElementById('chart-sales'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] }, options: { ...commonOpts, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
-      charts.retNew = new Chart(document.getElementById('chart-ret-new-stacked'), { type: 'bar', data: { labels: [], datasets: [{ label: 'Retained', data: [], backgroundColor: '#006E99' }, { label: 'New', data: [], backgroundColor: '#d95f1d' }] }, options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
+      charts.retNew = new Chart(document.getElementById('chart-ret-new-stacked'), { type: 'bar', data: { labels: [], datasets: [{ label: 'Retained', data: [], backgroundColor: '#006E99' }, { label: 'New', data: [], backgroundColor: '#d95f1d' }] }, options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } }, tooltip: { callbacks: { label: (item) => `${item.dataset.label}: ${retNewProportionMode ? Math.round(item.parsed.y) + '%' : Number(item.parsed.y).toLocaleString('th-TH') + ' คน'}` } } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
       const lineOpts = () => ({
         ...commonOpts,
-        layout: { padding: { top: 25, bottom: 15, left: 20, right: 50 } },
+        layout: { padding: { top: 34, bottom: 15, left: 20, right: 50 } },
         interaction: { mode: 'index', intersect: false },
         scales: {
           x: { grid: { display: false } },
@@ -2213,13 +2330,13 @@
           }
         }
       });
-      charts.newCust = new Chart(document.getElementById('chart-new'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#e86c31', backgroundColor: lineAreaGradient('#e86c31'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#e86c31', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(), plugins: [crosshairPlugin, lineEndLabelPlugin] });
-      charts.retCust = new Chart(document.getElementById('chart-ret'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#006E99', backgroundColor: lineAreaGradient('#006E99'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#006E99', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(), plugins: [crosshairPlugin, lineEndLabelPlugin] });
+      charts.newCust = new Chart(document.getElementById('chart-new'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#e86c31', backgroundColor: lineAreaGradient('#e86c31'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#e86c31', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(), plugins: [crosshairPlugin, lineEndLabelPlugin, pctChangeLabelPlugin] });
+      charts.retCust = new Chart(document.getElementById('chart-ret'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#006E99', backgroundColor: lineAreaGradient('#006E99'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#006E99', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(), plugins: [crosshairPlugin, lineEndLabelPlugin, pctChangeLabelPlugin] });
       charts.channel = new Chart(document.getElementById('chart-channel'), { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: ['#d95f1d', '#73d18e', '#006E99', '#ccc', '#888'] }] }, options: { ...commonOpts, plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } } }, plugins: [datalabelsPlugin] });
       charts.admin = new Chart(document.getElementById('chart-admin'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] }, options: { ...commonOpts, indexAxis: 'y', scales: { x: { beginAtZero: true, grid: { color: '#f5f5f5' } }, y: { grid: { display: false } } } }, plugins: [datalabelsPlugin] });
     }
 
-    window.switchTab = switchTab; window.applyFilters = applyFilters; window.setFilter = setFilter; window.clearFilters = clearFilters; window.toggleFilter = toggleFilter;
+    window.switchTab = switchTab; window.applyFilters = applyFilters; window.setFilter = setFilter; window.clearFilters = clearFilters; window.toggleFilter = toggleFilter; window.toggleChartPctChange = toggleChartPctChange; window.toggleRetNewProportion = toggleRetNewProportion;
   </script>
   <script src="cohort.js?v=13"></script>
   <script src="executive.js?v=20"></script>
