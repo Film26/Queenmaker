@@ -470,7 +470,7 @@
     // --- Auth/session (Task 4/7) ---
     // The server already redirects an unauthenticated GET /dashboard.html to the login page
     // (see requirePageAuth in server.js) - this client-side check additionally catches a
-    // session that expires *while this tab is already open* (idle timeout) and hides
+    // session that expires *while this tab is already open* (after the 7-day session lifetime) and hides
     // admin-only navigation based on role (Manager vs Super Admin).
     function checkSessionOrRedirect() {
       fetch('/api/auth/me', { credentials: 'same-origin' }).then(res => {
