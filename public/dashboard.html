@@ -32,7 +32,7 @@
     }
     .charts-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 24px;
       margin-bottom: 25px;
     }
@@ -2363,7 +2363,7 @@
       const btn = document.getElementById('proportion-toggle-retnew');
       if (btn) {
         btn.classList.toggle('active', retNewProportionMode);
-        btn.textContent = retNewProportionMode ? 'Showing 100% Proportion' : 'Proportion';
+        btn.textContent = retNewProportionMode ? '% Proportion' : 'Proportion';
       }
       applyRetNewProportionMode();
       if (charts.retNew) charts.retNew.update();
@@ -2451,7 +2451,7 @@
       charts.sales = new Chart(document.getElementById('chart-sales'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
       charts.orders = new Chart(document.getElementById('chart-orders'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#0ea5e9', borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
       charts.aov = new Chart(document.getElementById('chart-aov'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#f59e0b', borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
-      charts.sph = new Chart(document.getElementById('chart-sph'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#7c3aed', borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
+      charts.sph = new Chart(document.getElementById('chart-sph'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#006E99', borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
       charts.frequency = new Chart(document.getElementById('chart-frequency'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#14b8a6', borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
       charts.retNew = new Chart(document.getElementById('chart-ret-new-stacked'), { type: 'bar', data: { labels: [], datasets: [{ label: 'Retained', data: [], backgroundColor: '#006E99' }, { label: 'New', data: [], backgroundColor: '#d95f1d' }] }, options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } }, tooltip: { callbacks: { label: (item) => `${item.dataset.label}: ${retNewProportionMode ? Math.round(item.parsed.y) + '%' : Number(item.parsed.y).toLocaleString('th-TH') + ' คน'}` } } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
       const lineOpts = (tooltipFmt) => ({
