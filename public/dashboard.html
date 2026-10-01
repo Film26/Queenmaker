@@ -1543,6 +1543,9 @@
       // ตัวเลือกของ filter อื่นทั้งหมดต้องมาจากข้อมูลของกลุ่มที่เลือกเท่านั้น (ค่าที่ไม่มีในกลุ่มนี้จะถูกรีเซ็ตเป็น All)
       populateDropdowns();
       if (rawData.length > 0) populateExecDropdowns();
+      // KPI Compare badges เทียบกับเป้าของ Group ที่เลือกอยู่ (ตั้งแยกไว้ในหน้า KPI Setting > KPI Group) - ต้อง
+      // อัปเดต window.kpiSettingsData ก่อน applyFilters() จะ re-render การ์ด/badge ด้วยเป้าใหม่
+      if (typeof window.kpiApplyScopedSettings === 'function') window.kpiApplyScopedSettings(val);
       applyFilters();
     }
     window.setGroup = setGroup;

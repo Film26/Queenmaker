@@ -6,7 +6,8 @@
 const KPI_LEGACY_STORAGE_KEY = 'qm_kpi_setting_v1';
 const KPI_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function kpiDefaultState() {
+// ฟิลด์ของ "หนึ่งขอบเขต" เป้า KPI - ใช้รูปแบบเดียวกันทั้งกับ KPI All (ภาพรวมทั้งหมด ไม่แยก Group) และแต่ละ KPI Group
+function kpiDefaultScopeState() {
   return {
     byProduct: [
       { name: 'Plus', values: Array(12).fill(null) },
@@ -39,15 +40,32 @@ function kpiDefaultState() {
   };
 }
 
-// รวมกับค่า default กันกรณีโครงสร้างเก่าขาดฟิลด์ใหม่
-function kpiNormalizeState(parsed) {
-  if (!parsed || typeof parsed !== 'object') return kpiDefaultState();
-  const def = kpiDefaultState();
+// เอกสารทั้งก้อนที่เก็บต่อองค์กร: ฟิลด์ระดับบนสุด = ขอบเขต "KPI All" (เหมือน kpiDefaultScopeState ทุกประการ - ข้อมูล
+// เดิมก่อนมี KPI Group จึงยังอ่าน/เขียนได้ตามปกติ ไม่ breaking) บวก groups: { "<ชื่อ Group>": <ขอบเขตรูปแบบเดียวกัน> }
+function kpiDefaultState() {
+  return Object.assign(kpiDefaultScopeState(), { groups: {} });
+}
+
+// รวมกับค่า default กันกรณีโครงสร้างเก่าขาดฟิลด์ใหม่ - ใช้ร่วมกันทั้งกับ KPI All และแต่ละ Group (โครงสร้างฟิลด์เดียวกัน)
+function kpiNormalizeScopeState(parsed) {
+  if (!parsed || typeof parsed !== 'object') return kpiDefaultScopeState();
+  const def = kpiDefaultScopeState();
   return Object.assign(def, parsed, {
     customerSetting: Object.assign(def.customerSetting, parsed.customerSetting),
     customerMonthly: Object.assign(def.customerMonthly, parsed.customerMonthly),
     crm: Object.assign(def.crm, parsed.crm)
   });
+}
+
+function kpiNormalizeState(parsed) {
+  const doc = kpiNormalizeScopeState(parsed);
+  doc.groups = {};
+  if (parsed && parsed.groups && typeof parsed.groups === 'object' && !Array.isArray(parsed.groups)) {
+    Object.keys(parsed.groups).forEach(name => {
+      doc.groups[name] = kpiNormalizeScopeState(parsed.groups[name]);
+    });
+  }
+  return doc;
 }
 
 // อ่านค่า KPI ขององค์กรที่ล็อกอินอยู่จาก server (server ดูองค์กรจาก session เอง ไม่รับจาก client)
@@ -145,6 +163,45 @@ window.handleKpiCustomerPaste = function(event, type0, m0) {
     });
     updateKpiCustomerMonthlyTotal(type);
   });
+};
+
+// ขอบเขตที่กำลังแก้ไขอยู่ในหน้านี้ตอนนี้: 'All' (KPI All) หรือชื่อ Group หนึ่งชื่อ
+// window.__kpiDoc = เอกสารทั้งก้อนที่โหลดมาจาก server (ทุกขอบเขตรวมกัน)
+// window.__kpiState = "มุมมองของขอบเขตที่เปิดอยู่" ชี้ไปที่ตัวเดียวกับ window.__kpiDoc เมื่อขอบเขตเป็น 'All' (ฟิลด์ของ
+// All อยู่ที่ระดับบนสุดของเอกสารอยู่แล้ว) หรือชี้ไปที่ window.__kpiDoc.groups[ชื่อ] เมื่อเป็น Group - ฟังก์ชันเดิมทั้งหมด
+// ที่อ่าน/เขียน window.__kpiState (ตาราง/ฟอร์มด้านล่าง) จึงทำงานเหมือนเดิมได้โดยไม่ต้องแก้ ไม่ว่ากำลังแก้ขอบเขตไหนอยู่
+function kpiSetActiveScope(name) {
+  window.__kpiScope = name || 'All';
+  if (window.__kpiScope === 'All') {
+    window.__kpiState = window.__kpiDoc;
+  } else {
+    window.__kpiDoc.groups = window.__kpiDoc.groups || {};
+    if (!window.__kpiDoc.groups[window.__kpiScope]) window.__kpiDoc.groups[window.__kpiScope] = kpiDefaultScopeState();
+    window.__kpiState = window.__kpiDoc.groups[window.__kpiScope];
+  }
+}
+
+// รายชื่อ Group ให้เลือกในหน้านี้: รวมชื่อ Group ที่พบในไฟล์ข้อมูลที่ Import เข้าหน้า Dashboard ไว้แล้วในเซสชันนี้
+// (getGroupOptionList มาจาก dashboard.html - เช็ค typeof กันพังถ้ายังไม่ได้ import ข้อมูล) กับชื่อ Group ที่เคยบันทึก
+// เป้า KPI ไว้แล้ว (เผื่อเปิดหน้านี้โดยยังไม่ได้ import ไฟล์ที่มี Group นั้นในเซสชันนี้ ก็ยังเห็น/แก้ของเดิมได้)
+function kpiAvailableGroups() {
+  const fromData = (() => {
+    try { return typeof getGroupOptionList === 'function' ? getGroupOptionList() : []; } catch (e) { return []; }
+  })();
+  const fromSaved = window.__kpiDoc && window.__kpiDoc.groups ? Object.keys(window.__kpiDoc.groups) : [];
+  return Array.from(new Set(fromData.concat(fromSaved))).sort();
+}
+
+function kpiEscapeHtml(str) {
+  return (str === null || str === undefined ? '' : String(str))
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+window.switchKpiScope = function(name) {
+  kpiSetActiveScope(name);
+  const container = document.getElementById('view-kpisetting');
+  if (container) kpiRenderAll(container);
 };
 
 async function renderKpiSetting() {
@@ -317,6 +374,36 @@ async function renderKpiSetting() {
       .kpiset-freq-value { font-size: 15px; font-weight: 700; color: #1e293b; }
 
       .kpiset-saved-note { font-size: 11px; color: #94a3b8; margin-top: -10px; margin-bottom: 20px; }
+
+      .kpiset-scope-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 18px 0 10px 0;
+        font-family: 'Inter', sans-serif;
+      }
+      .kpiset-scope-row label { font-size: 12.5px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 6px; }
+      .kpiset-scope-select {
+        padding: 7px 10px;
+        font-size: 12.5px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #fff;
+        min-width: 240px;
+      }
+      .kpiset-scope-hint { font-size: 11px; color: #94a3b8; }
+      .kpiset-scope-banner {
+        display: inline-block;
+        font-size: 11.5px;
+        font-weight: 700;
+        color: #92400e;
+        background: #fef3c7;
+        border: 1px solid #fde68a;
+        border-radius: 999px;
+        padding: 4px 12px;
+        margin-bottom: 14px;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -343,16 +430,21 @@ async function renderKpiSetting() {
     }
   }
 
-  window.__kpiState = state || kpiDefaultState();
+  window.__kpiDoc = state || kpiDefaultState();
+  kpiSetActiveScope(window.__kpiScope || 'All'); // คงขอบเขตที่เปิดอยู่ตอนสลับแท็บไปมา - ครั้งแรกเป็น 'All' เสมอ
   kpiRenderAll(container);
 }
 
 function kpiRenderAll(container) {
   const state = window.__kpiState;
+  const scope = window.__kpiScope || 'All';
+  const scopeLabel = scope === 'All' ? 'KPI All (ภาพรวมทั้งหมด)' : `KPI Group: ${scope}`;
 
   const savedNote = state.savedAt
-    ? `บันทึกล่าสุด: ${new Date(state.savedAt).toLocaleString('th-TH')}`
-    : 'ยังไม่เคยบันทึก';
+    ? `บันทึกล่าสุด (${scopeLabel}): ${new Date(state.savedAt).toLocaleString('th-TH')}`
+    : `ยังไม่เคยบันทึก (${scopeLabel})`;
+
+  const groupOptions = kpiAvailableGroups();
 
   container.innerHTML = `
     <div class="kpiset-header">
@@ -376,10 +468,22 @@ function kpiRenderAll(container) {
       </div>
       <div class="kpiset-header-actions">
         ${kpiCanEdit() ? `
-        <button class="kpiset-btn kpiset-btn-reset" onclick="resetKpiSettings()"><i class="fas fa-undo"></i> ล้างค่าทั้งหมด</button>
+        <button class="kpiset-btn kpiset-btn-reset" onclick="resetKpiSettings()"><i class="fas fa-undo"></i> ล้างค่า (${scope === 'All' ? 'KPI All' : kpiEscapeHtml(scope)})</button>
         <button class="kpiset-btn kpiset-btn-save" onclick="saveKpiSettings()"><i class="fas fa-save"></i> บันทึก</button>` : '<span style="color:#9ca3af;font-size:13px;">ดูได้อย่างเดียว - เฉพาะ Super Admin / Manager ที่แก้เป้า KPI ได้</span>'}
       </div>
     </div>
+
+    <div class="kpiset-scope-row">
+      <label for="kpi-scope-select"><i class="fas fa-layer-group"></i> KPI Group</label>
+      <select class="kpiset-scope-select" id="kpi-scope-select" onchange="switchKpiScope(this.value)">
+        <option value="All" ${scope === 'All' ? 'selected' : ''}>KPI All (ภาพรวมทั้งหมด ไม่แยก Group)</option>
+        ${groupOptions.map(g => `<option value="${kpiEscapeHtml(g)}" ${scope === g ? 'selected' : ''}>${kpiEscapeHtml(g)}</option>`).join('')}
+      </select>
+      ${groupOptions.length === 0
+        ? '<span class="kpiset-scope-hint">นำเข้าไฟล์ข้อมูล (Import Data) ก่อน เพื่อเลือกตั้งเป้าเฉพาะ Group</span>'
+        : '<span class="kpiset-scope-hint">เลือก Group เพื่อตั้งเป้าแยกเฉพาะกลุ่มนั้น (คนละชุดข้อมูลกับ KPI All)</span>'}
+    </div>
+    <div class="kpiset-scope-banner">กำลังตั้งค่า: ${kpiEscapeHtml(scopeLabel)}</div>
     <div class="kpiset-saved-note">${savedNote}</div>
 
     <div class="kpiset-card">
@@ -667,29 +771,55 @@ function kpiApplyStateToGlobalSettings(state) {
   }
 }
 
+// เลือก state ของขอบเขตที่ตรงกับ Group ที่กำลังดูอยู่บน Dashboard (ใช้เทียบ KPI Compare) - ถ้า Group นั้นไม่เคยตั้ง
+// เป้าไว้ คืนค่า default (เป้า 0 = "ไม่มีเป้า") ไม่ fallback ไปใช้เป้าของ KPI All เพราะสองขอบเขตนี้แยกจากกันโดยเจตนา
+function kpiScopeStateFromDoc(doc, groupName) {
+  if (!doc) return kpiDefaultScopeState();
+  if (!groupName || groupName === 'All') return doc;
+  return (doc.groups && doc.groups[groupName]) || kpiDefaultScopeState();
+}
+
+// อัปเดต window.kpiSettingsData (ที่ badge KPI Compare บน Dashboard อ่าน) ให้ตรงกับ Group ที่ filter บน Overview
+// เลือกอยู่ตอนนี้ - dashboard.html เรียกฟังก์ชันนี้เองทุกครั้งที่สลับ Group filter (ดู setGroup ใน dashboard.html)
+window.kpiApplyScopedSettings = function(groupName) {
+  if (!window.__kpiRemoteDoc) return;
+  kpiApplyStateToGlobalSettings(kpiScopeStateFromDoc(window.__kpiRemoteDoc, groupName));
+};
+
+// เซฟเอกสารที่เพิ่งบันทึก/ล้างค่าไว้เป็น "ค่าล่าสุดจาก server" แล้วรีเฟรช badge บน Dashboard ให้ตรงกับ Group filter
+// ที่เปิดอยู่ตอนนี้ (อาจเป็นคนละ Group กับขอบเขตที่เพิ่งแก้ในหน้านี้ก็ได้ - อ่านจาก filters.Group ของ Dashboard เอง)
+function kpiRefreshDashboardBadges(doc) {
+  window.__kpiRemoteDoc = doc;
+  const activeGroup = (typeof filters !== 'undefined' && filters.Group) || 'All';
+  window.kpiApplyScopedSettings(activeGroup);
+  if (typeof rawData !== 'undefined' && rawData.length > 0 && typeof applyFilters === 'function') applyFilters();
+}
+
 window.saveKpiSettings = async function() {
   if (!kpiCanEdit()) { alert('เฉพาะ Super Admin / Manager ที่แก้ KPI Setting ได้'); return; }
-  const state = kpiCollectStateFromDom();
+  kpiCollectStateFromDom(); // แก้ window.__kpiState ซึ่งเป็น object เดียวกับขอบเขตที่เปิดอยู่ใน window.__kpiDoc อยู่แล้ว
+  window.__kpiState.savedAt = new Date().toISOString(); // ประทับเวลาเฉพาะขอบเขตที่บันทึก ไม่กระทบขอบเขตอื่น
 
-  let saved;
+  let savedDoc;
   try {
     const res = await fetch('/api/kpi', {
       method: 'PUT',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(state)
+      body: JSON.stringify(window.__kpiDoc) // ส่งทั้งเอกสาร (ทุกขอบเขต) เพราะ server เก็บเป็นก้อนเดียวต่อองค์กร
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || ('HTTP ' + res.status));
-    saved = kpiNormalizeState(body.data);
+    savedDoc = kpiNormalizeState(body.data);
   } catch (e) {
     console.error('[KPI Setting] บันทึกไม่สำเร็จ', e);
     alert('บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง\n' + e.message);
     return;
   }
 
-  window.__kpiState = saved;
-  kpiApplyStateToGlobalSettings(saved);
+  window.__kpiDoc = savedDoc;
+  kpiSetActiveScope(window.__kpiScope); // ชี้ window.__kpiState ไปที่ object ใหม่ในขอบเขตเดิม
+  kpiRefreshDashboardBadges(savedDoc);
 
   const container = document.getElementById('view-kpisetting');
   if (container) kpiRenderAll(container);
@@ -699,34 +829,53 @@ window.saveKpiSettings = async function() {
 
 window.resetKpiSettings = async function() {
   if (!kpiCanEdit()) { alert('เฉพาะ Super Admin / Manager ที่แก้ KPI Setting ได้'); return; }
-  if (!confirm('ต้องการล้างค่า KPI Setting ทั้งหมดขององค์กรหรือไม่?')) return;
+  const scope = window.__kpiScope || 'All';
+  const scopeLabel = scope === 'All' ? 'KPI All (ภาพรวมทั้งหมด)' : `Group "${scope}"`;
+  if (!confirm(`ต้องการล้างค่า ${scopeLabel} หรือไม่? (ขอบเขตอื่นจะไม่ถูกล้าง)`)) return;
+
+  // ล้างเฉพาะขอบเขตที่กำลังเปิดอยู่ แล้วบันทึกทั้งเอกสารทับ (เหมือนกด "บันทึก" ด้วยค่าว่าง) - ขอบเขตอื่นในเอกสารเดิม
+  // ไม่ถูกแตะต้อง ต่างจากเดิมที่ปุ่มนี้เคยลบค่า KPI ทั้งองค์กรทิ้งทั้งหมด
+  const cleared = kpiDefaultScopeState();
+  if (scope === 'All') {
+    Object.assign(window.__kpiDoc, cleared);
+  } else {
+    window.__kpiDoc.groups = window.__kpiDoc.groups || {};
+    window.__kpiDoc.groups[scope] = cleared;
+  }
+  kpiSetActiveScope(scope);
 
   try {
-    const res = await fetch('/api/kpi', { method: 'DELETE', credentials: 'same-origin' });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || ('HTTP ' + res.status));
-    }
+    const res = await fetch('/api/kpi', {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(window.__kpiDoc)
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || ('HTTP ' + res.status));
+    window.__kpiDoc = kpiNormalizeState(body.data);
+    kpiSetActiveScope(scope);
   } catch (e) {
     console.error('[KPI Setting] ล้างค่าไม่สำเร็จ', e);
     alert('ล้างค่าไม่สำเร็จ กรุณาลองใหม่อีกครั้ง\n' + e.message);
     return;
   }
 
-  window.__kpiState = kpiDefaultState();
-  kpiApplyStateToGlobalSettings(window.__kpiState);
+  kpiRefreshDashboardBadges(window.__kpiDoc);
   const container = document.getElementById('view-kpisetting');
   if (container) kpiRenderAll(container);
 };
 
-// โหลดค่าที่ organization นี้บันทึกไว้ (ถ้ามี) เข้า window.kpiSettingsData ตอนเปิดหน้า
-// เพื่อให้หน้า CRM Dashboard / Insight Hub ใช้ค่าที่ตั้งไว้ได้แม้ยังไม่เคยเปิดหน้า KPI Setting ในเซสชันนี้
-// ถ้ายังไม่เคยบันทึก (หรือโหลดไม่สำเร็จ) จะเป็นค่าเริ่มต้น "ไม่มีเป้า" (0) ซึ่งหน้า Dashboard แสดงเป็น "KPI -"
+// โหลดค่าที่ organization นี้บันทึกไว้ (ถ้ามี) เข้า window.kpiSettingsData ตอนเปิดหน้า ตามขอบเขตที่ตรงกับ Group filter
+// ของ Dashboard ในเซสชันนี้ (ปกติคือ 'All' ตอนเพิ่งเปิดหน้า) เพื่อให้ CRM Dashboard / Insight Hub ใช้ค่าที่ตั้งไว้ได้
+// แม้ยังไม่เคยเปิดหน้า KPI Setting ในเซสชันนี้ - ถ้ายังไม่เคยบันทึก (หรือโหลดไม่สำเร็จ) จะเป็นค่าเริ่มต้น "ไม่มีเป้า" (0)
+// ซึ่งหน้า Dashboard แสดงเป็น "KPI -"
 (async function kpiPreloadSettings() {
   try {
-    const state = await kpiFetchSavedState();
-    if (!state) return;
-    kpiApplyStateToGlobalSettings(state);
+    const doc = await kpiFetchSavedState();
+    window.__kpiRemoteDoc = doc || kpiDefaultState();
+    const activeGroup = (typeof filters !== 'undefined' && filters.Group) || 'All';
+    window.kpiApplyScopedSettings(activeGroup);
     // ข้อมูลอาจ Import เสร็จไปก่อนที่ค่า KPI จะโหลดมาถึง - วาดการ์ดใหม่ให้ badge ใช้เป้าที่ถูกต้อง
     if (typeof rawData !== 'undefined' && rawData.length > 0 && typeof applyFilters === 'function') applyFilters();
   } catch (e) {
