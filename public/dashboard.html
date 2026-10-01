@@ -434,15 +434,19 @@
 
             <div class="chart-box grid-span-1">
               <div class="chart-title">ยอดขายของ Admin แต่ละคน</div>
-              <div class="chart-container"><canvas id="chart-admin"></canvas></div>
+              <div class="chart-container" style="overflow-y:auto;">
+                <div id="chart-admin-inner" style="position:relative; width:100%; height:100%;">
+                  <canvas id="chart-admin"></canvas>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        <div id="view-cohort" style="display:none; padding: 20px; background: #fff; border-radius: 16px; margin-top: 20px; overflow-x: auto; min-height: 500px;">
+        <div id="view-cohort" style="display:none; padding: 20px; background: #fbf9f4; border-radius: 16px; margin-top: 20px; overflow-x: auto; min-height: 500px;">
           </div>
         <div id="view-executive1" class="view-content" style="display:none; padding: 20px;"></div>
-      
-        <div id="view-executive2" class="view-content" style="display:none; padding: 20px; background-color: #f8f9fa;"></div>
+
+        <div id="view-executive2" class="view-content" style="display:none; padding: 20px; background-color: #fbf9f4;"></div>
       
         <div id="view-retention" class="view-content" style="display:none; padding: 20px;"></div>
         <div id="view-ai-analytics" class="view-content" style="display:none; padding: 20px;"></div>
@@ -2199,10 +2203,15 @@
         charts.channel.update();
       }
       
-      const admins = Object.keys(curr.admins).sort((a,b) => curr.admins[b] - curr.admins[a]).slice(0,5);
+      // แสดง Admin ทุกคนที่มีอยู่ในคอลัมน์ Admin Name (ไม่ตัดเหลือ Top 5 เหมือนเดิม) - เมื่อมีหลายคนให้เลื่อนดูได้
+      // แทนที่จะบีบแท่งให้เล็กจนอ่านไม่ออก จึงต้องปรับความสูงของกราฟตามจำนวน Admin แล้วให้กล่องห่อ scroll เอา
+      const admins = Object.keys(curr.admins).sort((a,b) => curr.admins[b] - curr.admins[a]);
       if(charts.admin) {
+        const adminInner = document.getElementById('chart-admin-inner');
+        if (adminInner) adminInner.style.height = Math.max(280, admins.length * 34) + 'px';
         charts.admin.data.labels = admins;
         charts.admin.data.datasets[0].data = admins.map(a => curr.admins[a]);
+        charts.admin.resize();
         charts.admin.update();
       }
     }
@@ -2523,15 +2532,16 @@
 
     // ตัวเลขราคาบนกราฟ (เช่น ฿227,825) ย่อเป็น K/M/B เมื่อหลักใหญ่ ไม่ให้ตัวเลขยาวจนชนกันบนแท่ง/จุดกราฟ -
     // Tooltip ตอน hover ยังคงโชว์ค่าเต็มตามปกติ (ไม่ได้แตะ Tooltip) ย่อแค่ label ที่พิมพ์ลงบนกราฟเท่านั้น
-    function formatCompactCurrency(val) {
+    function formatCompactCurrency(val, decimals) {
+      const d = decimals === undefined ? 1 : decimals;
       const n = Number(val) || 0;
       const sign = n < 0 ? '-' : '';
       const abs = Math.abs(n);
       let out;
-      if (abs >= 1e9) out = (abs / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
-      else if (abs >= 1e6) out = (abs / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
-      else if (abs >= 1e3) out = (abs / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
-      else out = abs.toLocaleString('th-TH');
+      if (abs >= 1e9) out = (abs / 1e9).toFixed(d).replace(/\.0+$/, '') + 'B';
+      else if (abs >= 1e6) out = (abs / 1e6).toFixed(d).replace(/\.0+$/, '') + 'M';
+      else if (abs >= 1e3) out = (abs / 1e3).toFixed(d).replace(/\.0+$/, '') + 'K';
+      else out = Math.round(abs).toLocaleString('th-TH');
       return '฿' + sign + out;
     }
     const datalabelsPlugin = {
@@ -2545,9 +2555,10 @@
           meta.data.forEach((bar, index) => {
             const val = dataset.data[index]; if (val === 0 || !val) return;
             const isSales = chart.canvas.id === 'chart-sales' || chart.canvas.id === 'chart-admin' || chart.canvas.id === 'chart-channel' || chart.canvas.id === 'chart-aov' || chart.canvas.id === 'chart-sph';
+            const isSph = chart.canvas.id === 'chart-sph';
             const isFrequency = chart.canvas.id === 'chart-frequency';
             const isRetNewProportion = chart.canvas.id === 'chart-ret-new-stacked' && retNewProportionMode;
-            let displayVal = isRetNewProportion ? Math.round(val) + '%' : isFrequency ? Number(val).toFixed(2) : isSales ? formatCompactCurrency(val) : val.toLocaleString('th-TH');
+            let displayVal = isRetNewProportion ? Math.round(val) + '%' : isFrequency ? Number(val).toFixed(2) : isSales ? formatCompactCurrency(val, isSph ? 0 : 1) : val.toLocaleString('th-TH');
             let x = bar.x, y = bar.y; ctx.fillStyle = '#ffffff'; 
             if (chart.config.type === 'doughnut') {
               const arc = bar; const centerAngle = arc.startAngle + (arc.endAngle - arc.startAngle) / 2; const rangeFromCenter = arc.innerRadius + (arc.outerRadius - arc.innerRadius) / 2;
