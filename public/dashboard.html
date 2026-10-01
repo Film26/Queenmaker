@@ -922,6 +922,14 @@
       const mainFiltersBar = document.getElementById('mainFiltersBar');
       const execFiltersBar = document.getElementById('execFiltersBar');
 
+      // หน้า Migration ใช้แค่ Group/Year/Month - ซ่อน Filter ที่เหลือในแถบบนสุด (ข้อมูลของหน้านี้ก็ไม่สนค่าเหล่านี้ ดู getMigrationData)
+      // ทำทุกครั้งที่สลับแท็บ เพื่อให้ปุ่มกลับมาแสดงเมื่อออกจากหน้า Migration ไปหน้าอื่นที่ใช้แถบเดียวกัน (รวม AI Analytics)
+      const isMigrationTab = tabId === 'executive2';
+      MIGRATION_HIDDEN_FILTERS.forEach(type => {
+        const btn = document.getElementById('btn-' + type);
+        if (btn && btn.parentElement) btn.parentElement.style.display = isMigrationTab ? 'none' : '';
+      });
+
       if (tabId === 'ai-analytics') {
         if (sideAiAnalytics) sideAiAnalytics.classList.add('active');
         document.getElementById('view-ai-analytics').style.display = 'block';
@@ -993,7 +1001,7 @@
         } else if (tabId === 'executive2') {
           document.getElementById('tab-executive2').classList.add('active');
           document.getElementById('view-executive2').style.display = 'block';
-          if (typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, getScopedRawData()); }
+          if (typeof renderExecutive2 === 'function') { renderExecutive2(getMigrationData(), getScopedRawData()); }
         } else if (tabId === 'retention') {
           document.getElementById('tab-retention').classList.add('active');
           document.getElementById('view-retention').style.display = 'block';
@@ -1928,6 +1936,13 @@
       });
     }
 
+    // หน้า Migration แสดงเฉพาะ Filter Group/Year/Month - ค่าของ Filter อื่นที่เลือกค้างไว้จากหน้าอื่น
+    // (Channel/SubChannel/Product/SubProduct/Admin) จะถูกมองเป็น "All" เพื่อไม่ให้มีผลแบบมองไม่เห็นบนหน้านี้
+    const MIGRATION_HIDDEN_FILTERS = ['Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin', 'KPI'];
+    function getMigrationData() {
+      return computeFilteredData(Object.assign({}, filters, { Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All' }));
+    }
+
     function applyFilters() {
       // แก้ปัญหาหน้าเด้งกลับขึ้นบนสุดทุกครั้งที่กด Filter (ทั้ง global filter บนสุด และ filter ภายในแต่ละ view
       // ล้วนเรียกฟังก์ชันนี้ซึ่ง re-render ทุก view ที่เปิดอยู่ ทำให้ความสูงหน้าเปลี่ยนแล้วเลื่อนขึ้นบนสุด)
@@ -1942,7 +1957,7 @@
       processData(filteredData);
 
       try { if (document.getElementById('view-cohort').style.display === 'block' && typeof renderCohortHeatmap === 'function') { renderCohortHeatmap(filteredData, getScopedRawData()); } } catch(e) { console.error(e); }
-      try { if (document.getElementById('view-executive2').style.display === 'block' && typeof renderExecutive2 === 'function') { renderExecutive2(filteredData, getScopedRawData()); } } catch(e) { console.error(e); }
+      try { if (document.getElementById('view-executive2').style.display === 'block' && typeof renderExecutive2 === 'function') { renderExecutive2(getMigrationData(), getScopedRawData()); } } catch(e) { console.error(e); }
       // InsightHub deliberately NOT re-rendered here - it has its own data source (see
       // loadInsightHubDataFromAppsScript/window.refreshInsightHub above), unrelated to this
       // CSV-driven filters/rawData pipeline.
