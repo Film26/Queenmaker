@@ -476,7 +476,7 @@ function kpiRenderAll(container) {
     <div class="kpiset-scope-row">
       <label for="kpi-scope-select"><i class="fas fa-layer-group"></i> KPI Group</label>
       <select class="kpiset-scope-select" id="kpi-scope-select" onchange="switchKpiScope(this.value)">
-        <option value="All" ${scope === 'All' ? 'selected' : ''}>KPI All (ภาพรวมทั้งหมด ไม่แยก Group)</option>
+        <option value="All" ${scope === 'All' ? 'selected' : ''}>KPI All</option>
         ${groupOptions.map(g => `<option value="${kpiEscapeHtml(g)}" ${scope === g ? 'selected' : ''}>${kpiEscapeHtml(g)}</option>`).join('')}
       </select>
       ${groupOptions.length === 0
