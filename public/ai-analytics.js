@@ -48,6 +48,11 @@ function renderAiAnalytics(filteredData, rawData) {
       .ai-action-list li { font-size: 13.5px; line-height: 1.7; color: #334155; padding-left: 20px; position: relative; }
       .ai-action-list li::before { content: '•'; position: absolute; left: 4px; color: #d95f1d; font-weight: 700; }
 
+      .ai-situation-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+      .ai-situation-list li { font-size: 13.5px; line-height: 1.8; color: #334155; padding-left: 20px; position: relative; }
+      .ai-situation-list li::before { content: '•'; position: absolute; left: 4px; color: #d95f1d; font-weight: 700; }
+      .ai-situation-list li b { color: #1e293b; }
+
       .ai-table-sub { font-size: 12px; color: #94a3b8; margin: -8px 0 14px; }
       .ai-table-wrap { overflow-x: auto; }
       table.ai-table { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
@@ -316,7 +321,7 @@ function renderAiAnalytics(filteredData, rawData) {
   // ==================================================================================
   const situationParas = [];
   situationParas.push(
-    `ยอดสะสมเดือน <span class="ai-highlight">${monthLabel(currentMonthStr)}</span> ถึงวันที่ ${daysElapsed} อยู่ที่ ${fmtMoney(mtdM.totalSales)} บาท` +
+    `<b>ภาพรวมเดือน:</b> ยอดสะสมเดือน <span class="ai-highlight">${monthLabel(currentMonthStr)}</span> ถึงวันที่ ${daysElapsed} อยู่ที่ ${fmtMoney(mtdM.totalSales)} บาท` +
     (pace !== null ? ` ${pace >= 0 ? 'สูง' : 'ต่ำ'}กว่าช่วงเดียวกันของ ${monthLabelShort(prevMonthStr)} อยู่ <span class="${pace >= 0 ? 'ai-up' : 'ai-down'}">${fmtPct(pace)}</span>` : '') +
     (vs3mo !== null ? ` และ${vs3mo >= 0 ? 'สูง' : 'ต่ำ'}กว่าค่าเฉลี่ย ${avg3.monthsUsed} เดือนก่อนหน้า <span class="${vs3mo >= 0 ? 'ai-up' : 'ai-down'}">${fmtPct(vs3mo)}</span>` : '') +
     `. ถ้าอัตราต่อวันคงระดับนี้ไปจนจบเดือน คาดว่าจะจบที่ราว <span class="ai-highlight">${fmtMoney(forecast)}</span> บาท` +
@@ -324,7 +329,7 @@ function renderAiAnalytics(filteredData, rawData) {
   );
 
   situationParas.push(
-    `ในระยะสั้น 7 วันล่าสุด (${shortDate(last7Start)}-${shortDate(latestKey)}) ทำ ${fmtMoney(last7M.totalSales)} บาท` +
+    `<b>7 วันล่าสุด:</b> ในระยะสั้น 7 วันล่าสุด (${shortDate(last7Start)}-${shortDate(latestKey)}) ทำ ${fmtMoney(last7M.totalSales)} บาท` +
     (wow !== null ? ` <span class="${wow >= 0 ? 'ai-up' : 'ai-down'}">${fmtPct(wow)}</span> เทียบ 7 วันก่อนหน้า (${fmtMoney(prev7M.totalSales)})` : '') +
     ` ปิดที่ ${fmtMoney(latestDayM.totalSales)} บาท`
   );
@@ -332,16 +337,16 @@ function renderAiAnalytics(filteredData, rawData) {
   if (watchList.length > 0) {
     const names = watchList.map(c => `${c.subChannel} (เดือน ${fmtPct(c.pace)} แต่ 7 วันล่าสุด ${fmtPct(c.wow)})`).join(', ');
     situationParas.push(
-      `ช่องทางที่ต้องจับตาที่สุดคือ ${names}. ภาพรวมทั้งเดือนยังดี แต่โมเมนตัมช่วงสัปดาห์ล่าสุดร่วงแรง เป็นสัญญาณล่วงหน้าว่าอาจชะลอตัวลง ถ้าไม่รีบดูอาจกระทบยอดเดือนถัดไป`
+      `<b>ช่องทางที่ต้องจับตา:</b> ช่องทางที่ภาพรวมทั้งเดือนยังดี แต่เริ่มมีสัญญาณว่ากำลังชะลอตัวคือ ${names}. โมเมนตัมช่วงสัปดาห์ล่าสุดร่วงแรง เป็นสัญญาณล่วงหน้าว่าอาจชะลอตัวลง ถ้าไม่รีบดูอาจกระทบยอดเดือนถัดไป`
     );
   }
 
   if (decliners.length > 0) {
     const parts = decliners.map(c => `${c.subChannel} หายไป ${fmtMoney(c.lost)} บาท (${fmtPct(c.pace)})${c.isSmallBase ? ' [ฐานเล็ก]' : ''}`).join('; ');
-    situationParas.push(`เรียงตามเม็ดเงินที่หายไปเทียบเดือนก่อนหน้า: ${parts}`);
+    situationParas.push(`<b>ช่องทางที่ยอดขายลดลง:</b> ช่องทางที่ยอดขายลดลงเทียบเดือนก่อนหน้า คือ ${parts}`);
   }
 
-  const situationHtml = situationParas.map(p => `<p>${p}</p>`).join('');
+  const situationHtml = `<ul class="ai-situation-list">${situationParas.map(p => `<li>${p}</li>`).join('')}</ul>`;
 
   // ==================================================================================
   // 5) "ทีม Ads ควรทำ" - action items
