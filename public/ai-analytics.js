@@ -426,7 +426,7 @@ function renderAiAnalytics(filteredData, rawData) {
   // ==================================================================================
   container.innerHTML = `
     <div class="ai-section-title">AI Analytics</div>
-    <div class="ai-section-sub">วิเคราะห์อัตโนมัติจากข้อมูลที่กรองอยู่ในขณะนี้ - คำนวณจากตัวเลขจริงทั้งหมด ไม่มีการเดา (ข้อมูลล่าสุดถึงวันที่ ${latestD}/${latestM}/${latestY})</div>
+    <div class="ai-section-sub">(ข้อมูลล่าสุดถึงวันที่ ${latestD}/${latestM}/${latestY})</div>
     ${kpiHtml}
     <div class="ai-block">
       <div class="ai-block-head"><span class="ai-icon">🔍</span><h3>อ่านสถานการณ์</h3></div>
