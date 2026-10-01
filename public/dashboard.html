@@ -422,7 +422,7 @@
             <div class="chart-box grid-span-1">
               <div class="chart-title-row">
                 <div class="chart-title" style="color:#d95f1d; margin-bottom:0;">ลูกค้าเก่า vs ลูกค้าใหม่</div>
-                <button type="button" class="chart-pct-toggle" id="proportion-toggle-retnew" onclick="toggleRetNewProportion()">Proportion</button>
+                <button type="button" class="chart-pct-toggle" id="proportion-toggle-retnew" onclick="toggleRetNewProportion()">% Proportion</button>
               </div>
               <div class="chart-container"><canvas id="chart-ret-new-stacked"></canvas></div>
             </div>
@@ -2359,7 +2359,7 @@
       const btn = document.getElementById('proportion-toggle-retnew');
       if (btn) {
         btn.classList.toggle('active', retNewProportionMode);
-        btn.textContent = retNewProportionMode ? '% Proportion' : 'Proportion';
+        btn.textContent = retNewProportionMode ? 'Proportion' : '% Proportion';
       }
       applyRetNewProportionMode();
       if (charts.retNew) charts.retNew.update();
