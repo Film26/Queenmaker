@@ -16,8 +16,8 @@
     .filter-content { display: none; position: absolute; background-color: #fff; min-width: 160px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); z-index: 100; border-radius: 8px; padding: 5px 0; max-height: 300px; overflow-y: auto; border: 1px solid #eee; margin-top: 5px;}
     .filter-content.show { display: block; }
     .filter-content div { padding: 8px 15px; cursor: pointer; font-size: 13px; color: #555;}
-    .filter-content div:hover { background-color: #fdf1e6; color: #1e293b;}
-    .filter-content div.selected { background-color: #fdf1e6; font-weight: bold; color: #1e293b;}
+    .filter-content div:hover { background-color: #dbeafe; color: #1d4ed8;}
+    .filter-content div.selected { background-color: #dbeafe; font-weight: bold; color: #1d4ed8;}
 
     .clear-filters-btn { background: none; border: none; color: #1e293b; font-size: 13px; cursor: pointer; text-decoration: underline; margin-left: 10px; display: none;}
     /* Layout for 10 KPIs and 6 Charts - Beautiful Design */
@@ -75,6 +75,7 @@
     .chart-view-mode-toggle { display: inline-flex; background: #f1f5f9; border-radius: 20px; padding: 3px; gap: 2px; }
     .chart-view-mode-btn { font-size: 12.5px; font-weight: 700; padding: 6px 18px; border-radius: 18px; border: none; background: transparent; color: #64748b; cursor: pointer; transition: background .15s, color .15s; }
     .chart-view-mode-btn.active { background: #1e293b; color: #fff; }
+    .chart-view-year-select { font-size: 12.5px; font-weight: 700; padding: 6px 12px; border-radius: 18px; border: 1px solid #cbd5e1; background: #fff; color: #1e293b; cursor: pointer; }
     /* Tabs Styling */
     .tabs-container { margin-bottom: 20px; display: flex; gap: 10px; }
     .tab-btn { background-color: #fff; border: 1px solid #ddd; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; color: #555; }
@@ -342,6 +343,7 @@
               <button type="button" class="chart-view-mode-btn active" id="view-mode-year" onclick="setChartViewMode('year')">Year</button>
               <button type="button" class="chart-view-mode-btn" id="view-mode-month" onclick="setChartViewMode('month')">Month</button>
             </div>
+            <select class="chart-view-year-select" id="chart-view-year-select" style="display:none;" onchange="setChartViewYear(this.value)"></select>
           </div>
 
           <div class="charts-grid">
@@ -699,10 +701,24 @@
     let retNewRetainedRaw = [], retNewNewRaw = [];
     let retNewProportionMode = false;
 
-    // แคชข้อมูลกราฟเทรนด์ทั้งหมดของ Overview (12 เดือนล่าสุดตาม Filter ที่เลือก) ไว้ที่นี่ เพื่อให้ปุ่ม
-    // Switch Month/Year สลับมุมมองกราฟใหม่ได้ทันทีโดยไม่ต้องคำนวณข้อมูลซ้ำ (แค่ตัด array ให้เหลือจุดเดียว)
+    // แคชข้อมูลกราฟเทรนด์ทั้งหมดของ Overview ไว้ที่นี่ เพื่อให้ปุ่ม Switch Year/Month สลับมุมมองกราฟใหม่ได้
     let trendCache = null;
     let chartViewMode = 'year';
+    // เดือนย่อภาษาไทย ใช้เป็น label แกน X ตอนโหมด Month (ไม่ต้องมีปีกำกับซ้ำ เพราะมี dropdown เลือกปีแยกอยู่แล้ว)
+    const MONTH_SHORT_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+    // ==========================================
+    // 📊 ชุดข้อมูลของ "กราฟด้านล่าง" (Overview charts-grid) โดยเฉพาะ - แยกจาก monthlyData/availableMonths
+    // ที่การ์ด "ภาพรวมทั้งหมด"/"สรุปปีล่าสุด (YTD)" ใช้ เพราะ Filter บนสุด (Year/Month) ควรมีผลแค่กับ 2 การ์ดนั้น
+    // ส่วนกราฟด้านล่างทั้งหมดคุมด้วยปุ่ม "แสดงกราฟแบบ: Year/Month" (+ dropdown เลือกปีตอนโหมด Month) แทน -
+    // ยังคงกรองด้วย Group/Channel/SubChannel/Product/Sub Product/Admin ที่เลือกอยู่เหมือนเดิม (ไม่ใช่ตัดกรองทั้งหมด)
+    // ==========================================
+    let chartMonthlyData = {};
+    let chartAvailableMonths = [];
+    let chartYearlyData = {};
+    let chartAvailableYears = [];
+    let chartViewYear = null;
+    let cumulativeAllByMonth = {};
 
     // 💡 คลังสำหรับรับค่าเป้า KPI ขององค์กรจากหน้า KPI SETTING (kpisetting.js โหลดจาก /api/kpi แล้วส่งค่ามาใส่ที่นี่)
     // ค่าเริ่มต้นเป็น 0 = "ยังไม่มีเป้า" (badge แสดงเป็น "KPI -") - ห้ามใส่ตัวเลขตั้งต้นที่นี่ เพราะทุกองค์กรจะเห็นเป็นเป้าของตัวเอง
@@ -1948,17 +1964,23 @@
     }
 
     // เปิด/ปิดข้อความ "ไม่พบข้อมูล" ในหน้า Overview และซ่อน/แสดงการ์ด+กราฟตามสถานะข้อมูลที่ผ่าน Filter
+    // isEmpty ตรงนี้หมายถึง "การ์ด 2 ใบบนสุดไม่มีข้อมูลตาม Filter Year/Month ที่เลือก" เท่านั้น - ไม่แตะ
+    // charts-grid เพราะกราฟด้านล่างทั้งหมดใช้ชุดข้อมูลของตัวเอง (ดู buildChartData) ไม่ยึด Year/Month ของ Filter
+    // บนสุดแล้ว ถึงการ์ดจะว่าง กราฟด้านล่างก็ควรโชว์ข้อมูลของมันต่อไปตามปกติ
     function setOverviewEmptyState(isEmpty) {
       const banner = document.getElementById('overview-empty-state');
       const cardsWrap = document.querySelector('#view-overview .overview-cards-wrap');
-      const chartsGrid = document.querySelector('#view-overview .charts-grid');
       if (banner) banner.style.display = isEmpty ? 'block' : 'none';
       if (cardsWrap) cardsWrap.style.display = isEmpty ? 'none' : '';
-      if (chartsGrid) chartsGrid.style.display = isEmpty ? 'none' : '';
     }
 
     function processData(data) {
       monthlyData = {};
+      // กราฟด้านล่างทั้งหมด (charts-grid) ใช้ชุดข้อมูลของตัวเอง ไม่ยึด Year/Month ของ Filter บนสุด (ดู
+      // buildChartData) จึงต้องสร้างใหม่เสมอ ไม่ว่าชุดข้อมูลที่กรองด้วย Year/Month แล้ว (data) จะว่างหรือไม่ก็ตาม
+      // ไม่งั้นพอเลือก Year ที่ไม่มีข้อมูล 2 การ์ดบนจะว่างถูกต้อง แต่กราฟด้านล่างจะหายไปด้วยทั้งที่ไม่ควร
+      buildChartData();
+      buildTrendCache();
       if (!data || data.length === 0) { renderEmpty(); return; }
       setOverviewEmptyState(false);
 
@@ -2015,7 +2037,6 @@
       setOverviewEmptyState(true);
       OVERVIEW_METRIC_IDS.forEach(id => setMetricText('val-' + id, 'N/A', ''));
       ['ytd-new', 'ytd-orders', 'ytd-sales', 'ytd-aov', 'ytd-sph', 'ytd-repeat', 'ytd-repeat-rate'].forEach(id => updateChangeUI('mom-' + id, null, null));
-      Object.values(charts).forEach(c => { if(c && c.data) { c.data.labels = []; c.update(); } });
     }
 
     // ==========================================
@@ -2056,7 +2077,6 @@
       // ที่กรองอยู่ด้วย) ห้ามย้อนไปโชว์ยอดของเดือนก่อนหน้าแทน ไม่งั้นจะดูเหมือนมีข้อมูลทั้งที่เดือนที่เลือกจริงๆ ไม่มี
       if (filters.Month !== 'All' && !monthlyData[filters.Month]) { renderEmpty(); return; }
       const selectedMonthStr = filters.Month !== 'All' ? filters.Month : availableMonths[availableMonths.length - 1];
-      const idx = availableMonths.indexOf(selectedMonthStr);
       const curr = monthlyData[selectedMonthStr];
       const currYear = curr.year;
       // เลือก Month = การ์ดสรุปแสดงเฉพาะเดือนนั้นเดือนเดียว (เช่น 2022-11 = ออเดอร์ของเดือน พ.ย. 2022 เท่านั้น)
@@ -2154,49 +2174,7 @@
         }
       });
 
-      // --- ชุดโค้ดการจัดการโครงสร้างและข้อมูลของกราฟทำงานปกติ 100% ---
-      const trendMonths = availableMonths.slice(0, idx + 1).slice(-12);
-      const salesData = trendMonths.map(m => monthlyData[m].sales);
-      const ordersArr = trendMonths.map(m => monthlyData[m].orders);
-      const aovArr = trendMonths.map(m => monthlyData[m].metrics.aov || 0);
-      const sphArr = trendMonths.map(m => monthlyData[m].metrics.spendingPerHead || 0);
-      const freqArr = trendMonths.map(m => monthlyData[m].metrics.ordersPerCustomer || 0);
-      const buyersArr = trendMonths.map(m => monthlyData[m].buyers.size);
-      const newCustArr = [], retCustArr = [];
-
-      trendMonths.forEach(m => {
-        let n = 0, r = 0;
-        monthlyData[m].buyers.forEach(id => {
-          if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === m) n++; else r++;
-        });
-        newCustArr.push(n); retCustArr.push(r);
-      });
-
-      // ลูกค้าสะสม (All Customer) ต้องนับสะสมจากประวัติทั้งหมดของ Dataset ที่กรองอยู่ ไม่ใช่แค่หน้าต่าง 12
-      // เดือนที่แสดงในกราฟ - ถ้านับแค่ในหน้าต่างจะทำให้เดือนแรกๆ ของกราฟดูเหมือนมีลูกค้าน้อยกว่าความเป็นจริง
-      let cumulativeAll = 0;
-      const cumulativeByMonth = {};
-      availableMonths.forEach(m => {
-        let n = 0;
-        monthlyData[m].buyers.forEach(id => {
-          if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === m) n++;
-        });
-        cumulativeAll += n;
-        cumulativeByMonth[m] = cumulativeAll;
-      });
-      const allCustArr = trendMonths.map(m => cumulativeByMonth[m]);
-
-      const activePctArr = trendMonths.map((m, i) => allCustArr[i] > 0 ? (buyersArr[i] / allCustArr[i]) * 100 : 0);
-      const newSharePctArr = trendMonths.map((m, i) => buyersArr[i] > 0 ? (newCustArr[i] / buyersArr[i]) * 100 : 0);
-      const oldSharePctArr = trendMonths.map((m, i) => buyersArr[i] > 0 ? 100 - newSharePctArr[i] : 0);
-
-      trendCache = {
-        months: trendMonths, sales: salesData, orders: ordersArr, aov: aovArr, sph: sphArr,
-        frequency: freqArr, allCustomer: allCustArr, buyers: buyersArr, newCust: newCustArr, retCust: retCustArr,
-        activePct: activePctArr, newSharePct: newSharePctArr, oldSharePct: oldSharePctArr
-      };
-      renderTrendCharts();
-
+      // (กราฟด้านล่างทั้งหมดถูก build ไปแล้วที่ต้นฟังก์ชัน processData() - ไม่ยึด Year/Month ของ Filter บนสุด)
       const channelColors = { 'Facebook': '#1877f2', 'Line': '#06c755', 'Instagram': '#1e40af', 'CRM': '#d95f1d', 'Other': '#9ca3af', 'Tiktok': '#ff0050', 'Shopee': '#ff5722', 'Lazada': '#1a1446', 'Call': '#71717a' };
       const channels = Object.keys(curr.channels).sort((a,b) => curr.channels[b] - curr.channels[a]).slice(0,5);
       if(charts.channel) {
@@ -2372,15 +2350,125 @@
       if (charts.retNew) charts.retNew.update();
     }
 
-    // วาดกราฟเทรนด์ทั้งหมดของ Overview ใหม่จาก trendCache ตามโหมด Year/Month ที่เลือกอยู่ - โหมด Year
-    // แสดงย้อนหลัง 12 เดือนเหมือนเดิม ส่วนโหมด Month ตัดให้เหลือแท่ง/จุดเดียวของเดือนที่เลือกอยู่ (จุดสุดท้ายของ
-    // trendMonths เสมอ เพราะ trendMonths คำนวณจาก selectedMonthStr อยู่แล้ว)
+    // สร้างชุดข้อมูลของ "กราฟด้านล่าง" ใหม่ทั้งหมด (เรียกทุกครั้งที่ Filter บน Group/Channel/SubChannel/
+    // Product/Sub Product/Admin เปลี่ยน) - จงใจบังคับ Year/Month เป็น 'All' เสมอ เพราะกราฟกลุ่มนี้ไม่ยึด
+    // Year/Month ของ Filter บนสุดอีกต่อไป (คุมด้วยปุ่ม Year/Month ของกราฟเองแทน)
+    function buildChartData() {
+      const rows = computeFilteredData(Object.assign({}, filters, { Year: 'All', Month: 'All' }));
+      chartMonthlyData = {};
+      rows.forEach(row => {
+        const dateStr = window.getRowDateStr(row);
+        if (!dateStr) return;
+        const d = parseDate(dateStr);
+        if (!d) return;
+        const mStr = d.str;
+        if (!chartMonthlyData[mStr]) chartMonthlyData[mStr] = { year: d.y, rows: [] };
+        chartMonthlyData[mStr].rows.push(row);
+      });
+      Object.keys(chartMonthlyData).forEach(ms => {
+        const m = chartMonthlyData[ms];
+        const M = calculateMetrics(m.rows);
+        m.metrics = M; m.sales = M.totalSales; m.orders = M.totalOrders;
+        m.buyers = new Set(M.customerOrders.keys());
+      });
+      chartAvailableMonths = Object.keys(chartMonthlyData).sort();
+
+      chartYearlyData = {};
+      chartAvailableMonths.forEach(ms => {
+        const m = chartMonthlyData[ms];
+        const y = String(m.year);
+        if (!chartYearlyData[y]) chartYearlyData[y] = { rows: [] };
+        const yRows = chartYearlyData[y].rows;
+        for (let i = 0; i < m.rows.length; i++) yRows.push(m.rows[i]);
+      });
+      chartAvailableYears = Object.keys(chartYearlyData).sort();
+      chartAvailableYears.forEach(y => {
+        const Y = chartYearlyData[y];
+        const M = calculateMetrics(Y.rows);
+        Y.metrics = M; Y.sales = M.totalSales; Y.orders = M.totalOrders;
+        Y.buyers = new Set(M.customerOrders.keys());
+      });
+
+      // ลูกค้าสะสม (All Customer) สะสมจริงจากเดือนแรกสุดในประวัติของ Dataset ที่กรองอยู่ - ใช้ฐานเดียวกันทั้งโหมด
+      // Year (เอาค่า ณ เดือนสุดท้ายของปีนั้น) และโหมด Month (เอาค่า ณ เดือนนั้นตรงๆ) ไม่ให้ตัวเลขขัดแย้งกันเอง
+      let cum = 0;
+      cumulativeAllByMonth = {};
+      chartAvailableMonths.forEach(m => {
+        let n = 0;
+        chartMonthlyData[m].buyers.forEach(id => {
+          if (globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === m) n++;
+        });
+        cum += n;
+        cumulativeAllByMonth[m] = cum;
+      });
+
+      if (!chartViewYear || chartAvailableYears.indexOf(chartViewYear) === -1) {
+        chartViewYear = chartAvailableYears.length ? chartAvailableYears[chartAvailableYears.length - 1] : null;
+      }
+      populateChartYearSelect();
+    }
+    function lastMonthOfYear(y) {
+      let last = null;
+      chartAvailableMonths.forEach(m => { if (m.indexOf(y + '-') === 0) last = m; });
+      return last;
+    }
+    function populateChartYearSelect() {
+      const sel = document.getElementById('chart-view-year-select');
+      if (!sel) return;
+      sel.innerHTML = chartAvailableYears.map(y => `<option value="${y}">${y}</option>`).join('');
+      sel.value = chartViewYear || '';
+    }
+    // คำนวณชุดเมตริกเทรนด์ทั้ง 12 ตัวจากรายการ bucket ที่ให้มา (เดือน หรือ ปี ก็ได้) - ใช้ร่วมกันทั้งโหมด
+    // Year และ Month เพื่อไม่ให้สูตรคำนวณแต่ละเมตริกเพี้ยนไปคนละแบบระหว่าง 2 โหมด
+    function buildTrendSeries(labels, bucketFor, isFirstPurchaseInBucket, allCustomerFor) {
+      const sales = [], orders = [], aov = [], sph = [], frequency = [], buyers = [], newCust = [], retCust = [], allCustomer = [];
+      labels.forEach((key) => {
+        const b = bucketFor(key);
+        sales.push(b.sales); orders.push(b.orders);
+        aov.push((b.metrics && b.metrics.aov) || 0);
+        sph.push((b.metrics && b.metrics.spendingPerHead) || 0);
+        frequency.push((b.metrics && b.metrics.ordersPerCustomer) || 0);
+        buyers.push(b.buyers.size);
+        let n = 0, r = 0;
+        b.buyers.forEach(id => { if (isFirstPurchaseInBucket(id, key)) n++; else r++; });
+        newCust.push(n); retCust.push(r);
+        allCustomer.push(allCustomerFor(key));
+      });
+      const activePct = labels.map((_, i) => allCustomer[i] > 0 ? (buyers[i] / allCustomer[i]) * 100 : 0);
+      const newSharePct = labels.map((_, i) => buyers[i] > 0 ? (newCust[i] / buyers[i]) * 100 : 0);
+      const oldSharePct = labels.map((_, i) => buyers[i] > 0 ? 100 - newSharePct[i] : 0);
+      return { months: labels, sales, orders, aov, sph, frequency, allCustomer, buyers, newCust, retCust, activePct, newSharePct, oldSharePct };
+    }
+    // สร้าง trendCache ใหม่ตามโหมด Year/Month ที่เลือกอยู่ - Year: 1 จุดต่อ 1 ปีที่มีข้อมูลจริง (ไม่เติมปีว่าง),
+    // Month: 1 จุดต่อ 1 เดือนที่มีข้อมูลจริงของปีที่เลือกใน dropdown เท่านั้น (ไม่เติมเดือนว่าง)
+    function buildTrendCache() {
+      if (chartViewMode === 'year') {
+        trendCache = buildTrendSeries(
+          chartAvailableYears,
+          (y) => chartYearlyData[y],
+          (id, y) => globalFirstPurchase[id] && globalFirstPurchase[id].year === Number(y),
+          (y) => { const lm = lastMonthOfYear(y); return lm ? (cumulativeAllByMonth[lm] || 0) : 0; }
+        );
+      } else {
+        const monthsOfYear = chartViewYear ? chartAvailableMonths.filter(m => m.indexOf(chartViewYear + '-') === 0) : [];
+        trendCache = buildTrendSeries(
+          monthsOfYear,
+          (m) => chartMonthlyData[m],
+          (id, m) => globalFirstPurchase[id] && globalFirstPurchase[id].monthStr === m,
+          (m) => cumulativeAllByMonth[m] || 0
+        );
+      }
+      renderTrendCharts();
+    }
+    // วาดกราฟเทรนด์ทั้งหมดของ Overview ใหม่จาก trendCache ตรงๆ (ไม่ตัด array อีกต่อไป เพราะ buildTrendCache()
+    // คำนวณจุดข้อมูลที่ถูกต้องตามโหมด Year/Month มาให้แล้ว) - โหมด Month ใช้ label เป็นชื่อเดือนย่อแทน YYYY-MM
+    // เพราะปีถูกเลือกผ่าน dropdown แยกอยู่แล้ว ไม่ต้องย้ำซ้ำบนแกน X
     function renderTrendCharts() {
       if (!trendCache) return;
-      const isMonth = chartViewMode === 'month';
-      const vs = (arr) => isMonth ? arr.slice(-1) : arr;
-      const labels = vs(trendCache.months);
-      const setChart = (chart, arr) => { if (!chart) return; chart.data.labels = labels; chart.data.datasets[0].data = vs(arr); chart.update(); };
+      const labels = chartViewMode === 'month'
+        ? trendCache.months.map(m => MONTH_SHORT_TH[Number(m.slice(5, 7)) - 1])
+        : trendCache.months;
+      const setChart = (chart, arr) => { if (!chart) return; chart.data.labels = labels; chart.data.datasets[0].data = arr; chart.update(); };
 
       setChart(charts.sales, trendCache.sales);
       setChart(charts.orders, trendCache.orders);
@@ -2395,13 +2483,13 @@
       setChart(charts.newSharePct, trendCache.newSharePct);
       setChart(charts.oldSharePct, trendCache.oldSharePct);
 
-      // Badge % MoM อ้างอิงจากเทรนด์เต็ม 12 เดือนเสมอ (เทียบเดือนล่าสุดกับเดือนก่อนหน้า) ไม่ผูกกับโหมด
-      // Year/Month ของกราฟ เพราะเป็นค่าเปรียบเทียบ ไม่ใช่ข้อมูลที่กราฟกำลังแสดงอยู่
+      // Badge % เทียบจุดล่าสุดกับจุดก่อนหน้าของกราฟที่กำลังแสดงอยู่ (เดือนก่อนหน้า ถ้าอยู่โหมด Month, ปีก่อนหน้า
+      // ถ้าอยู่โหมด Year) - อิงตามสิ่งที่กราฟกำลังแสดงจริง ไม่ใช่ค่าคงที่ตายตัวแบบเดิม
       updateMomBadge('mom-badge-new', trendCache.newCust);
       updateMomBadge('mom-badge-ret', trendCache.retCust);
 
-      retNewRetainedRaw = vs(trendCache.retCust);
-      retNewNewRaw = vs(trendCache.newCust);
+      retNewRetainedRaw = trendCache.retCust;
+      retNewNewRaw = trendCache.newCust;
       if (charts.retNew) { charts.retNew.data.labels = labels; applyRetNewProportionMode(); charts.retNew.update(); }
     }
     function setChartViewMode(mode) {
@@ -2409,9 +2497,28 @@
       const yearBtn = document.getElementById('view-mode-year'), monthBtn = document.getElementById('view-mode-month');
       if (yearBtn) yearBtn.classList.toggle('active', mode === 'year');
       if (monthBtn) monthBtn.classList.toggle('active', mode === 'month');
-      renderTrendCharts();
+      const yearSelect = document.getElementById('chart-view-year-select');
+      if (yearSelect) yearSelect.style.display = mode === 'month' ? '' : 'none';
+      buildTrendCache();
+    }
+    function setChartViewYear(y) {
+      chartViewYear = y;
+      buildTrendCache();
     }
 
+    // ตัวเลขราคาบนกราฟ (เช่น ฿227,825) ย่อเป็น K/M/B เมื่อหลักใหญ่ ไม่ให้ตัวเลขยาวจนชนกันบนแท่ง/จุดกราฟ -
+    // Tooltip ตอน hover ยังคงโชว์ค่าเต็มตามปกติ (ไม่ได้แตะ Tooltip) ย่อแค่ label ที่พิมพ์ลงบนกราฟเท่านั้น
+    function formatCompactCurrency(val) {
+      const n = Number(val) || 0;
+      const sign = n < 0 ? '-' : '';
+      const abs = Math.abs(n);
+      let out;
+      if (abs >= 1e9) out = (abs / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
+      else if (abs >= 1e6) out = (abs / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+      else if (abs >= 1e3) out = (abs / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+      else out = abs.toLocaleString('th-TH');
+      return '฿' + sign + out;
+    }
     const datalabelsPlugin = {
       id: 'datalabels',
       afterDatasetsDraw(chart, args, options) {
@@ -2425,7 +2532,7 @@
             const isSales = chart.canvas.id === 'chart-sales' || chart.canvas.id === 'chart-admin' || chart.canvas.id === 'chart-channel' || chart.canvas.id === 'chart-aov' || chart.canvas.id === 'chart-sph';
             const isFrequency = chart.canvas.id === 'chart-frequency';
             const isRetNewProportion = chart.canvas.id === 'chart-ret-new-stacked' && retNewProportionMode;
-            let displayVal = isRetNewProportion ? Math.round(val) + '%' : isFrequency ? Number(val).toFixed(2) : isSales ? '฿' + val.toLocaleString('th-TH', {minimumFractionDigits: 0, maximumFractionDigits: 0}) : val.toLocaleString('th-TH');
+            let displayVal = isRetNewProportion ? Math.round(val) + '%' : isFrequency ? Number(val).toFixed(2) : isSales ? formatCompactCurrency(val) : val.toLocaleString('th-TH');
             let x = bar.x, y = bar.y; ctx.fillStyle = '#ffffff'; 
             if (chart.config.type === 'doughnut') {
               const arc = bar; const centerAngle = arc.startAngle + (arc.endAngle - arc.startAngle) / 2; const rangeFromCenter = arc.innerRadius + (arc.outerRadius - arc.innerRadius) / 2;
@@ -2451,12 +2558,15 @@
       Chart.defaults.font.family = 'Inter'; Chart.defaults.color = '#777';
       const commonOpts = { maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } }, layout: { padding: { top: 25, bottom: 15, left: 20, right: 20 } } };
       const barOpts = () => ({ ...commonOpts, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f5f5f5' } } } });
-      charts.sales = new Chart(document.getElementById('chart-sales'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
-      charts.orders = new Chart(document.getElementById('chart-orders'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#0ea5e9', borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
-      charts.aov = new Chart(document.getElementById('chart-aov'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#f59e0b', borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
-      charts.sph = new Chart(document.getElementById('chart-sph'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#006E99', borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
-      charts.frequency = new Chart(document.getElementById('chart-frequency'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#14b8a6', borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
-      charts.retNew = new Chart(document.getElementById('chart-ret-new-stacked'), { type: 'bar', data: { labels: [], datasets: [{ label: 'Retained', data: [], backgroundColor: '#006E99' }, { label: 'New', data: [], backgroundColor: '#d95f1d' }] }, options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } }, tooltip: { callbacks: { label: (item) => `${item.dataset.label}: ${retNewProportionMode ? Math.round(item.parsed.y) + '%' : Number(item.parsed.y).toLocaleString('th-TH') + ' คน'}` } } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
+      // ธีมสีกราฟ "ด้านล่าง" ทั้งหมด (ยกเว้น Channel โดนัท กับ Admin ที่ยังคงสีเดิมไว้แยกหมวดหมู่ได้) ใช้แค่ 2 สี
+      // สลับกันตามลำดับกราฟในหน้า: กรมท่า (#1e293b) / แดง (#dc3545)
+      const THEME_A = '#1e293b', THEME_B = '#dc3545';
+      charts.sales = new Chart(document.getElementById('chart-sales'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: THEME_A, borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
+      charts.orders = new Chart(document.getElementById('chart-orders'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: THEME_B, borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
+      charts.aov = new Chart(document.getElementById('chart-aov'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: THEME_A, borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
+      charts.sph = new Chart(document.getElementById('chart-sph'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: THEME_B, borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
+      charts.frequency = new Chart(document.getElementById('chart-frequency'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: THEME_A, borderRadius: 6 }] }, options: barOpts(), plugins: [datalabelsPlugin] });
+      charts.retNew = new Chart(document.getElementById('chart-ret-new-stacked'), { type: 'bar', data: { labels: [], datasets: [{ label: 'Retained', data: [], backgroundColor: THEME_A }, { label: 'New', data: [], backgroundColor: THEME_B }] }, options: { ...commonOpts, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } }, tooltip: { callbacks: { label: (item) => `${item.dataset.label}: ${retNewProportionMode ? Math.round(item.parsed.y) + '%' : Number(item.parsed.y).toLocaleString('th-TH') + ' คน'}` } } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, grid: { color: '#f5f5f5' } } } }, plugins: [datalabelsPlugin] });
       const lineOpts = (tooltipFmt) => ({
         ...commonOpts,
         layout: { padding: { top: 34, bottom: 15, left: 20, right: 50 } },
@@ -2477,18 +2587,18 @@
       });
       const fmtPeopleTooltip = (v) => Number(v).toLocaleString('th-TH') + ' คน';
       const fmtPercentTooltip = (v) => Number(v).toFixed(1) + '%';
-      charts.allCustomer = new Chart(document.getElementById('chart-allcustomer'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#475569', backgroundColor: lineAreaGradient('#475569'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#475569', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPeopleTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin] });
-      charts.buyers = new Chart(document.getElementById('chart-buyers'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#059669', backgroundColor: lineAreaGradient('#059669'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#059669', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPeopleTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin] });
-      charts.activePct = new Chart(document.getElementById('chart-activepct'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#f59e0b', backgroundColor: lineAreaGradient('#f59e0b'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#f59e0b', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPercentTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin] });
-      charts.newCust = new Chart(document.getElementById('chart-new'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#e86c31', backgroundColor: lineAreaGradient('#e86c31'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#e86c31', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPeopleTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin, pctChangeLabelPlugin] });
-      charts.retCust = new Chart(document.getElementById('chart-ret'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#006E99', backgroundColor: lineAreaGradient('#006E99'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#006E99', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPeopleTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin, pctChangeLabelPlugin] });
-      charts.newSharePct = new Chart(document.getElementById('chart-newshare'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#e86c31', backgroundColor: lineAreaGradient('#e86c31'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#e86c31', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPercentTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin] });
-      charts.oldSharePct = new Chart(document.getElementById('chart-oldshare'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#006E99', backgroundColor: lineAreaGradient('#006E99'), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#006E99', pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPercentTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin] });
+      charts.allCustomer = new Chart(document.getElementById('chart-allcustomer'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: THEME_B, backgroundColor: lineAreaGradient(THEME_B), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: THEME_B, pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPeopleTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin] });
+      charts.buyers = new Chart(document.getElementById('chart-buyers'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: THEME_A, backgroundColor: lineAreaGradient(THEME_A), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: THEME_A, pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPeopleTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin] });
+      charts.activePct = new Chart(document.getElementById('chart-activepct'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: THEME_B, backgroundColor: lineAreaGradient(THEME_B), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: THEME_B, pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPercentTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin] });
+      charts.newCust = new Chart(document.getElementById('chart-new'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: THEME_A, backgroundColor: lineAreaGradient(THEME_A), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: THEME_A, pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPeopleTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin, pctChangeLabelPlugin] });
+      charts.retCust = new Chart(document.getElementById('chart-ret'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: THEME_B, backgroundColor: lineAreaGradient(THEME_B), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: THEME_B, pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPeopleTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin, pctChangeLabelPlugin] });
+      charts.newSharePct = new Chart(document.getElementById('chart-newshare'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: THEME_A, backgroundColor: lineAreaGradient(THEME_A), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: THEME_A, pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPercentTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin] });
+      charts.oldSharePct = new Chart(document.getElementById('chart-oldshare'), { type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: THEME_B, backgroundColor: lineAreaGradient(THEME_B), fill: true, tension: 0.35, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: THEME_B, pointBorderColor: '#fff', pointBorderWidth: 2, pointHitRadius: 12 }] }, options: lineOpts(fmtPercentTooltip), plugins: [crosshairPlugin, lineEndLabelPlugin] });
       charts.channel = new Chart(document.getElementById('chart-channel'), { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: ['#d95f1d', '#73d18e', '#006E99', '#ccc', '#888'] }] }, options: { ...commonOpts, plugins: { legend: { display: true, position: 'right', labels: { boxWidth: 12 } } } }, plugins: [datalabelsPlugin] });
       charts.admin = new Chart(document.getElementById('chart-admin'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: '#d95f1d', borderRadius: 6 }] }, options: { ...commonOpts, indexAxis: 'y', scales: { x: { beginAtZero: true, grid: { color: '#f5f5f5' } }, y: { grid: { display: false } } } }, plugins: [datalabelsPlugin] });
     }
 
-    window.switchTab = switchTab; window.applyFilters = applyFilters; window.setFilter = setFilter; window.clearFilters = clearFilters; window.toggleFilter = toggleFilter; window.toggleChartPctChange = toggleChartPctChange; window.toggleRetNewProportion = toggleRetNewProportion; window.setChartViewMode = setChartViewMode;
+    window.switchTab = switchTab; window.applyFilters = applyFilters; window.setFilter = setFilter; window.clearFilters = clearFilters; window.toggleFilter = toggleFilter; window.toggleChartPctChange = toggleChartPctChange; window.toggleRetNewProportion = toggleRetNewProportion; window.setChartViewMode = setChartViewMode; window.setChartViewYear = setChartViewYear;
   </script>
   <script src="cohort.js?v=13"></script>
   <script src="executive.js?v=20"></script>
