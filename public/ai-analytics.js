@@ -24,7 +24,7 @@ function renderAiAnalytics(filteredData, rawData) {
       .ai-section-title { font-size: 20px; font-weight: 700; color: #1e293b; margin: 0 0 4px; }
       .ai-section-sub { font-size: 12.5px; color: #94a3b8; margin: 0 0 20px; }
 
-      .ai-kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 22px; }
+      .ai-kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 22px; }
       .ai-kpi-card { background: #fff; border: 1px solid #eee0d5; border-radius: 14px; padding: 16px 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
       .ai-kpi-label { font-size: 12px; color: #94a3b8; margin-bottom: 8px; }
       .ai-kpi-value { font-size: 21px; font-weight: 800; color: #1e293b; margin-bottom: 4px; }
@@ -204,7 +204,7 @@ function renderAiAnalytics(filteredData, rawData) {
   const prev7Start = shiftDate(latestKey, -13);
 
   // ==================================================================================
-  // 2) ตัวเลขภาพรวม (การ์ดบนสุด 5 ใบ)
+  // 2) ตัวเลขภาพรวม (การ์ดบนสุด 4 ใบ)
   // ==================================================================================
   const mtdM = sumForMonth(currentMonthStr, daysElapsed, null);
   const prevSameM = sumForMonth(prevMonthStr, daysElapsed, null);
@@ -236,11 +236,6 @@ function renderAiAnalytics(filteredData, rawData) {
         <div class="ai-kpi-label">เทียบค่าเฉลี่ย ${avg3 ? avg3.monthsUsed : 3} เดือนก่อน</div>
         <div class="ai-kpi-change">${arrowPct(vs3mo)}</div>
         <div class="ai-kpi-sub">${avg3 ? `ค่าเฉลี่ยช่วงเดียวกัน ${fmtMoney(avg3.avg)}` : 'ยังไม่มีข้อมูลเดือนก่อนหน้าพอเทียบ'}</div>
-      </div>
-      <div class="ai-kpi-card">
-        <div class="ai-kpi-label">คาดการณ์สิ้นเดือน</div>
-        <div class="ai-kpi-value">${fmtMoney(forecast)}</div>
-        <div class="ai-kpi-sub">${forecastVsPrevFull !== null ? `${fmtPct(forecastVsPrevFull)} เทียบ ${monthLabelShort(prevMonthStr)} ทั้งเดือน (${fmtMoney(prevFullM.totalSales)})` : `เทียบ ${monthLabelShort(prevMonthStr)} ทั้งเดือนยังไม่ได้ (ไม่มีข้อมูล)`}</div>
       </div>
       <div class="ai-kpi-card">
         <div class="ai-kpi-label">7 วันล่าสุด</div>
