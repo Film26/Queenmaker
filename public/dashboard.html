@@ -155,7 +155,7 @@
 
         <div class="user-actions" style="justify-self: end; display: flex; gap: 15px; align-items: center;">
           <button id="importBtn" class="btn" style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-            <i class="fas fa-file-import"></i> Import Data
+            <i class="fas fa-file-import"></i> <span id="importBtnLabel">Import Data</span>
           </button>
           <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display: none;">
           <button id="exportBtn" class="btn" onclick="exportCurrentView()" style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 8px;">
@@ -468,6 +468,10 @@
     // --- โครงสร้างตัวแปรหลักดั้งเดิม ---
     let rawData = [];
     let filteredData = [];
+    // ชุดข้อมูลแยกต่างหากสำหรับหน้า Retention โดยเฉพาะ (ดูปุ่ม Import - ใช้ปุ่ม/ตำแหน่งเดิม แต่ตอนอยู่แท็บ
+    // Retention จะนำเข้าเข้าชุดนี้แทน ไม่แตะ rawData หลัก) กด Import ซ้ำจะ "เพิ่มต่อ" (merge+dedupe) ไม่ใช่แทนที่
+    // - ดู ingestRetentionRows ทุกแท็บอื่นยังคงใช้ rawData เดิมเหมือนก่อนมีฟีเจอร์นี้ทุกประการ
+    let retentionRawData = [];
 
     // คอยเก็บสถานะ Filter โดยเพิ่ม 'KPI' เข้ามา (ตั้งค่าเริ่มต้นเป็น Off)
     let filters = { Group: 'All', Month: 'All', Year: 'All', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All', KPI: 'Off' };
@@ -776,6 +780,29 @@
       }
     }
 
+    // นำเข้าไฟล์เข้า retentionRawData (ชุดข้อมูลเฉพาะหน้า Retention) แทน rawData หลัก - ใช้ปุ่ม Import ปุ่มเดิม
+    // ตำแหน่งเดิม แค่สลับปลายทางตามแท็บที่เปิดอยู่ตอนกด (ดู fileInput change handler) ต่างจาก ingestRows ตรงที่
+    // กด Import ซ้ำจะ "เพิ่มต่อ" (merge) ไม่ใช่แทนที่ทั้งหมด - ตัดแถวที่ซ้ำกับของเดิมทิ้ง (เทียบทุกคอลัมน์/ค่าทุกตัว
+    // ของแถว) กันข้อมูลซ้ำซ้อนเวลา import ไฟล์ที่มีช่วงวันที่ทับกับของเก่า
+    function ingestRetentionRows(rows) {
+      try {
+        const cleaned = (rows || []).filter(row => row && Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== ''));
+        const sig = (row) => Object.keys(row).sort().map(k => k + '=' + row[k]).join('|');
+        const existing = new Set(retentionRawData.map(sig));
+        let added = 0;
+        cleaned.forEach(row => {
+          const s = sig(row);
+          if (!existing.has(s)) { existing.add(s); retentionRawData.push(row); added++; }
+        });
+        scopedRetentionCache = { src: null, group: null, data: null };
+        refreshRetentionView();
+        alert('นำเข้าข้อมูลสำหรับ Retention สำเร็จ: เพิ่ม ' + added.toLocaleString() + ' แถวใหม่ (ข้ามซ้ำ ' + (cleaned.length - added).toLocaleString() + ' แถว) รวมทั้งหมด ' + retentionRawData.length.toLocaleString() + ' แถว');
+      } catch (err) {
+        console.error(err);
+        alert('เกิดข้อผิดพลาดในการประมวลผลข้อมูล Retention');
+      }
+    }
+
     // --- อ่านไฟล์ Excel (.xlsx/.xls) เป็นแถวข้อมูลหน้าตาเดียวกับที่ PapaParse ให้ (หัวคอลัมน์ = key, ค่าเป็นข้อความ) ---
     // - ชีตที่เลือก: ชีตที่แถวหัวมีทั้งคอลัมน์ยอดขายและวันที่ (ถ้ามีหลายชีตเลือกชีตที่มีแถวมากที่สุด) ไม่มีเลยใช้ชีตแรก
     // - เซลล์วันที่ (รูปแบบวันที่ใน Excel) แปลงเป็นข้อความ วัน/เดือน/ปี ตรงๆ จากเลขวันที่ ไม่ผ่านรูปแบบแสดงผลของเครื่อง
@@ -860,6 +887,9 @@
           const file = e.target.files[0];
           if (!file) return;
           const ext = (file.name.split('.').pop() || '').toLowerCase();
+          // ปุ่ม Import ปุ่มเดียว ตำแหน่งเดิม - แต่ถ้ากดตอนอยู่แท็บ Retention ไฟล์ที่เลือกจะเข้า retentionRawData
+          // (merge) แทน ไม่แตะ rawData หลัก ส่วนทุกแท็บอื่นทำงานเหมือนเดิมทุกประการ
+          const ingest = window.currentTabId === 'retention' ? ingestRetentionRows : ingestRows;
           showLoading(true);
           if (ext === 'xlsx' || ext === 'xls') {
             const reader = new FileReader();
@@ -868,7 +898,7 @@
               // ให้ overlay "กำลังโหลด" แสดงก่อนเริ่มงานหนัก (อ่านไฟล์ Excel ขนาดใหญ่ใช้เวลาหลายวินาที)
               setTimeout(() => {
                 try {
-                  ingestRows(readExcelRows(reader.result));
+                  ingest(readExcelRows(reader.result));
                 } catch (err) {
                   console.error(err);
                   alert('อ่านไฟล์ Excel ไม่สำเร็จ: ' + (err && err.message ? err.message : err));
@@ -883,7 +913,7 @@
               header: true,
               skipEmptyLines: true,
               complete: (results) => {
-                try { ingestRows(results.data); }
+                try { ingest(results.data); }
                 catch (err) { console.error(err); alert('เกิดข้อผิดพลาดในการประมวลผลข้อมูล'); }
                 finally { showLoading(false); }
               },
@@ -909,6 +939,10 @@
     // --- Navigation & UI Control ---
     function switchTab(tabId) {
       window.currentTabId = tabId;
+      // ปุ่ม Import ปุ่มเดียวกัน แค่เปลี่ยนป้ายให้รู้ว่ากำลังจะนำเข้าเข้าชุดข้อมูลไหน (ดู fileInput change handler
+      // ด้านบนที่สลับปลายทางจริงตาม window.currentTabId)
+      const importBtnLabel = document.getElementById('importBtnLabel');
+      if (importBtnLabel) importBtnLabel.textContent = tabId === 'retention' ? 'Import Data for Retention' : 'Import Data';
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.view-content').forEach(view => view.style.display = 'none');
       document.getElementById('view-overview').style.display = 'none';
@@ -1009,7 +1043,7 @@
         } else if (tabId === 'retention') {
           document.getElementById('tab-retention').classList.add('active');
           document.getElementById('view-retention').style.display = 'block';
-          if (typeof renderRetention === 'function') { renderRetention(filteredData, getScopedRawData()); }
+          refreshRetentionView();
         }
       }
     }
@@ -1519,6 +1553,28 @@
       }
       return scopedRawCache.data;
     }
+    // เหมือน getScopedRawData() ข้างบนทุกประการ แค่ใช้กับ retentionRawData (ชุดข้อมูลเฉพาะหน้า Retention) แทน
+    let scopedRetentionCache = { src: null, group: null, data: null };
+    function getScopedRetentionRawData() {
+      const g = filters.Group;
+      if (!g || g === 'All') return retentionRawData;
+      if (scopedRetentionCache.src !== retentionRawData || scopedRetentionCache.group !== g) {
+        scopedRetentionCache = { src: retentionRawData, group: g, data: retentionRawData.filter(r => getNormalizedGroup(r) === g) };
+      }
+      return scopedRetentionCache.data;
+    }
+    // Retention ใช้ Filter บนสุดกรองข้อมูลของตัวเองเหมือนทุกแท็บ แต่กรองกับ retentionRawData (ถ้าเคย Import ผ่าน
+    // ปุ่ม Import ตอนอยู่แท็บ Retention แล้ว) ไม่ใช่ rawData หลัก - ยังไม่เคย Import เฉพาะหน้านี้เลยก็ fallback
+    // ไปใช้ rawData หลักแทน (พฤติกรรมเดิมก่อนมีฟีเจอร์นี้) กันไม่ให้หน้า Retention ว่างเปล่าไปเฉยๆ
+    function refreshRetentionView() {
+      if (typeof renderRetention !== 'function') return;
+      const source = retentionRawData.length > 0 ? getScopedRetentionRawData() : getScopedRawData();
+      renderRetention(computeFilteredData(filters, source), source);
+    }
+    // retention.js เรียกตัวนี้ตอนต้องการข้อมูลดิบแบบ "ไม่ผ่านการกรอง Group" เลย (เช่น มุมมอง Migration ที่ต้อง
+    // ignoreGroup) - ต่างจาก getScopedRetentionRawData()/getScopedRawData() ที่กรอง Group ไว้แล้ว ต้องแยก
+    // ฟังก์ชันเพราะ renderRetention(filteredData, rawData) พารามิเตอร์ rawData ที่ส่งเข้าไปถูกกรอง Group มาแล้ว
+    window.getRetentionFullRawData = function () { return retentionRawData.length > 0 ? retentionRawData : rawData; };
 
     function getGroupOptionList() {
       const values = new Set();
@@ -1913,8 +1969,10 @@
     // ซึ่งแต่ละหน้าจัดการเป็น cutoff ของตัวเองต่างหาก) แยกออกมาเป็นฟังก์ชันกลาง เพื่อให้ทั้ง Filter บนสุด (ใช้ตัวแปร
     // filters ของหน้า Overview/Cohort/Migration/Retention) และ Filter แยกของหน้า Executive (ใช้ execFilters
     // คนละชุดกัน ไม่ยุ่งกัน) เรียกใช้ตรรกะเดียวกันได้โดยไม่ต้องเขียนซ้ำ
-    function computeFilteredData(sourceFilters) {
-      return rawData.filter(row => {
+    // dataSource: เดิมใช้ rawData หลักเสมอ - เพิ่มพารามิเตอร์ (optional) ให้สลับไปกรอง retentionRawData แทนได้
+    // (ดู refreshRetentionView) ไม่กระทบจุดเรียกเดิมที่ไม่ส่ง dataSource มา ยังเป็น rawData หลักเหมือนเดิมทุกจุด
+    function computeFilteredData(sourceFilters, dataSource) {
+      return (dataSource || rawData).filter(row => {
         if (!isSaleOrder(row)) return false;
         const dateStr = window.getRowDateStr(row);
         if (!dateStr) return false;
@@ -1965,7 +2023,7 @@
       // InsightHub deliberately NOT re-rendered here - it has its own data source (see
       // loadInsightHubDataFromAppsScript/window.refreshInsightHub above), unrelated to this
       // CSV-driven filters/rawData pipeline.
-      try { if (document.getElementById('view-retention').style.display === 'block' && typeof renderRetention === 'function') { renderRetention(filteredData, getScopedRawData()); } } catch(e) { console.error(e); }
+      try { if (document.getElementById('view-retention').style.display === 'block') { refreshRetentionView(); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-ai-analytics').style.display === 'block' && typeof renderAiAnalytics === 'function') { renderAiAnalytics(filteredData, getScopedRawData()); } } catch(e) { console.error(e); }
       // หน้า Executive ใช้ execFilters แยกต่างหาก ไม่ได้อยู่ในลูป filteredData ด้านบน - ถ้าไม่เรียกตรงนี้ด้วย
       // การ Import Data/Load Sample ใหม่ตอนที่ค้างอยู่หน้า Executive อยู่แล้ว จะไม่รีเฟรชข้อมูลเลย (ค้าง
