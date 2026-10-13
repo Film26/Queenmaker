@@ -795,12 +795,15 @@ function renderRetention(filteredData, rawData) {
   const rows = filteredData.filter(r => !monthSel || retMonthKey(r) === monthSel);
 
   function scoped(ignoreOpts) {
+    // ใช้ getRetentionFullRawData() (ไม่ผ่าน Group scoping) เสมอ ไม่ใช่พารามิเตอร์ rawData ที่ renderRetention()
+    // ได้รับมา เพราะอันนั้นถูกกรอง Group มาก่อนแล้ว - ถ้าใช้ตัวนั้น ignoreGroup จะไม่มีผลจริง
+    const fullSource = window.getRetentionFullRawData ? window.getRetentionFullRawData() : rawData;
     const base = window.computeFilteredData(Object.assign({}, window.filters,
       ignoreOpts.ignoreGroup ? { Group: 'All' } : {},
       ignoreOpts.ignoreChan ? { Channel: 'All' } : {},
       ignoreOpts.ignoreSub ? { SubChannel: 'All' } : {},
       ignoreOpts.ignoreProd ? { Product: 'All', SubProduct: 'All' } : {}
-    ));
+    ), fullSource);
     return monthSel ? base.filter(r => retMonthKey(r) === monthSel) : base;
   }
   function rerender() { renderRetention(window.RET._filteredData, window.RET._rawData); }
