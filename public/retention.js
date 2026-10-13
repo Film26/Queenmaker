@@ -2,16 +2,14 @@
 // Retention Analytics — ported from the standalone "Retention Dashboard.html" prototype into the
 // real Queenmaker app. Reuses the app's own row-normalization helpers (getNormalizedProduct,
 // getNormalizedAdmin, getNormalizedChannel, getCustomerUniqueId, parseDate, isSaleOrder, ...) instead
-// of the prototype's own pre-indexed HOLISTA_DATA format, so it works directly on real imported rows
-// and respects the SAME shared top filter bar (Group/Year/Month/Channel/SubChannel/Product/SubProduct/
-// Admin) as every other tab — no separate filter bar is rendered here on purpose, to avoid two
-// competing sets of filters on the same page. Month, when selected in the top filter, is matched as an
-// exact "YYYY-MM" (same convention window.filters.Month already uses elsewhere in dashboard.html).
+// of the prototype's own pre-indexed HOLISTA_DATA format, so it works directly on real imported rows.
 //
-// Product-level visibility (hide a SKU/product from all Dashboards) already exists app-wide via
-// isProductActive()/computeFilteredData() (Settings elsewhere) and is already applied to the rows this
-// file receives — so this port does NOT add a second, competing "Settings > Product Visibility" page
-// like the prototype had; it just inherits whatever is already hidden.
+// This page is intentionally a standalone form, independent of the app's shared top filter bar
+// (Group/Year/Month/Channel/SubChannel/Product/SubProduct/Admin) — it shows everything imported via its
+// own "Import Data for Retention" button (see dashboard.html's retentionRawData/ingestRetentionRows),
+// filtered only by isSaleOrder. Earlier this reused the shared filter bar/selections, but that data is
+// often a different time range than whatever the shared filters happened to be set to on another tab,
+// which made freshly-imported Retention data look like it "didn't process" (silently filtered out).
 
 const AT_RISK_DAYS = 60;
 const RET_MONTH_SHORT_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -312,10 +310,9 @@ function retViewOverview(el, rows, ctx) {
   const monthKeys = ctx.monthKeys;
   el.innerHTML = `
   <div class="ret-panel ret-full">
-    <h3>แนวโน้ม Retention รายเดือน — ทุกช่องทาง vs ช่องทางที่เลือก</h3>
+    <h3>แนวโน้ม Retention รายเดือน</h3>
     <div class="ret-hint">% ของลูกค้าที่ซื้อในเดือนนั้นซึ่งเป็น "ลูกค้าเก่า" (เคยซื้อสินค้าเดิมมาก่อน) — ยิ่งสูง = กลับมาซื้อซ้ำเยอะ</div>
     <canvas id="ret-trendChart" style="max-height:280px"></canvas>
-    <div class="ret-hint" id="ret-trendLegend" style="margin-top:10px;margin-bottom:0;"></div>
   </div>
   <div class="ret-grid2">
     <div class="ret-panel">
@@ -331,18 +328,9 @@ function retViewOverview(el, rows, ctx) {
     </div>
   </div>`;
   // trend
-  const allRows = ctx.scoped({ ignoreChan: true });
-  const allSeries = retMonthlyReturn(allRows, monthKeys);
-  let datasets = [{ label: 'ทุกช่องทาง', data: allSeries.map(x => +(x.rate * 100).toFixed(1)),
+  const allSeries = retMonthlyReturn(rows, monthKeys);
+  const datasets = [{ label: 'ทุกช่องทาง', data: allSeries.map(x => +(x.rate * 100).toFixed(1)),
     borderColor: '#1e293b', backgroundColor: 'rgba(30,41,59,.10)', tension: .3, fill: true, pointRadius: 3 }];
-  let legend;
-  if (window.filters.Channel !== 'All') {
-    const selSeries = retMonthlyReturn(rows, monthKeys);
-    datasets.push({ label: 'ช่องทาง: ' + window.filters.Channel, data: selSeries.map(x => +(x.rate * 100).toFixed(1)),
-      borderColor: '#198754', backgroundColor: 'rgba(25,135,84,.08)', tension: .3, fill: false, pointRadius: 3, borderDash: [6, 3] });
-    legend = 'เส้นประเขียว = เฉพาะช่องทางที่เลือก เทียบกับเส้นน้ำเงิน (ทุกช่องทาง ภายใต้ตัวกรองอื่นเดิม)';
-  } else legend = 'เลือก Channel ใน Filter ด้านบน เพื่อเทียบเส้นช่องทางนั้นกับภาพรวมทุกช่องทาง';
-  document.getElementById('ret-trendLegend').textContent = legend;
   retDrawLine('ret-trendChart', monthKeys.map(retMonthLabel), datasets, '%');
   // products table
   const m = retProductMetrics(rows);
@@ -415,7 +403,7 @@ function retViewMatrix(el, rows, ctx) {
       `<span class="ret-tbtn ${v === dim ? 'active' : ''}" data-d="${v}">${t}</span>`).join('');
   document.querySelectorAll('#ret-matrixDim .ret-tbtn').forEach(b => b.onclick = () => { window.RET.matrixDim = b.dataset.d; ctx.rerender(); });
   const names = retProductNames(rows);
-  const base = ctx.scoped(dim === 'chan' ? { ignoreChan: true } : { ignoreSub: true });
+  const base = ctx.scoped();
   const getDim = dim === 'chan' ? retChanName : retSubChanName;
   const cols = [...new Set(base.map(getDim))].sort();
   const data = {}; names.forEach(n => data[n] = {});
@@ -623,9 +611,8 @@ function retViewAffinity(el, rows) {
 }
 
 // ============ 6. MIGRATION ============
-function retViewMigration(el, rows, ctx) {
-  const allRows = ctx.scoped({ ignoreGroup: true, ignoreProd: true });
-  const tl = retTimelines(allRows);
+function retViewMigration(el, rows) {
+  const tl = retTimelines(rows);
   let startK = 0, startH = 0, startBoth = 0, kThenH = 0, hThenK = 0;
   for (const [c, occ] of tl) {
     const fg = occ[0].groups; const all = new Set(); occ.forEach(o => o.groups.forEach(g => all.add(g)));
@@ -650,7 +637,7 @@ function retViewMigration(el, rows, ctx) {
   });
   el.innerHTML = `
   <div class="ret-panel ret-full"><h3>การย้ายข้ามกลุ่มสินค้า (Kides ↔ Holista)</h3>
-    <div class="ret-hint">* ไม่สนใจตัวกรอง Group/Product เพื่อดูเส้นทางข้ามกลุ่มของลูกค้าจริง</div>
+    <div class="ret-hint">ลูกค้าเริ่มจากกลุ่มหนึ่งแล้วไปซื้ออีกกลุ่มกี่ %</div>
     <div class="ret-flow">
       <div class="ret-flowcard"><div class="big">${fmtPct(startK ? kThenH / startK : 0)}</div>
         <div class="lbl">ของลูกค้าที่<b>เริ่มจาก Kides</b> (${fmtNum(startK)} คน) ต่อมาซื้อ <b>Holista</b> (${fmtNum(kThenH)} คน)</div></div>
@@ -783,50 +770,32 @@ function renderRetention(filteredData, rawData) {
   window.RET._rawData = rawData;
 
   if (!filteredData || filteredData.length === 0) {
-    container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">ไม่มีข้อมูลตาม Filter ที่เลือก</div>';
+    container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">ยังไม่มีข้อมูลสำหรับ Retention — กดปุ่ม "Import Data for Retention" มุมขวาบนเพื่อนำเข้าไฟล์</div>';
     return;
   }
   retInjectStyles();
 
-  // Month filter (top bar) matched as an exact "YYYY-MM", same convention window.filters.Month already
-  // uses elsewhere — Group/Channel/SubChannel/Product/Sub Product/Admin are already applied upstream in
-  // filteredData itself (computeFilteredData), so only Month needs handling here.
-  const monthSel = window.filters && window.filters.Month !== 'All' ? window.filters.Month : null;
-  const rows = filteredData.filter(r => !monthSel || retMonthKey(r) === monthSel);
+  // ไม่ยึด Filter บนสุดของแอป (Group/Year/Month/Channel/SubChannel/Product/Admin) อีกต่อไป - หน้า Retention
+  // เป็นฟอร์ม/ชุดข้อมูลของตัวเอง แสดงทุกแถวที่ Import เข้ามา (กรองแค่ isSaleOrder กันแถวที่ไม่ใช่ยอดขายจริงปนมา)
+  // เหตุผล: ข้อมูลที่ Import เฉพาะหน้านี้มักเป็นคนละช่วงเวลา/ชุดกับข้อมูลหลัก พอยึด Filter เดิม (เช่น Year ที่เลือก
+  // ค้างจากแท็บอื่น) ข้อมูลที่เพิ่ง Import จะถูกกรองออกจนดูเหมือน "ไม่ประมวลผล" ทั้งที่จริงมีข้อมูลอยู่
+  const rows = filteredData.filter(r => window.isSaleOrder(r));
 
-  function scoped(ignoreOpts) {
-    // ใช้ getRetentionFullRawData() (ไม่ผ่าน Group scoping) เสมอ ไม่ใช่พารามิเตอร์ rawData ที่ renderRetention()
-    // ได้รับมา เพราะอันนั้นถูกกรอง Group มาก่อนแล้ว - ถ้าใช้ตัวนั้น ignoreGroup จะไม่มีผลจริง
-    const fullSource = window.getRetentionFullRawData ? window.getRetentionFullRawData() : rawData;
-    const base = window.computeFilteredData(Object.assign({}, window.filters,
-      ignoreOpts.ignoreGroup ? { Group: 'All' } : {},
-      ignoreOpts.ignoreChan ? { Channel: 'All' } : {},
-      ignoreOpts.ignoreSub ? { SubChannel: 'All' } : {},
-      ignoreOpts.ignoreProd ? { Product: 'All', SubProduct: 'All' } : {}
-    ), fullSource);
-    return monthSel ? base.filter(r => retMonthKey(r) === monthSel) : base;
-  }
+  function scoped() { return rows; }
   function rerender() { renderRetention(window.RET._filteredData, window.RET._rawData); }
-  const ctx = { scoped, rerender, monthKeys: [...new Set(filteredData.map(retMonthKey).filter(Boolean))].sort() };
+  const ctx = { scoped, rerender, monthKeys: [...new Set(rows.map(retMonthKey).filter(Boolean))].sort() };
 
   const ov = retOverall(rows);
-  const scopeParts = [];
-  if (window.filters.Group && window.filters.Group !== 'All') scopeParts.push('Group: ' + window.filters.Group);
-  if (monthSel) scopeParts.push('เดือน: ' + retMonthLabel(monthSel));
-  if (window.filters.Channel !== 'All') scopeParts.push('Channel: ' + window.filters.Channel);
-  if (window.filters.SubChannel !== 'All') scopeParts.push('SubChannel: ' + window.filters.SubChannel);
-  if (window.filters.Product !== 'All') scopeParts.push('สินค้า: ' + window.filters.Product);
-  if (window.filters.Admin !== 'All') scopeParts.push('Admin: ' + window.filters.Admin);
 
   container.innerHTML = `
     <div class="retention-container">
       <div class="retention-header">
         <div class="retention-header-text">
           <h2>Retention Analytics</h2>
-          <p>สถิติการซื้อซ้ำ, LTV, Churn, Cross-sell และประสิทธิภาพแอดมิน — ใช้ Filter ด้านบนสุดของหน้าเพื่อเจาะกลุ่มข้อมูล</p>
+          <p>สถิติการซื้อซ้ำ, LTV, Churn, Cross-sell และประสิทธิภาพแอดมิน — คำนวณจากข้อมูลที่ Import เข้าหน้านี้ทั้งหมด (ไม่ขึ้นกับ Filter บนสุดของแอป)</p>
         </div>
       </div>
-      <div class="ret-scope-note">กำลังวิเคราะห์ <b>${fmtNum(rows.length)}</b> รายการ${scopeParts.length ? ' · ตัวกรอง: ' + scopeParts.join(' · ') : ' · ไม่มีตัวกรองเพิ่มเติม'}</div>
+      <div class="ret-scope-note">กำลังวิเคราะห์ <b>${fmtNum(rows.length)}</b> รายการ</div>
       <div class="retention-kpi-grid">
         <div class="retention-kpi-card"><div class="retention-kpi-lbl">ลูกค้า (ราย)</div><div class="retention-kpi-val">${fmtNum(ov.customers)}</div><div class="retention-kpi-d">มีข้อมูลระบุตัวตน</div></div>
         <div class="retention-kpi-card"><div class="retention-kpi-lbl">ครั้งที่ซื้อ (occasions)</div><div class="retention-kpi-val">${fmtNum(ov.orders)}</div><div class="retention-kpi-d">ลูกค้า × วันที่ไม่ซ้ำ</div></div>
