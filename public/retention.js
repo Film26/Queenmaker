@@ -25,16 +25,59 @@ const RET_VIEWS = [
 ];
 
 // ===================== row accessors (bound to the app's own normalization helpers) =====================
+// ไฟล์ Retention ที่ผู้ใช้ import จริงเป็นแบบ "raw + cleansed รวมกัน" (ตัวอย่าง: มีทั้ง
+// "เลขที่ออเดอร์ (ออเดอร์)" แบบ raw และคอลัมน์ clean อย่าง Order Type / Revenue_Allocated / Note
+// ต่อท้ายไฟล์) ซึ่งคอลัมน์ raw หลายตัวจะ "บัง" คอลัมน์ clean เวลาใช้ fuzzy matcher กลางของแอพหลัก
+// (getRowValue จะเจอคอลัมน์ raw ที่มาก่อนในไฟล์ก่อนเจอคอลัมน์ clean) จึงอ่านตรงจากชื่อคอลัมน์ clean
+// ที่ทราบแน่นอนก่อน แล้ว fallback ไป helper กลางเฉพาะเมื่อไม่พบคอลัมน์ clean นั้นจริง ๆ
+function retReadCol(row, name) { return window.getRowValue(row, [name]); }
 function retCustId(row) { return window.getCustomerUniqueId(row); }
 function retProdName(row) { return window.getNormalizedProduct(row); }
-function retGroupName(row) { return window.getNormalizedGroup(row); }
-function retChanName(row) { return window.getNormalizedChannel(window.getRowValue(row, ['ช่องทาง', 'Channel']), row); }
-function retSubChanName(row) { return window.getNormalizedSubChannel ? window.getNormalizedSubChannel(row) : 'Other'; }
-function retAdminName(row) { const a = window.getNormalizedAdmin(row); return a === 'Unknown' ? null : a; }
+const RET_KIDES_PRODUCTS = ['Kides', 'Gummy DHA', 'Gummy Elderberry', 'Gummy Calcium'];
+function retGroupName(row) {
+  const g = window.getNormalizedGroup(row);
+  if (g && g !== 'Unknown') return g;
+  // ไฟล์ตัวอย่างไม่มีคอลัมน์ Group เลย - derive จาก Product ตาม taxonomy ของ spec เดิม
+  const prod = retProdName(row);
+  if (!prod || prod === 'Unknown') return 'Unknown';
+  return RET_KIDES_PRODUCTS.indexOf(prod) !== -1 ? 'Kides' : 'Holista';
+}
+function retChanName(row) {
+  const clean = retReadCol(row, 'Channel');
+  if (clean) return window.getNormalizedChannel(clean, row);
+  return window.getNormalizedChannel(window.getRowValue(row, ['ช่องทาง', 'Channel']), row);
+}
+function retSubChanName(row) {
+  const clean = retReadCol(row, 'SubChannel');
+  if (clean) return clean;
+  return window.getNormalizedSubChannel ? window.getNormalizedSubChannel(row) : 'Other';
+}
+function retAdminName(row) {
+  const note = retReadCol(row, 'Note');
+  if (note && note.toString().trim()) return note.toString().trim();
+  const a = window.getNormalizedAdmin(row);
+  return a === 'Unknown' ? null : a;
+}
 function retParsedDate(row) { return window.parseDate(window.getRowDateStr(row)); }
 function retDayNum(row) { const d = retParsedDate(row); return d ? Math.floor(Date.UTC(d.y, d.m - 1, d.d) / 86400000) : null; }
 function retMonthKey(row) { const d = retParsedDate(row); return d ? d.str : null; }
-function retRevenue(row) { return window.getRowRevenueOrZero(row); }
+function retRevenue(row) {
+  const alloc = retReadCol(row, 'Revenue_Allocated');
+  if (alloc !== undefined && alloc !== null && alloc.toString().trim() !== '') {
+    const n = parseFloat(alloc.toString().replace(/[^0-9.\-]/g, ''));
+    if (!isNaN(n)) return n;
+  }
+  return window.getRowRevenueOrZero(row);
+}
+// ไฟล์ตัวอย่างมีคอลัมน์ "Order Type" (ตัว T ใหญ่) ซึ่งไม่ตรงกับคีย์ที่ isSaleOrder ของแอพหลักเช็กแบบ
+// exact-case ("Order type" / "OrderType") พอดี เลยเช็กตรงด้วยคอลัมน์ clean นี้ก่อน
+function retIsSaleOrder(row) {
+  const ot = retReadCol(row, 'Order Type');
+  if (ot !== undefined && ot !== null && ot.toString().trim() !== '') {
+    return ot.toString().trim().toUpperCase() === 'SALE';
+  }
+  return window.isSaleOrder(row);
+}
 // ไม่มีคอลัมน์ส่วนลดมาตรฐานในระบบหลัก (ไม่มี helper กลางให้ใช้) - อ่านตรงจากหัวคอลัมน์ที่เป็นไปได้เอง
 // เฉพาะในไฟล์นี้ ถ้าไม่พบคอลัมน์เลยจะถือว่าไม่มีส่วนลด (หน้า Discount Dependency จะโชว์ 0% แทนที่จะพัง)
 function retHasDiscount(row) {
@@ -54,10 +97,11 @@ function retMonthLabel(mk) {
 function retDiagnoseExclusions(rows) {
   let nonSaleType = 0, noRevenueCol = 0, zeroRevenue = 0, nonSaleRemark = 0, ok = 0;
   rows.forEach(row => {
-    const otRaw = row['Order type'] !== undefined ? row['Order type'] : row['OrderType'];
+    const otRaw = retReadCol(row, 'Order Type') !== undefined ? retReadCol(row, 'Order Type')
+      : (row['Order type'] !== undefined ? row['Order type'] : row['OrderType']);
     const ot = (otRaw || '').toString().trim();
     if (ot) { if (ot.toUpperCase() !== 'SALE') nonSaleType++; else ok++; return; }
-    const revenue = window.getRowRevenue(row);
+    const revenue = retRevenue(row);
     if (isNaN(revenue)) { noRevenueCol++; return; }
     if (revenue <= 0) { zeroRevenue++; return; }
     const remark = (window.getRowValue(row, ['หมายเหตุ', 'Remark']) || '').toUpperCase();
@@ -798,7 +842,7 @@ function renderRetention(filteredData, rawData) {
   // เป็นฟอร์ม/ชุดข้อมูลของตัวเอง แสดงทุกแถวที่ Import เข้ามา (กรองแค่ isSaleOrder กันแถวที่ไม่ใช่ยอดขายจริงปนมา)
   // เหตุผล: ข้อมูลที่ Import เฉพาะหน้านี้มักเป็นคนละช่วงเวลา/ชุดกับข้อมูลหลัก พอยึด Filter เดิม (เช่น Year ที่เลือก
   // ค้างจากแท็บอื่น) ข้อมูลที่เพิ่ง Import จะถูกกรองออกจนดูเหมือน "ไม่ประมวลผล" ทั้งที่จริงมีข้อมูลอยู่
-  const rows = filteredData.filter(r => window.isSaleOrder(r));
+  const rows = filteredData.filter(r => retIsSaleOrder(r));
 
   // มีข้อมูล Import เข้ามาจริง แต่ "เป็นยอดขายจริง" (isSaleOrder) ไม่ผ่านสักแถวเดียว - แทนที่จะโชว์แดชบอร์ด 0
   // ทุกช่องแบบงงๆ ให้บอกสาเหตุ + ตัวอย่างชื่อคอลัมน์ในไฟล์ เพื่อเทียบกับคอลัมน์ที่ระบบคาดหวัง (วันที่/ยอดขาย)
