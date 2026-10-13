@@ -794,7 +794,6 @@
           const s = sig(row);
           if (!existing.has(s)) { existing.add(s); retentionRawData.push(row); added++; }
         });
-        scopedRetentionCache = { src: null, group: null, data: null };
         refreshRetentionView();
         alert('นำเข้าข้อมูลสำหรับ Retention สำเร็จ: เพิ่ม ' + added.toLocaleString() + ' แถวใหม่ (ข้ามซ้ำ ' + (cleaned.length - added).toLocaleString() + ' แถว) รวมทั้งหมด ' + retentionRawData.length.toLocaleString() + ' แถว');
       } catch (err) {
@@ -1553,28 +1552,16 @@
       }
       return scopedRawCache.data;
     }
-    // เหมือน getScopedRawData() ข้างบนทุกประการ แค่ใช้กับ retentionRawData (ชุดข้อมูลเฉพาะหน้า Retention) แทน
-    let scopedRetentionCache = { src: null, group: null, data: null };
-    function getScopedRetentionRawData() {
-      const g = filters.Group;
-      if (!g || g === 'All') return retentionRawData;
-      if (scopedRetentionCache.src !== retentionRawData || scopedRetentionCache.group !== g) {
-        scopedRetentionCache = { src: retentionRawData, group: g, data: retentionRawData.filter(r => getNormalizedGroup(r) === g) };
-      }
-      return scopedRetentionCache.data;
-    }
-    // Retention ใช้ Filter บนสุดกรองข้อมูลของตัวเองเหมือนทุกแท็บ แต่กรองกับ retentionRawData (ถ้าเคย Import ผ่าน
-    // ปุ่ม Import ตอนอยู่แท็บ Retention แล้ว) ไม่ใช่ rawData หลัก - ยังไม่เคย Import เฉพาะหน้านี้เลยก็ fallback
-    // ไปใช้ rawData หลักแทน (พฤติกรรมเดิมก่อนมีฟีเจอร์นี้) กันไม่ให้หน้า Retention ว่างเปล่าไปเฉยๆ
+    // Retention เป็นฟอร์ม/ชุดข้อมูลของตัวเอง ไม่ยึด Filter บนสุดของแอป (Group/Year/Month/Channel/ฯลฯ) อีกต่อไป -
+    // เดิมเคยกรองด้วย Filter ชุดเดียวกับแท็บอื่น แต่ข้อมูลที่ Import เฉพาะหน้านี้มักเป็นคนละช่วงเวลากับที่ Filter
+    // บนสุดตั้งค้างไว้จากแท็บอื่น ทำให้ข้อมูลที่เพิ่ง Import ถูกกรองออกจนดูเหมือนไม่ประมวลผล จึงตัดการพึ่ง Filter
+    // ออกไปเลย ส่ง retentionRawData ทั้งก้อนตรงๆ (ยังไม่เคย Import เฉพาะหน้านี้เลยก็ fallback ไปใช้ rawData หลัก
+    // แทน กันไม่ให้หน้าว่างเปล่า) ตัวกรอง isSaleOrder ทำในฝั่ง retention.js เอง
     function refreshRetentionView() {
       if (typeof renderRetention !== 'function') return;
-      const source = retentionRawData.length > 0 ? getScopedRetentionRawData() : getScopedRawData();
-      renderRetention(computeFilteredData(filters, source), source);
+      const source = retentionRawData.length > 0 ? retentionRawData : rawData;
+      renderRetention(source, source);
     }
-    // retention.js เรียกตัวนี้ตอนต้องการข้อมูลดิบแบบ "ไม่ผ่านการกรอง Group" เลย (เช่น มุมมอง Migration ที่ต้อง
-    // ignoreGroup) - ต่างจาก getScopedRetentionRawData()/getScopedRawData() ที่กรอง Group ไว้แล้ว ต้องแยก
-    // ฟังก์ชันเพราะ renderRetention(filteredData, rawData) พารามิเตอร์ rawData ที่ส่งเข้าไปถูกกรอง Group มาแล้ว
-    window.getRetentionFullRawData = function () { return retentionRawData.length > 0 ? retentionRawData : rawData; };
 
     function getGroupOptionList() {
       const values = new Set();
@@ -1967,12 +1954,11 @@
 
     // กรอง rawData ด้วยชุด filter ที่ส่งเข้ามา (Year/Channel/SubChannel/Product/SubProduct/Admin - ไม่รวม Month
     // ซึ่งแต่ละหน้าจัดการเป็น cutoff ของตัวเองต่างหาก) แยกออกมาเป็นฟังก์ชันกลาง เพื่อให้ทั้ง Filter บนสุด (ใช้ตัวแปร
-    // filters ของหน้า Overview/Cohort/Migration/Retention) และ Filter แยกของหน้า Executive (ใช้ execFilters
-    // คนละชุดกัน ไม่ยุ่งกัน) เรียกใช้ตรรกะเดียวกันได้โดยไม่ต้องเขียนซ้ำ
-    // dataSource: เดิมใช้ rawData หลักเสมอ - เพิ่มพารามิเตอร์ (optional) ให้สลับไปกรอง retentionRawData แทนได้
-    // (ดู refreshRetentionView) ไม่กระทบจุดเรียกเดิมที่ไม่ส่ง dataSource มา ยังเป็น rawData หลักเหมือนเดิมทุกจุด
-    function computeFilteredData(sourceFilters, dataSource) {
-      return (dataSource || rawData).filter(row => {
+    // filters ของหน้า Overview/Cohort/Migration) และ Filter แยกของหน้า Executive (ใช้ execFilters คนละชุดกัน
+    // ไม่ยุ่งกัน) เรียกใช้ตรรกะเดียวกันได้โดยไม่ต้องเขียนซ้ำ - หน้า Retention ไม่ใช้ฟังก์ชันนี้แล้ว (ดู
+    // refreshRetentionView, เป็นฟอร์มของตัวเอง ไม่ยึด Filter บนสุด)
+    function computeFilteredData(sourceFilters) {
+      return rawData.filter(row => {
         if (!isSaleOrder(row)) return false;
         const dateStr = window.getRowDateStr(row);
         if (!dateStr) return false;
