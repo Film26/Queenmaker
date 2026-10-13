@@ -1552,15 +1552,13 @@
       }
       return scopedRawCache.data;
     }
-    // Retention เป็นฟอร์ม/ชุดข้อมูลของตัวเอง ไม่ยึด Filter บนสุดของแอป (Group/Year/Month/Channel/ฯลฯ) อีกต่อไป -
-    // เดิมเคยกรองด้วย Filter ชุดเดียวกับแท็บอื่น แต่ข้อมูลที่ Import เฉพาะหน้านี้มักเป็นคนละช่วงเวลากับที่ Filter
-    // บนสุดตั้งค้างไว้จากแท็บอื่น ทำให้ข้อมูลที่เพิ่ง Import ถูกกรองออกจนดูเหมือนไม่ประมวลผล จึงตัดการพึ่ง Filter
-    // ออกไปเลย ส่ง retentionRawData ทั้งก้อนตรงๆ (ยังไม่เคย Import เฉพาะหน้านี้เลยก็ fallback ไปใช้ rawData หลัก
-    // แทน กันไม่ให้หน้าว่างเปล่า) ตัวกรอง isSaleOrder ทำในฝั่ง retention.js เอง
+    // Retention เป็นฟอร์ม/ชุดข้อมูลของตัวเอง แยกขาดจาก rawData หลักโดยสิ้นเชิง ทั้งไม่ยึด Filter บนสุดของแอป
+    // (Group/Year/Month/Channel/ฯลฯ) และไม่ fallback ไปโชว์ rawData หลักเวลา retentionRawData ยังว่างอยู่ด้วย -
+    // ตามเจตนาของระบบ: เข้าแท็บ Retention ต้องกด "Import Data for Retention" ก่อนถึงจะเห็นข้อมูล ถ้ายังไม่เคย
+    // Import เฉพาะหน้านี้เลยต้องเห็นหน้าว่างเปล่าจริงๆ ไม่ใช่แอบโชว์ข้อมูลชุดหลักแทนจนดูเหมือนข้อมูล 2 ชุดถูกปนกัน
     function refreshRetentionView() {
       if (typeof renderRetention !== 'function') return;
-      const source = retentionRawData.length > 0 ? retentionRawData : rawData;
-      renderRetention(source, source);
+      renderRetention(retentionRawData, retentionRawData);
     }
 
     function getGroupOptionList() {
