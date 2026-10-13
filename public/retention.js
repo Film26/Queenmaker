@@ -48,6 +48,25 @@ function retMonthLabel(mk) {
   const [y, m] = mk.split('-');
   return RET_MONTH_SHORT_TH[(+m) - 1] + ' ' + y;
 }
+// ตรวจว่าทำไมแถวถึงไม่ผ่าน isSaleOrder() ของแอปหลัก (ดู dashboard.html) - ใช้แสดงข้อความช่วยวินิจฉัยตอน Import
+// แล้วได้ 0 รายการ เพราะ isSaleOrder เป็น all-or-nothing ถ้าคอลัมน์ไฟล์ไม่ตรงชื่อที่คาดไว้เลยจะตัดทิ้งทั้งไฟล์
+// โดยไม่มีข้อความอธิบาย ทำให้ดูเหมือน Import พัง ทั้งที่จริงแค่คอลัมน์ไม่ตรง
+function retDiagnoseExclusions(rows) {
+  let nonSaleType = 0, noRevenueCol = 0, zeroRevenue = 0, nonSaleRemark = 0, ok = 0;
+  rows.forEach(row => {
+    const otRaw = row['Order type'] !== undefined ? row['Order type'] : row['OrderType'];
+    const ot = (otRaw || '').toString().trim();
+    if (ot) { if (ot.toUpperCase() !== 'SALE') nonSaleType++; else ok++; return; }
+    const revenue = window.getRowRevenue(row);
+    if (isNaN(revenue)) { noRevenueCol++; return; }
+    if (revenue <= 0) { zeroRevenue++; return; }
+    const remark = (window.getRowValue(row, ['หมายเหตุ', 'Remark']) || '').toUpperCase();
+    const NON_SALE_KEYWORDS = ['ของขวัญวันเกิด', 'ของขวัญปีใหม่', 'เคลม', 'ของแถม', 'แจก', 'SAMPLE', 'REPLACE', 'คืนเงิน', 'RERUND', 'REFUND'];
+    if (NON_SALE_KEYWORDS.some(kw => remark.includes(kw.toUpperCase()))) { nonSaleRemark++; return; }
+    ok++;
+  });
+  return { nonSaleType, noRevenueCol, zeroRevenue, nonSaleRemark, ok, total: rows.length };
+}
 
 // ===================== formatting =====================
 function fmtPct(x) { return ((x || 0) * 100).toFixed(1) + '%'; }
@@ -780,6 +799,26 @@ function renderRetention(filteredData, rawData) {
   // เหตุผล: ข้อมูลที่ Import เฉพาะหน้านี้มักเป็นคนละช่วงเวลา/ชุดกับข้อมูลหลัก พอยึด Filter เดิม (เช่น Year ที่เลือก
   // ค้างจากแท็บอื่น) ข้อมูลที่เพิ่ง Import จะถูกกรองออกจนดูเหมือน "ไม่ประมวลผล" ทั้งที่จริงมีข้อมูลอยู่
   const rows = filteredData.filter(r => window.isSaleOrder(r));
+
+  // มีข้อมูล Import เข้ามาจริง แต่ "เป็นยอดขายจริง" (isSaleOrder) ไม่ผ่านสักแถวเดียว - แทนที่จะโชว์แดชบอร์ด 0
+  // ทุกช่องแบบงงๆ ให้บอกสาเหตุ + ตัวอย่างชื่อคอลัมน์ในไฟล์ เพื่อเทียบกับคอลัมน์ที่ระบบคาดหวัง (วันที่/ยอดขาย)
+  if (rows.length === 0) {
+    const diag = retDiagnoseExclusions(filteredData);
+    const cols = Object.keys(filteredData[0] || {});
+    container.innerHTML = `<div class="ret-panel ret-full" style="margin-top:20px;">
+      <h3>Import ${fmtNum(filteredData.length)} แถวสำเร็จ แต่ไม่มีแถวไหนถูกนับเป็น "ยอดขายจริง" เลย</h3>
+      <div class="ret-hint" style="margin-bottom:16px;">ระบบตัดสินแถวที่เป็นยอดขายจริงจากคอลัมน์ "Order type" (ถ้ามี) หรือจากคอลัมน์ยอดขาย (ถ้าไม่พบคอลัมน์ยอดขายที่จำได้เลย จะไม่นับแถวนั้นเลย)</div>
+      <ul class="ret-pts">
+        <li>แถวที่ Order type ไม่ใช่ "SALE": <b>${fmtNum(diag.nonSaleType)}</b></li>
+        <li>แถวที่<b>หาคอลัมน์ยอดขายไม่เจอ</b> (ชื่อคอลัมน์ไม่ตรงกับที่ระบบรู้จัก): <b>${fmtNum(diag.noRevenueCol)}</b></li>
+        <li>แถวที่ยอดขาย = 0 หรือติดลบ: <b>${fmtNum(diag.zeroRevenue)}</b></li>
+        <li>แถวที่หมายเหตุมีคำว่าของแถม/เคลม/คืนเงิน ฯลฯ: <b>${fmtNum(diag.nonSaleRemark)}</b></li>
+      </ul>
+      <div class="ret-hint" style="margin-top:14px;">ชื่อคอลัมน์ทั้งหมดในไฟล์ที่ Import (${cols.length} คอลัมน์):</div>
+      <div style="font-size:11.5px; color:#64748b; line-height:1.8; word-break:break-word;">${cols.map(c => `<span class="ret-pill-tag">${c}</span>`).join(' ')}</div>
+    </div>`;
+    return;
+  }
 
   function scoped() { return rows; }
   function rerender() { renderRetention(window.RET._filteredData, window.RET._rawData); }
