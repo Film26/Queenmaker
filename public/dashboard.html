@@ -1245,7 +1245,10 @@
     // การปัดเศษทำเฉพาะตอนแสดงผลเท่านั้น (formatCurrency ฯลฯ) ห้ามปัดก่อนนำไปคำนวณ
     // ==========================================================================
     const DATE_KEYS = ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่'];
-    const REVENUE_KEYS = ['ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน'];
+    // Revenue_Allocated มาก่อนสุด (ไฟล์ Retention pattern - ยอดขายที่ปันตามรายการสินค้าในบิลแล้ว แม่นยำกว่า)
+    // ต้องมาก่อน 'ยอดขาย' เสมอ เพราะไฟล์ pattern นี้มีคอลัมน์ "ยอดขาย (ออเดอร์)" ที่เป็นยอดรวมทั้งบิลซ้ำทุกแถว
+    // ด้วย ถ้าไม่กันไว้ก่อน getRowValue (จับคำแบบ includes) จะไปแมตช์คอลัมน์นั้นแทน ทำให้ยอดขายถูกนับซ้ำ
+    const REVENUE_KEYS = ['Revenue_Allocated', 'ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน'];
     // Order ID จับด้วยชื่อหัวคอลัมน์ "ตรงตัว" (ไม่ใช้ includes) เพราะถ้าเดาผิดคอลัมน์จะนับจำนวนออเดอร์ผิดทั้งระบบ
     const ORDER_ID_KEYS = ['Order ID', 'OrderID', 'Order No', 'Order Number', 'Order Code', 'Transaction ID', 'Bill No', 'Invoice No', 'เลขที่ออเดอร์', 'เลขที่คำสั่งซื้อ', 'เลขที่บิล', 'เลขที่ใบสั่งซื้อ', 'เลขออเดอร์', 'รหัสออเดอร์', 'หมายเลขคำสั่งซื้อ'];
 
@@ -1372,7 +1375,11 @@
       // แต่ค่าว่างเปล่าทุกแถว - ถ้ายึดแค่ว่า "มีคอลัมน์นี้ไหม" แล้วเจอค่าว่าง จะถูกตีเป็น "ไม่ใช่ยอดขาย" หมดทั้งไฟล์
       // (import แล้วเห็นข้อมูลเป็น 0 ทั้งที่ไฟล์มีข้อมูลจริง) -> ต้องเช็คว่าค่าใน "แถวนั้น" ไม่ว่างด้วย ถึงจะเชื่อคอลัมน์นี้
       // ถ้าว่าง ให้ตกไปใช้กติกาแบบเดิม (เดา non-sale จาก Remark + revenue > 0) แทน
-      const otRaw = row['Order type'] !== undefined ? row['Order type'] : row['OrderType'];
+      // [RETENTION PATTERN] ไฟล์ Retention มีคอลัมน์ "Order Type" (T ใหญ่ มีเว้นวรรค) คนละคอลัมน์กับ "Order type"
+      // (t เล็ก) ของไฟล์เดิม - เพิ่มอ่านจากคอลัมน์นี้ด้วย เพิ่มเติมจากของเดิม ไม่ได้แทนที่
+      const otRaw = row['Order type'] !== undefined ? row['Order type']
+        : row['OrderType'] !== undefined ? row['OrderType']
+        : row['Order Type'];
       const ot = (otRaw || '').toString().trim();
       if (ot) {
         return ot.toUpperCase() === 'SALE';
@@ -1394,6 +1401,13 @@
       if (row && row['Channel'] !== undefined && row['Sub Channel'] !== undefined) {
         const cStd = (row['Channel'] || '').toString().trim();
         return cStd || 'Other';
+      }
+      // [RETENTION PATTERN] คอลัมน์ "Channel" คู่กับ "Order Type" (T ใหญ่) ของไฟล์ Retention - ใช้ค่าตรงๆ
+      // เหมือนกับเงื่อนไข [CLEANSED] ด้านบน เพิ่มเติมจากของเดิม ไม่ได้แทนที่ (ไฟล์เดิมมีคอลัมน์ "Sub Channel"
+      // มีเว้นวรรค ไม่ใช่ "SubChannel" จึงไม่เข้าเงื่อนไขนี้)
+      if (row && row['Channel'] !== undefined && row['Order Type'] !== undefined) {
+        const cRet = (row['Channel'] || '').toString().trim();
+        return cRet || 'Other';
       }
       let ch = (rawChannel || '').toString().trim();
       if (!ch && row) {
@@ -1429,6 +1443,12 @@
       if (row['Sub Channel'] !== undefined && row['Order type'] !== undefined) {
         const sStd = (row['Sub Channel'] || '').toString().trim();
         return applySubChannelAlias(sStd) || 'Other';
+      }
+      // [RETENTION PATTERN] คอลัมน์ "SubChannel" (ไม่มีเว้นวรรค) คู่กับ "Order Type" (T ใหญ่) ของไฟล์ Retention -
+      // ใช้ค่าตรงๆ เพิ่มเติมจากของเดิม ไม่ได้แทนที่
+      if (row['SubChannel'] !== undefined && row['Order Type'] !== undefined) {
+        const sRet = (row['SubChannel'] || '').toString().trim();
+        return applySubChannelAlias(sRet) || 'Other';
       }
       let sub = getRowValue(row, ['Sub Channel', 'SubChannel', 'ชื่อคลัง']);
       if (!sub || sub.toString().trim() === '') {
@@ -1510,6 +1530,13 @@
         const aStd = ((row['Admin_STD'] !== undefined ? row['Admin_STD'] : row['Admin Name_1']) || '').toString().trim();
         return aStd || 'Unknown';
       }
+      // [RETENTION PATTERN] คอลัมน์ "Note" คู่กับ "Order Type" (T ใหญ่) ของไฟล์ Retention คือชื่อแอดมินอยู่แล้ว
+      // (ไม่ต้องเดา/จับคำแบบไฟล์เดิมด้านล่าง) ใช้ตรงๆ - เพิ่มเติมจากของเดิม ไม่ได้แทนที่ รองรับชื่อแอดมินใหม่ที่ไม่อยู่
+      // ใน keyword list ด้านล่างได้ด้วย (เช่น "เอ", "พัด")
+      if (row['Note'] !== undefined && row['Order Type'] !== undefined) {
+        const nRet = (row['Note'] || '').toString().trim();
+        return nRet || 'Unknown';
+      }
       // จับค่าจากคอลัมน์ Admin Name เท่านั้น (ชื่อแอดมิน/Admin/Admin Name) ถ้าคอลัมน์นี้ไม่มีข้อมูลจริง
       // ให้ถือว่าไม่ทราบชื่อแอดมินไปเลย ไม่เอาคอลัมน์อื่น (เช่น หมายเหตุ/Remark) มาแสดงแทน
       let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
@@ -1550,6 +1577,10 @@
         v = k !== undefined ? row[k] : '';
       }
       const g = (v || '').toString().trim();
+      // [RETENTION PATTERN] คอลัมน์ Group ของไฟล์ Retention ใส่คำว่า "Non-Sale" ตรงๆ ในแถวที่ไม่ใช่ยอดขาย
+      // (แถวพวกนี้ถูกตัดออกจากยอดขาย/Filter อยู่แล้วผ่าน isSaleOrder ก่อนถึงจุดนี้เป็นปกติ - กันไว้อีกชั้นเผื่อ
+      // มีจุดอื่นในอนาคตที่อ่าน Group โดยไม่ผ่าน isSaleOrder ก่อน ไม่ให้ "Non-Sale" โผล่เป็นตัวเลือกกลุ่มปลอม)
+      if (g.toLowerCase() === 'non-sale') return 'Unknown';
       return g || 'Unknown';
     }
 
