@@ -794,6 +794,10 @@
           const s = sig(row);
           if (!existing.has(s)) { existing.add(s); retentionRawData.push(row); added++; }
         });
+        // ข้อมูลใหม่เข้ามาแล้ว ตัวเลือกใน dropdown ของ Filter บนสุด (Year/Channel/ฯลฯ) ต้องสร้างใหม่ ไม่งั้นจะยังว่าง
+        // เปล่าอยู่เหมือนตอนที่ retentionRawData ยังไม่มีข้อมูลเลย (ดู filterRowReaders/populateDropdowns)
+        populateDropdowns();
+        refreshGroupMenus();
         refreshRetentionView();
         alert('นำเข้าข้อมูลสำหรับ Retention สำเร็จ: เพิ่ม ' + added.toLocaleString() + ' แถวใหม่ (ข้ามซ้ำ ' + (cleaned.length - added).toLocaleString() + ' แถว) รวมทั้งหมด ' + retentionRawData.length.toLocaleString() + ' แถว');
       } catch (err) {
@@ -937,7 +941,15 @@
 
     // --- Navigation & UI Control ---
     function switchTab(tabId) {
+      const prevTabId = window.currentTabId;
       window.currentTabId = tabId;
+      // แท็บ Retention ใช้ Filter บนสุดเหมือนแท็บอื่น แต่ตัวเลือกใน dropdown (Year/Month/Channel/ฯลฯ) ต้องอ่านจาก
+      // retentionRawData แทน rawData ตอนอยู่แท็บนี้ (ดู filterRowReaders) - พอข้าม "เข้า/ออก" แท็บ Retention
+      // ต้องสร้าง dropdown ใหม่ทุกครั้ง ไม่งั้นตัวเลือก Year/Channel ฯลฯ จะค้างเป็นของชุดข้อมูลเดิมผิดแท็บ
+      if ((prevTabId === 'retention') !== (tabId === 'retention') && (rawData.length > 0 || retentionRawData.length > 0)) {
+        populateDropdowns();
+        refreshGroupMenus();
+      }
       // ปุ่ม Import ปุ่มเดียวกัน แค่เปลี่ยนป้ายให้รู้ว่ากำลังจะนำเข้าเข้าชุดข้อมูลไหน (ดู fileInput change handler
       // ด้านบนที่สลับปลายทางจริงตาม window.currentTabId)
       const importBtnLabel = document.getElementById('importBtnLabel');
@@ -1552,20 +1564,70 @@
       }
       return scopedRawCache.data;
     }
-    // Retention เป็นฟอร์ม/ชุดข้อมูลของตัวเอง แยกขาดจาก rawData หลักโดยสิ้นเชิง ทั้งไม่ยึด Filter บนสุดของแอป
-    // (Group/Year/Month/Channel/ฯลฯ) และไม่ fallback ไปโชว์ rawData หลักเวลา retentionRawData ยังว่างอยู่ด้วย -
-    // ตามเจตนาของระบบ: เข้าแท็บ Retention ต้องกด "Import Data for Retention" ก่อนถึงจะเห็นข้อมูล ถ้ายังไม่เคย
-    // Import เฉพาะหน้านี้เลยต้องเห็นหน้าว่างเปล่าจริงๆ ไม่ใช่แอบโชว์ข้อมูลชุดหลักแทนจนดูเหมือนข้อมูล 2 ชุดถูกปนกัน
+    // retentionRawData เป็นชุดข้อมูลแยกขาดจาก rawData หลักโดยสิ้นเชิง (ไม่ fallback ไปโชว์ rawData หลักเวลา
+    // retentionRawData ยังว่างอยู่) - ตามเจตนาของระบบ: เข้าแท็บ Retention ต้องกด "Import Data for Retention"
+    // ก่อนถึงจะเห็นข้อมูล ถ้ายังไม่เคย Import เฉพาะหน้านี้เลยต้องเห็นหน้าว่างเปล่าจริงๆ แต่ยึด Filter บนสุดของแอป
+    // (Group/Year/Month/Channel/SubChannel/Product/Admin) ได้ตามปกติเหมือนหน้าอื่น - ตัวเลือกใน dropdown จะสลับมา
+    // อ่านจาก retentionRawData แทน rawData โดยอัตโนมัติตอนอยู่แท็บนี้ (ดู filterRowReaders)
+    let scopedRetentionCache = { src: null, group: null, data: null };
+    function getScopedRetentionData() {
+      const g = filters.Group;
+      if (!g || g === 'All') return retentionRawData;
+      if (scopedRetentionCache.src !== retentionRawData || scopedRetentionCache.group !== g) {
+        scopedRetentionCache = { src: retentionRawData, group: g, data: retentionRawData.filter(r => window.retGroupName(r) === g) };
+      }
+      return scopedRetentionCache.data;
+    }
+
+    // ตัวช่วยกลาง: คืนชุดฟังก์ชันอ่านค่าจากแถว (วันที่/ช่องทาง/สินค้า/แอดมิน/กลุ่ม/ยอดขายจริงหรือไม่) ให้ตรงกับ
+    // แท็บที่เปิดอยู่ - แท็บ Retention ใช้ตัวอ่านเฉพาะของ retention.js (retChanName ฯลฯ) เพราะไฟล์ Retention เป็น
+    // คอลัมน์คนละแบบกับ rawData หลัก (ดูคอมเมนต์ใน retention.js) ส่วนแท็บอื่นใช้ตัวอ่านเดิมของแอปหลักเหมือนเดิมทุกอย่าง
+    function filterRowReaders() {
+      const isRet = window.currentTabId === 'retention';
+      return {
+        isRet: isRet,
+        fullSource: isRet ? retentionRawData : rawData,
+        source: isRet ? getScopedRetentionData() : getScopedRawData(),
+        isSale: isRet ? window.retIsSaleOrder : isSaleOrder,
+        dateOf: isRet ? window.retParsedDate : function(row) { const s = window.getRowDateStr(row); return s ? parseDate(s) : null; },
+        channelOf: isRet ? window.retChanName : function(row) { return getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row); },
+        subChannelOf: isRet ? window.retSubChanName : getNormalizedSubChannel,
+        productOf: isRet ? window.retProdName : getNormalizedProduct,
+        subProductOf: isRet ? function() { return null; } : getNormalizedSubProduct,
+        adminOf: isRet ? window.retAdminName : getNormalizedAdmin,
+        groupOf: isRet ? window.retGroupName : getNormalizedGroup
+      };
+    }
+
+    // กรอง retentionRawData ด้วย Filter บนสุด (Group/Year/Channel/SubChannel/Product/Admin) - ไม่กรอง isSaleOrder
+    // ตรงนี้ (renderRetention ใน retention.js จัดการเองต่อ เพื่อให้แยกแยะได้ว่า "ไม่มีแถวเพราะ Filter แคบไป"
+    // กับ "ไม่มีแถวเพราะไม่ผ่าน isSaleOrder" เป็นคนละข้อความแจ้งเตือนกัน)
+    function computeFilteredRetentionData(sourceFilters) {
+      return retentionRawData.filter(row => {
+        const d = window.retParsedDate(row);
+        if (sourceFilters.Year !== 'All' && (!d || d.y.toString() !== sourceFilters.Year)) return false;
+        if (!isProductActive(window.retProdName(row))) return false;
+        if (sourceFilters.Group && sourceFilters.Group !== 'All' && window.retGroupName(row) !== sourceFilters.Group) return false;
+        if (sourceFilters.Channel !== 'All' && window.retChanName(row) !== sourceFilters.Channel) return false;
+        if (sourceFilters.SubChannel !== 'All' && window.retSubChanName(row) !== sourceFilters.SubChannel) return false;
+        if (sourceFilters.Product !== 'All' && window.retProdName(row) !== sourceFilters.Product) return false;
+        if (sourceFilters.Admin !== 'All' && window.retAdminName(row) !== sourceFilters.Admin) return false;
+        return true;
+      });
+    }
+
     function refreshRetentionView() {
       if (typeof renderRetention !== 'function') return;
-      renderRetention(retentionRawData, retentionRawData);
+      const filtered = retentionRawData.length > 0 ? computeFilteredRetentionData(filters) : [];
+      renderRetention(filtered, retentionRawData);
     }
 
     function getGroupOptionList() {
+      const r = filterRowReaders();
       const values = new Set();
-      rawData.forEach(row => {
-        if (!isSaleOrder(row)) return;
-        const g = getNormalizedGroup(row);
+      r.fullSource.forEach(row => {
+        if (!r.isSale(row)) return;
+        const g = r.groupOf(row);
         if (g !== 'Unknown') values.add(g);
       });
       return Array.from(values).sort();
@@ -1638,20 +1700,21 @@
     // Product ยังกรอง isProductActive ต่อ เพราะสินค้าที่ถูกปิดใช้งานจากหน้า Settings จะถูกตัดออกจากทุก
     // KPI/กราฟอยู่แล้ว (ดู isProductActive) เลือกเป็น filter ไปก็ไม่มีข้อมูลให้แสดง
     function getConfigOptionList(type) {
+      const r = filterRowReaders();
       const values = new Set();
-      getScopedRawData().forEach(row => {
-        if (!isSaleOrder(row)) return;
+      r.source.forEach(row => {
+        if (!r.isSale(row)) return;
         let val;
         if (type === 'Channel') {
-          val = getNormalizedChannel(getRowValue(row, ['ช่องทาง', 'Channel']), row);
+          val = r.channelOf(row);
         } else if (type === 'SubChannel') {
-          val = getNormalizedSubChannel(row);
+          val = r.subChannelOf(row);
         } else if (type === 'Product') {
-          val = getNormalizedProduct(row);
+          val = r.productOf(row);
         } else if (type === 'SubProduct') {
-          val = getNormalizedSubProduct(row);
+          val = r.subProductOf(row);
         } else if (type === 'Admin') {
-          val = getNormalizedAdmin(row);
+          val = r.adminOf(row);
         }
         // 'Unknown' คือค่า placeholder ตอนคอลัมน์จริงไม่มีข้อมูล (Product/SubProduct/Admin) ไม่ใช่ค่าจริงจาก
         // ไฟล์ import จึงไม่เอามาแสดงเป็นตัวเลือก filter (แถวเหล่านี้ยังถูกนับรวมอยู่ตอนเลือก 'All' ตามปกติ)
@@ -1845,11 +1908,10 @@
 
     // Year list never depends on the current filter selection - built once from all raw data.
     function populateYearMenu() {
+      const r = filterRowReaders();
       const yearsSet = new Set();
-      getScopedRawData().forEach(row => {
-        const dateStr = window.getRowDateStr(row);
-        if (!dateStr) return;
-        const d = parseDate(dateStr);
+      r.source.forEach(row => {
+        const d = r.dateOf(row);
         if (!d) return;
         yearsSet.add(d.y.toString());
       });
@@ -1872,11 +1934,10 @@
     // Month list is scoped to the selected Year so you don't have to re-pick the month
     // after switching years. Resets the Month filter if it's no longer valid for the new year.
     function populateMonthMenu(selectedYear) {
+      const r = filterRowReaders();
       const monthsSet = new Set();
-      getScopedRawData().forEach(row => {
-        const dateStr = window.getRowDateStr(row);
-        if (!dateStr) return;
-        const d = parseDate(dateStr);
+      r.source.forEach(row => {
+        const d = r.dateOf(row);
         if (!d) return;
         if (selectedYear && selectedYear !== 'All' && d.y.toString() !== selectedYear) return;
         monthsSet.add(d.str);
@@ -1953,8 +2014,8 @@
     // กรอง rawData ด้วยชุด filter ที่ส่งเข้ามา (Year/Channel/SubChannel/Product/SubProduct/Admin - ไม่รวม Month
     // ซึ่งแต่ละหน้าจัดการเป็น cutoff ของตัวเองต่างหาก) แยกออกมาเป็นฟังก์ชันกลาง เพื่อให้ทั้ง Filter บนสุด (ใช้ตัวแปร
     // filters ของหน้า Overview/Cohort/Migration) และ Filter แยกของหน้า Executive (ใช้ execFilters คนละชุดกัน
-    // ไม่ยุ่งกัน) เรียกใช้ตรรกะเดียวกันได้โดยไม่ต้องเขียนซ้ำ - หน้า Retention ไม่ใช้ฟังก์ชันนี้แล้ว (ดู
-    // refreshRetentionView, เป็นฟอร์มของตัวเอง ไม่ยึด Filter บนสุด)
+    // ไม่ยุ่งกัน) เรียกใช้ตรรกะเดียวกันได้โดยไม่ต้องเขียนซ้ำ - หน้า Retention ใช้ computeFilteredRetentionData
+    // แยกต่างหาก (คอลัมน์ไฟล์ import คนละแบบ ต้องใช้ตัวอ่านของ retention.js เอง) ดู refreshRetentionView ด้านบน
     function computeFilteredData(sourceFilters) {
       return rawData.filter(row => {
         if (!isSaleOrder(row)) return false;

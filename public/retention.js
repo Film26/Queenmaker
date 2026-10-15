@@ -4,12 +4,12 @@
 // getNormalizedAdmin, getNormalizedChannel, getCustomerUniqueId, parseDate, isSaleOrder, ...) instead
 // of the prototype's own pre-indexed HOLISTA_DATA format, so it works directly on real imported rows.
 //
-// This page is intentionally a standalone form, independent of the app's shared top filter bar
-// (Group/Year/Month/Channel/SubChannel/Product/SubProduct/Admin) — it shows everything imported via its
-// own "Import Data for Retention" button (see dashboard.html's retentionRawData/ingestRetentionRows),
-// filtered only by isSaleOrder. Earlier this reused the shared filter bar/selections, but that data is
-// often a different time range than whatever the shared filters happened to be set to on another tab,
-// which made freshly-imported Retention data look like it "didn't process" (silently filtered out).
+// This page has its own imported dataset (retentionRawData, via its own "Import Data for Retention"
+// button — see dashboard.html's ingestRetentionRows) but DOES use the app's shared top filter bar
+// (Group/Year/Month/Channel/SubChannel/Product/Admin) same as Overview/Cohort/Migration. dashboard.html's
+// filterRowReaders()/computeFilteredRetentionData() apply that filter against retentionRawData using this
+// file's own column readers (retChanName, retAdminName, ...) since the Retention import format's columns
+// don't match the main dataset's. renderRetention() below filters further by isSaleOrder.
 
 const AT_RISK_DAYS = 60;
 const RET_MONTH_SHORT_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -34,10 +34,14 @@ function retReadCol(row, name) { return window.getRowValue(row, [name]); }
 function retCustId(row) { return window.getCustomerUniqueId(row); }
 function retProdName(row) { return window.getNormalizedProduct(row); }
 const RET_KIDES_PRODUCTS = ['Kides', 'Gummy DHA', 'Gummy Elderberry', 'Gummy Calcium'];
+// ไฟล์จริงมีคอลัมน์ "Group" ของตัวเอง (ค่าเป็น "-" สำหรับแถวที่ไม่ใช่ยอดขาย/Non-Sale) อ่านตรงจากคอลัมน์นี้ก่อนเสมอ
+// fallback ไป getNormalizedGroup (ของแอพหลัก) แล้วค่อย derive จาก Product เป็นลำดับสุดท้าย เผื่อไฟล์แบบอื่นที่ไม่มี
+// คอลัมน์ Group เลย
 function retGroupName(row) {
+  const clean = retReadCol(row, 'Group');
+  if (clean && clean.toString().trim() && clean.toString().trim() !== '-') return clean.toString().trim();
   const g = window.getNormalizedGroup(row);
   if (g && g !== 'Unknown') return g;
-  // ไฟล์ตัวอย่างไม่มีคอลัมน์ Group เลย - derive จาก Product ตาม taxonomy ของ spec เดิม
   const prod = retProdName(row);
   if (!prod || prod === 'Unknown') return 'Unknown';
   return RET_KIDES_PRODUCTS.indexOf(prod) !== -1 ? 'Kides' : 'Holista';
@@ -825,6 +829,9 @@ function retViewDiscount(el, rows) {
 }
 
 // ===================== main entry (called by dashboard.html whenever filters/data change) =====================
+// filteredData: retentionRawData หลังผ่าน Filter บนสุดของแอป (Group/Year/Channel/SubChannel/Product/Admin) แล้ว
+// rawData: retentionRawData ทั้งหมดแบบไม่ผ่าน Filter - ใช้แยกแยะว่า "ยังไม่เคย Import เลย" กับ "Import แล้วแต่
+// Filter ที่เลือกไว้แคบจนไม่เหลือข้อมูล" เป็นคนละข้อความแจ้งเตือนกัน (ดู computeFilteredRetentionData ใน dashboard.html)
 function renderRetention(filteredData, rawData) {
   const container = document.getElementById('view-retention');
   if (!container) return;
@@ -832,16 +839,17 @@ function renderRetention(filteredData, rawData) {
   window.RET._filteredData = filteredData;
   window.RET._rawData = rawData;
 
-  if (!filteredData || filteredData.length === 0) {
+  if (!rawData || rawData.length === 0) {
     container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">ยังไม่มีข้อมูลสำหรับ Retention — กดปุ่ม "Import Data for Retention" มุมขวาบนเพื่อนำเข้าไฟล์</div>';
     return;
   }
   retInjectStyles();
 
-  // ไม่ยึด Filter บนสุดของแอป (Group/Year/Month/Channel/SubChannel/Product/Admin) อีกต่อไป - หน้า Retention
-  // เป็นฟอร์ม/ชุดข้อมูลของตัวเอง แสดงทุกแถวที่ Import เข้ามา (กรองแค่ isSaleOrder กันแถวที่ไม่ใช่ยอดขายจริงปนมา)
-  // เหตุผล: ข้อมูลที่ Import เฉพาะหน้านี้มักเป็นคนละช่วงเวลา/ชุดกับข้อมูลหลัก พอยึด Filter เดิม (เช่น Year ที่เลือก
-  // ค้างจากแท็บอื่น) ข้อมูลที่เพิ่ง Import จะถูกกรองออกจนดูเหมือน "ไม่ประมวลผล" ทั้งที่จริงมีข้อมูลอยู่
+  if (!filteredData || filteredData.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">ไม่พบข้อมูลตาม Filter ที่เลือกไว้ด้านบน — ลองเปลี่ยน Filter หรือกด "ล้าง Filter" เพื่อดูข้อมูลทั้งหมด</div>';
+    return;
+  }
+
   const rows = filteredData.filter(r => retIsSaleOrder(r));
 
   // มีข้อมูล Import เข้ามาจริง แต่ "เป็นยอดขายจริง" (isSaleOrder) ไม่ผ่านสักแถวเดียว - แทนที่จะโชว์แดชบอร์ด 0
@@ -875,7 +883,7 @@ function renderRetention(filteredData, rawData) {
       <div class="retention-header">
         <div class="retention-header-text">
           <h2>Retention Analytics</h2>
-          <p>สถิติการซื้อซ้ำ, LTV, Churn, Cross-sell และประสิทธิภาพแอดมิน — คำนวณจากข้อมูลที่ Import เข้าหน้านี้ทั้งหมด (ไม่ขึ้นกับ Filter บนสุดของแอป)</p>
+          <p>สถิติการซื้อซ้ำ, LTV, Churn, Cross-sell และประสิทธิภาพแอดมิน — คำนวณจากข้อมูลที่ Import เข้าหน้านี้ ตาม Filter ด้านบนที่เลือกไว้</p>
         </div>
       </div>
       <div class="ret-scope-note">กำลังวิเคราะห์ <b>${fmtNum(rows.length)}</b> รายการ</div>
