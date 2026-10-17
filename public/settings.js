@@ -13,6 +13,27 @@ const SETTINGS_CATEGORIES = [
   { key: 'Admin', label: 'Admin', sub: 'ผู้ดูแลระบบ/แอดมิน', icon: 'fa-user-shield' }
 ];
 
+// เกณฑ์จัดกลุ่ม Sub-Channel ในหน้า Migration (เปอร์เซ็นต์) - เก็บใน config ขององค์กรภายใต้คีย์ MigrationRules
+// (เป็น object เดียว ไม่ใช่รายการแบบหมวดอื่น) ลูกค้าปรับเองได้ในแท็บ Migration ของหน้า Settings
+//   Vanguard      : % New > vanguardNewMin
+//   Migration Hub : (% New + % Migration) > migrationInflowMin และสัดส่วนลูกค้าเดิม (% Migration / (% New + % Migration)) >= migrationExistingMin
+//   Cash Cow      : (% New + % Migration) < retentionInflowMin
+//   Retention Hub : นอกนั้น ((% New + % Migration) >= retentionInflowMin)
+const MIGRATION_RULES_KEY = 'MigrationRules';
+const DEFAULT_MIGRATION_RULES = { vanguardNewMin: 70, migrationInflowMin: 70, migrationExistingMin: 80, retentionInflowMin: 30 };
+
+// ค่าเกณฑ์ที่ใช้จริง: ค่าที่องค์กรบันทึกไว้ (ถ้ามี) ทับค่า default ทีละฟิลด์
+function stgGetMigrationRules() {
+  const saved = (window.AppData && window.AppData.config && window.AppData.config[MIGRATION_RULES_KEY]) || {};
+  const out = Object.assign({}, DEFAULT_MIGRATION_RULES);
+  Object.keys(DEFAULT_MIGRATION_RULES).forEach(k => {
+    const n = Number(saved[k]);
+    if (saved[k] !== undefined && saved[k] !== null && saved[k] !== '' && Number.isFinite(n)) out[k] = n;
+  });
+  return out;
+}
+window.getMigrationRules = stgGetMigrationRules;
+
 // Product/SubProduct เป็น "กลุ่ม" ที่ต้อง Mapping กับค่าดิบจากคอลัมน์สินค้าในไฟล์ที่ import เข้ามาจริง
 // (แต่ละ item จะมี rawValues: string[] เพิ่มจากหมวดอื่นๆ ที่เป็นแค่รายชื่อเฉยๆ) ต่างจาก Channel/SubChannel/Admin
 // ซึ่งยังเป็นแค่รายชื่อ dropdown ธรรมดา ไม่มี mapping - เพราะ dashboard.html จับ Channel/SubChannel/Admin จาก
@@ -142,6 +163,7 @@ function settingsResolveConfig(state) {
   SETTINGS_CATEGORIES.forEach(c => {
     out[c.key] = Array.isArray(saved[c.key]) ? saved[c.key] : (defaults[c.key] || []);
   });
+  if (saved[MIGRATION_RULES_KEY] && typeof saved[MIGRATION_RULES_KEY] === 'object') out[MIGRATION_RULES_KEY] = saved[MIGRATION_RULES_KEY];
   return out;
 }
 
@@ -361,6 +383,9 @@ function stgRenderAll(container) {
         <i class="fas fa-users-gear"></i> จัดการผู้ใช้งานระบบ
         ${(window.AppData.accessRequests || []).length > 0 ? `<span class="stg-tab-badge">${window.AppData.accessRequests.length}</span>` : ''}
       </button>
+      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'migration' ? 'active' : ''}" onclick="stgSwitchMainTab('migration')">
+        <i class="fas fa-route"></i> Migration
+      </button>
       <button class="stg-maintab-btn ${__settingsUi.mainTab === 'exportlog' ? 'active' : ''}" onclick="stgSwitchMainTab('exportlog')">
         <i class="fas fa-file-export"></i> Export Log
         ${(window.qmExportUnseen || 0) > 0 ? `<span class="stg-tab-badge" id="stg-exportlog-tab-badge">${window.qmExportUnseen}</span>` : ''}
@@ -390,13 +415,14 @@ function stgRenderAll(container) {
 function stgBuildMainTabBody(tab) {
   if (tab === 'users') return stgBuildUsersSection();
   if (tab === 'exportlog') return stgBuildExportLogSection();
+  if (tab === 'migration') return stgBuildMigrationSection();
   return stgBuildConfigSection();
 }
 
 window.stgSwitchMainTab = function(tab) {
   __settingsUi.mainTab = tab;
   const body = document.getElementById('stg-maintab-body');
-  const tabOrder = ['config', 'users', 'exportlog'];
+  const tabOrder = ['config', 'users', 'migration', 'exportlog'];
   document.querySelectorAll('.stg-maintab-btn').forEach((b, i) => b.classList.toggle('active', tabOrder[i] === tab));
   if (!body) return;
   if (tab === 'exportlog') {
@@ -417,6 +443,95 @@ window.stgSwitchMainTab = function(tab) {
     return;
   }
   body.innerHTML = stgBuildMainTabBody(tab);
+};
+
+// =====================================================
+// Migration: เกณฑ์จัดกลุ่ม Sub-Channel (Vanguard / Migration Hub / Retention Hub / Cash Cow)
+// =====================================================
+function stgBuildMigrationSection() {
+  const r = stgGetMigrationRules();
+  const field = (key, value) => `<input type="number" id="stg-mig-${key}" class="stg-input stg-mig-input" min="0" max="100" step="1" value="${stgEscapeHtml(value)}"> %`;
+  const row = (dot, title, sub, rule, meaning) => `
+    <tr>
+      <td style="text-align:left;"><span class="stg-mig-dot" style="background:${dot};"></span><b>${title}</b><div class="stg-mig-sub">${sub}</div></td>
+      <td style="text-align:left;">${rule}</td>
+      <td style="text-align:left;" class="stg-mig-sub">${meaning}</td>
+    </tr>`;
+  return `
+    <div class="stg-card">
+      <div class="stg-section-toolbar">
+        <div>
+          <h3>เกณฑ์จัดกลุ่ม Migration</h3>
+          <p class="stg-mig-sub">ใช้จัดหมวด Sub-Channel ในหน้า Migration &middot; % New = ลูกค้าใหม่ / Buyers &middot; % Migration = ลูกค้าเดิมที่ซื้อ Sub-Channel นี้ครั้งแรก / Buyers &middot; ตรวจตามลำดับจากบนลงล่าง</p>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="stg-btn stg-btn-ghost" onclick="stgResetMigrationRules()"><i class="fas fa-rotate-left"></i> คืนค่าเริ่มต้น</button>
+          <button class="stg-btn stg-btn-primary" id="stg-mig-save-btn" onclick="stgSaveMigrationRules()"><i class="fas fa-save"></i> บันทึก</button>
+        </div>
+      </div>
+      <div class="stg-table-wrapper">
+        <table class="stg-table">
+          <thead><tr><th style="text-align:left;">กลุ่ม</th><th style="text-align:left;">เงื่อนไข</th><th style="text-align:left;">ความหมายเชิงกลยุทธ์</th></tr></thead>
+          <tbody>
+            ${row('#3b82f6', 'Vanguard (ทัพหน้า)', 'หาคนใหม่เก่งมาก',
+              `% New &gt; ${field('vanguardNewMin', r.vanguardNewMin)}`,
+              'ยิงแอดหาคนใหม่ (Pure New) แล้วได้ผลดีเยี่ยม')}
+            ${row('#22c55e', 'Migration Hub', 'จุดรับแขกเก่า',
+              `% New + % Migration &gt; ${field('migrationInflowMin', r.migrationInflowMin)}<br>และเป็นลูกค้าเดิม (% Migration ÷ (% New + % Migration)) ≥ ${field('migrationExistingMin', r.migrationExistingMin)}`,
+              'ลูกค้าเก่าจากเพจอื่น "ไหล" มาลองซื้อที่เพจนี้เยอะ')}
+            ${row('#f97316', 'Retention Hub', 'ถังเก็บลูกค้า',
+              `% New + % Migration ≥ เกณฑ์ Cash Cow (${stgEscapeHtml(r.retentionInflowMin)}%) และไม่เข้ากลุ่มด้านบน`,
+              'ลูกค้าเดิมของเพจนั้นกลับมาซื้อซ้ำต่อเนื่อง (เน้นกำไร)')}
+            ${row('#ef4444', 'Cash Cow', 'เสือนอนกิน',
+              `% New + % Migration &lt; ${field('retentionInflowMin', r.retentionInflowMin)}`,
+              'แทบไม่มีคนใหม่เลย แต่ลูกค้าเก่าแก่ยังซื้ออยู่ (ไม่ต้องลงแอด)')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function stgReadMigrationRulesForm() {
+  const out = {};
+  for (const key of Object.keys(DEFAULT_MIGRATION_RULES)) {
+    const el = document.getElementById('stg-mig-' + key);
+    const raw = el ? String(el.value).trim() : '';
+    const n = Number(raw);
+    if (raw === '' || !Number.isFinite(n) || n < 0 || n > 100) {
+      stgToast('กรุณากรอกตัวเลข 0-100 ให้ครบทุกช่อง', 'error');
+      if (el) el.focus();
+      return null;
+    }
+    out[key] = n;
+  }
+  return out;
+}
+
+function stgPersistMigrationRules(rules, successMessage) {
+  const btn = document.getElementById('stg-mig-save-btn');
+  if (btn) btn.disabled = true;
+  settingsApiSaveConfig(MIGRATION_RULES_KEY, rules).then(saved => {
+    window.AppData.config[MIGRATION_RULES_KEY] = saved;
+    stgNotifyChange('config', { category: MIGRATION_RULES_KEY });
+    const body = document.getElementById('stg-maintab-body');
+    if (body && __settingsUi.mainTab === 'migration') body.innerHTML = stgBuildMigrationSection();
+    stgToast(successMessage, 'success');
+  }).catch(err => {
+    console.error('[Settings] บันทึกเกณฑ์ Migration ไม่สำเร็จ', err);
+    stgToast('บันทึกไม่สำเร็จ: ' + (err && err.message ? err.message : err), 'error');
+    if (btn) btn.disabled = false;
+  });
+}
+
+window.stgSaveMigrationRules = function() {
+  const rules = stgReadMigrationRulesForm();
+  if (rules) stgPersistMigrationRules(rules, 'บันทึกเกณฑ์ Migration แล้ว');
+};
+
+window.stgResetMigrationRules = function() {
+  const d = DEFAULT_MIGRATION_RULES;
+  if (!confirm(`คืนค่าเกณฑ์ Migration เป็นค่าเริ่มต้น (Vanguard ${d.vanguardNewMin}% / Migration Hub ${d.migrationInflowMin}% + ลูกค้าเดิม ${d.migrationExistingMin}% / Cash Cow ${d.retentionInflowMin}%) ใช่หรือไม่?`)) return;
+  stgPersistMigrationRules(Object.assign({}, d), 'คืนค่าเริ่มต้นแล้ว');
 };
 
 // =====================================================
@@ -1246,6 +1361,9 @@ function stgInjectStyles() {
     }
     .stg-table td { padding: 10px 8px; border-bottom: 1px solid #f5f5f5; text-align: center; }
     .stg-empty { color: #94a3b8; padding: 30px !important; }
+    .stg-mig-input { width: 70px !important; display: inline-block; padding: 4px 8px; margin: 2px 0; text-align: right; }
+    .stg-mig-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+    .stg-mig-sub { font-size: 12px; color: #64748b; margin: 2px 0 0 0; }
 
     .stg-badge { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 11.5px; font-weight: 700; }
     .stg-badge-on { background: rgba(25,135,84,0.1); color: #198754; }

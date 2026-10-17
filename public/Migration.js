@@ -193,6 +193,11 @@ function renderExecutive2(filteredData, rawData) {
     }
   });
 
+  // Category thresholds (percent) - editable per organization on Settings > Migration
+  const rules = typeof window.getMigrationRules === 'function'
+    ? window.getMigrationRules()
+    : { vanguardNewMin: 70, migrationInflowMin: 70, migrationExistingMin: 80, retentionInflowMin: 30 };
+
   // Convert to array and calculate metrics
   const results = Object.keys(agg).map(sc => {
     const data = agg[sc];
@@ -212,16 +217,18 @@ function renderExecutive2(filteredData, rawData) {
     let dotClass = '';
     
     const totalNewAndMig = pctNew + pctMig;
-    
-    if (pctNew > 70) {
+    // share of the incoming buyers (new + migrated in) who are existing customers
+    const pctExistingOfInflow = totalNewAndMig === 0 ? 0 : (pctMig / totalNewAndMig) * 100;
+
+    if (pctNew > rules.vanguardNewMin) {
       category = 'Vanguard';
       categoryClass = 'badge-vanguard';
       dotClass = 'dot-vanguard';
-    } else if (pctMig > 70) {
+    } else if (totalNewAndMig > rules.migrationInflowMin && pctExistingOfInflow >= rules.migrationExistingMin) {
       category = 'Migration Hub';
       categoryClass = 'badge-migration';
       dotClass = 'dot-migration';
-    } else if (totalNewAndMig < 30) {
+    } else if (totalNewAndMig < rules.retentionInflowMin) {
       category = 'Cash Cow';
       categoryClass = 'badge-cashcow';
       dotClass = 'dot-cashcow';
@@ -264,28 +271,28 @@ function renderExecutive2(filteredData, rawData) {
         <div class="exec2-card-dot dot-vanguard"></div>
         <div class="exec2-card-text">
           <span class="exec2-card-title">Vanguard (ทัพหน้า)</span>
-          <span class="exec2-card-sub">หาคนใหม่เก่งมาก &middot; ยิงแอดหาคนใหม่ (Pure New) แล้วได้ผลดีเยี่ยม</span>
+          <span class="exec2-card-sub">หาคนใหม่เก่งมาก &middot; ยิงแอดหาคนใหม่ (Pure New) แล้วได้ผลดีเยี่ยม<br>% New &gt; ${rules.vanguardNewMin}%</span>
         </div>
       </div>
       <div class="exec2-card migration">
         <div class="exec2-card-dot dot-migration"></div>
         <div class="exec2-card-text">
           <span class="exec2-card-title">Migration Hub (จุดรับแขกเก่า)</span>
-          <span class="exec2-card-sub">ลูกค้าเก่าจากเพจอื่น "ไหล" มาลองซื้อที่เพจนี้เยอะ</span>
+          <span class="exec2-card-sub">ลูกค้าเก่าจากเพจอื่น "ไหล" มาลองซื้อที่เพจนี้เยอะ<br>% New + % Migration &gt; ${rules.migrationInflowMin}% และเป็นลูกค้าเดิม ≥ ${rules.migrationExistingMin}%</span>
         </div>
       </div>
       <div class="exec2-card retention">
         <div class="exec2-card-dot dot-retention"></div>
         <div class="exec2-card-text">
           <span class="exec2-card-title">Retention Hub (ถังเก็บลูกค้า)</span>
-          <span class="exec2-card-sub">ลูกค้าเดิมของเพจนั้นกลับมาซื้อซ้ำต่อเนื่อง (เน้นกำไร)</span>
+          <span class="exec2-card-sub">ลูกค้าเดิมของเพจนั้นกลับมาซื้อซ้ำต่อเนื่อง (เน้นกำไร)<br>% New + % Migration ≥ ${rules.retentionInflowMin}%</span>
         </div>
       </div>
       <div class="exec2-card cashcow">
         <div class="exec2-card-dot dot-cashcow"></div>
         <div class="exec2-card-text">
           <span class="exec2-card-title">Cash Cow (เสือนอนกิน)</span>
-          <span class="exec2-card-sub">แทบไม่มีคนใหม่เลย แต่ลูกค้าเก่าแก่ยังซื้ออยู่ (ไม่ต้องลงแอด)</span>
+          <span class="exec2-card-sub">แทบไม่มีคนใหม่เลย แต่ลูกค้าเก่าแก่ยังซื้ออยู่ (ไม่ต้องลงแอด)<br>% New + % Migration &lt; ${rules.retentionInflowMin}%</span>
         </div>
       </div>
     </div>
