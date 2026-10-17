@@ -988,7 +988,7 @@
         if (mainFiltersBar) mainFiltersBar.style.display = 'flex';
         if (execFiltersBar) execFiltersBar.style.display = 'none';
 
-        if (typeof renderAiAnalytics === 'function') { renderAiAnalytics(filteredData, getScopedRawData()); }
+        if (typeof renderAiAnalytics === 'function') { renderAiAnalytics(getAiAnalyticsData(), getScopedRawData(), { year: filters.Year, month: filters.Month }); }
       } else if (tabId === 'settings') {
         if (sideSettings) sideSettings.classList.add('active');
         document.getElementById('view-settings').style.display = 'block';
@@ -2081,6 +2081,12 @@
       return computeFilteredData(Object.assign({}, filters, { Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All' }));
     }
 
+    // หน้า AI Analytics วิเคราะห์ "เดือนที่เลือก" (Filter Year/Month) เทียบกับเดือน/สัปดาห์ก่อนหน้า จึงต้องได้ข้อมูล
+    // ทุกปี (ไม่ตัดตาม Year) ไม่งั้นเดือน ม.ค. จะไม่มี ธ.ค. ปีก่อนให้เทียบ - Year/Month ส่งไปเป็นตัวกำหนดเดือนแทน
+    function getAiAnalyticsData() {
+      return computeFilteredData(Object.assign({}, filters, { Year: 'All' }));
+    }
+
     function applyFilters() {
       // แก้ปัญหาหน้าเด้งกลับขึ้นบนสุดทุกครั้งที่กด Filter (ทั้ง global filter บนสุด และ filter ภายในแต่ละ view
       // ล้วนเรียกฟังก์ชันนี้ซึ่ง re-render ทุก view ที่เปิดอยู่ ทำให้ความสูงหน้าเปลี่ยนแล้วเลื่อนขึ้นบนสุด)
@@ -2100,7 +2106,7 @@
       // loadInsightHubDataFromAppsScript/window.refreshInsightHub above), unrelated to this
       // CSV-driven filters/rawData pipeline.
       try { if (document.getElementById('view-retention').style.display === 'block') { refreshRetentionView(); } } catch(e) { console.error(e); }
-      try { if (document.getElementById('view-ai-analytics').style.display === 'block' && typeof renderAiAnalytics === 'function') { renderAiAnalytics(filteredData, getScopedRawData()); } } catch(e) { console.error(e); }
+      try { if (document.getElementById('view-ai-analytics').style.display === 'block' && typeof renderAiAnalytics === 'function') { renderAiAnalytics(getAiAnalyticsData(), getScopedRawData(), { year: filters.Year, month: filters.Month }); } } catch(e) { console.error(e); }
       // หน้า Executive ใช้ execFilters แยกต่างหาก ไม่ได้อยู่ในลูป filteredData ด้านบน - ถ้าไม่เรียกตรงนี้ด้วย
       // การ Import Data/Load Sample ใหม่ตอนที่ค้างอยู่หน้า Executive อยู่แล้ว จะไม่รีเฟรชข้อมูลเลย (ค้าง
       // "No data available" ต่อไปจนกว่าจะสลับแท็บออกแล้วกลับเข้ามาใหม่)
@@ -2774,7 +2780,7 @@
   <script src="cohort.js?v=13"></script>
   <script src="executive.js?v=20"></script>
   <script src="Migration.js?v=16"></script>
-  <script src="ai-analytics.js?v=2"></script>
+  <script src="ai-analytics.js?v=3"></script>
   <script src="insighthub-api.js?v=1"></script>
   <script src="insighthub.js?v=16"></script>
   <script src="retention.js?v=1"></script>

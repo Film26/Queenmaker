@@ -8,7 +8,9 @@
 // Calculation Layer (see the comment above calculateMetrics() in dashboard.html) - never
 // re-implemented locally, so this tab can never drift from Overview/Executive/Migration's numbers.
 
-function renderAiAnalytics(filteredData, rawData) {
+// period = { year, month } จาก Filter บนสุด: month ('YYYY-MM') = วิเคราะห์เดือนนั้น, year อย่างเดียว = เดือนล่าสุดที่มี
+// ข้อมูลในปีนั้น, ไม่เลือกเลย ('All') = เดือนล่าสุดของข้อมูลทั้งหมด (filteredData ต้องมีเดือนก่อนหน้าด้วยเพื่อใช้เทียบ)
+function renderAiAnalytics(filteredData, rawData, period) {
   const container = document.getElementById('view-ai-analytics');
   if (!container) return;
 
@@ -157,7 +159,15 @@ function renderAiAnalytics(filteredData, rawData) {
     return;
   }
 
-  const latestKey = dateKeys[dateKeys.length - 1];
+  const selMonth = period && period.month && period.month !== 'All' ? period.month : null;
+  const selYear = period && period.year && period.year !== 'All' ? String(period.year) : null;
+  const periodKeys = dateKeys.filter(dk => selMonth ? dk.startsWith(selMonth + '-') : (selYear ? dk.startsWith(selYear + '-') : true));
+  if (periodKeys.length === 0) {
+    container.innerHTML = `<div style="text-align:center; padding:50px; color:#999;">ไม่พบข้อมูลของ${selMonth ? 'เดือน ' + selMonth : 'ปี ' + selYear} ตาม Filter ที่เลือก</div>`;
+    return;
+  }
+  // วันสุดท้ายที่มีข้อมูลในเดือน/ปีที่เลือก = "วันล่าสุด" ของการวิเคราะห์ (เดือนที่ปิดไปแล้วจะได้ทั้งเดือน)
+  const latestKey = periodKeys[periodKeys.length - 1];
   const [latestY, latestM, latestD] = latestKey.split('-').map(Number);
   const currentMonthStr = `${latestY}-${String(latestM).padStart(2, '0')}`;
   const daysElapsed = latestD;
@@ -223,7 +233,7 @@ function renderAiAnalytics(filteredData, rawData) {
   const kpiHtml = `
     <div class="ai-kpi-row">
       <div class="ai-kpi-card">
-        <div class="ai-kpi-label">ยอดสะสมเดือนนี้ (MTD)</div>
+        <div class="ai-kpi-label">ยอดสะสม ${monthLabelShort(currentMonthStr)} (MTD)</div>
         <div class="ai-kpi-value">${fmtMoney(mtdM.totalSales)}</div>
         <div class="ai-kpi-sub">เฉลี่ย ${fmtMoney(mtdM.totalSales / daysElapsed)} /วัน · ${fmtNum(mtdM.totalOrders)} ออเดอร์</div>
       </div>
@@ -253,7 +263,7 @@ function renderAiAnalytics(filteredData, rawData) {
   const allChannels = new Set();
   filteredData.forEach(row => { const sc = getSubChannel(row); if (sc) allChannels.add(sc); });
 
-  const channelRows = Array.from(allChannels).map(sc => {
+  const channelRows = Array.from(allChannels).filter(sc => monthHasChannelData(currentMonthStr, sc) || monthHasChannelData(prevMonthStr, sc)).map(sc => {
     const mtd = sumForMonth(currentMonthStr, daysElapsed, sc);
     const prevSame = sumForMonth(prevMonthStr, daysElapsed, sc);
     const avg3c = avg3Same(sc);
@@ -426,7 +436,7 @@ function renderAiAnalytics(filteredData, rawData) {
   // ==================================================================================
   container.innerHTML = `
     <div class="ai-section-title">AI Analytics</div>
-    <div class="ai-section-sub">(ข้อมูลล่าสุดถึงวันที่ ${latestD}/${latestM}/${latestY})</div>
+    <div class="ai-section-sub">(วิเคราะห์เดือน ${monthLabel(currentMonthStr)} · ข้อมูลถึงวันที่ ${latestD}/${latestM}/${latestY}${selMonth ? '' : ' · เลือกเดือนอื่นได้จาก Filter Month ด้านบน'})</div>
     ${kpiHtml}
     <div class="ai-block">
       <div class="ai-block-head"><span class="ai-icon">🔍</span><h3>อ่านสถานการณ์</h3></div>
