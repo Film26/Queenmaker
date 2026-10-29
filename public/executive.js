@@ -394,6 +394,13 @@ function renderExecutive1(filteredData, rawData) {
     agg[m].newGlobalBuyers.forEach(id => total.newGlobalBuyers.add(id));
     agg[m].newToSubBuyers.forEach(id => total.newToSubBuyers.add(id));
   }
+  // Total Year "Old Customers" ต้องไม่ทับซ้อนกับ "New Customers" (New + Old = Buyers เสมอ ให้ %New + %Old = 100%
+  // เหมือนที่แต่ละเดือนทำได้อยู่แล้ว) - total.retainedBuyers ที่ได้จากการ union ของ agg[m].retainedBuyers ด้านบน
+  // นับซ้ำ: ลูกค้าที่เพิ่งซื้อครั้งแรกในเดือนหนึ่ง (นับเป็น New เดือนนั้น) แล้วซื้อซ้ำอีกเดือนในปีเดียวกัน (นับเป็น Old
+  // ของเดือนนั้นด้วย) จะติดอยู่ใน union ทั้งสองฝั่ง ทำให้ Total Year ของ Old บวม เกิน Buyers - Old (Total Year) ที่
+  // ถูกต้องคือคนที่ซื้อปีนี้ "ลบ" คนที่เพิ่งเป็นลูกค้าใหม่ปีนี้ออก (ลูกค้าเก่าจริงๆ ที่ซื้อซ้ำ ไม่ใช่ "เคยถูกนับว่าซื้อซ้ำ
+  // ในบางเดือน" เฉยๆ) - รายเดือน (agg[m].retainedBuyers) ไม่ต้องแก้ เพราะต่อเดือนแยก new/old ไม่ซ้อนกันอยู่แล้ว
+  total.retainedBuyers = new Set([...total.uniqueBuyers].filter(id => !total.newGlobalBuyers.has(id)));
   // Formatting helpers
   // ค่าที่คำนวณไม่ได้ (ตัวหารเป็น 0 = ไม่มีข้อมูล) แสดง - ไม่แสดง 0/NaN - ปัดเศษเฉพาะตอนแสดงผลเท่านั้น
   const isNA = (num) => num === null || num === undefined || typeof num !== 'number' || !Number.isFinite(num);
