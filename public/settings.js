@@ -386,6 +386,9 @@ function stgRenderAll(container) {
       <button class="stg-maintab-btn ${__settingsUi.mainTab === 'migration' ? 'active' : ''}" onclick="stgSwitchMainTab('migration')">
         <i class="fas fa-route"></i> Migration
       </button>
+      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'import' ? 'active' : ''}" onclick="stgSwitchMainTab('import')">
+        <i class="fas fa-file-import"></i> Import Data
+      </button>
       <button class="stg-maintab-btn ${__settingsUi.mainTab === 'exportlog' ? 'active' : ''}" onclick="stgSwitchMainTab('exportlog')">
         <i class="fas fa-file-export"></i> Export Log
         ${(window.qmExportUnseen || 0) > 0 ? `<span class="stg-tab-badge" id="stg-exportlog-tab-badge">${window.qmExportUnseen}</span>` : ''}
@@ -416,13 +419,14 @@ function stgBuildMainTabBody(tab) {
   if (tab === 'users') return stgBuildUsersSection();
   if (tab === 'exportlog') return stgBuildExportLogSection();
   if (tab === 'migration') return stgBuildMigrationSection();
+  if (tab === 'import') return stgBuildImportSection();
   return stgBuildConfigSection();
 }
 
 window.stgSwitchMainTab = function(tab) {
   __settingsUi.mainTab = tab;
   const body = document.getElementById('stg-maintab-body');
-  const tabOrder = ['config', 'users', 'migration', 'exportlog'];
+  const tabOrder = ['config', 'users', 'migration', 'import', 'exportlog'];
   document.querySelectorAll('.stg-maintab-btn').forEach((b, i) => b.classList.toggle('active', tabOrder[i] === tab));
   if (!body) return;
   if (tab === 'exportlog') {
@@ -443,6 +447,83 @@ window.stgSwitchMainTab = function(tab) {
     return;
   }
   body.innerHTML = stgBuildMainTabBody(tab);
+};
+
+// =====================================================
+// Import Data: นำเข้าข้อมูลเพิ่มเติม (ต่อท้ายข้อมูลเดิม ตัดแถวที่ซ้ำกับของเดิม) - ใช้ window.qmImportData ใน dashboard.html
+// ตัวเดียวกับป๊อปอัพตอนเข้าระบบ
+// =====================================================
+function stgImportCountText(target) {
+  const count = typeof window.qmImportedRowCount === 'function' ? window.qmImportedRowCount(target) : 0;
+  return 'ตอนนี้มีข้อมูล ' + count.toLocaleString() + ' แถว';
+}
+
+function stgBuildImportSection() {
+  const fileRow = (target, icon, label) => `
+    <div class="stg-import-row">
+      <span class="stg-import-icon"><i class="fas ${icon}"></i></span>
+      <div class="stg-import-text">
+        <div class="stg-import-label">${label}</div>
+        <div class="stg-subtitle" id="stg-import-status-${target}">${stgImportCountText(target)} · รองรับไฟล์ .csv, .xlsx, .xls</div>
+      </div>
+      <button class="stg-btn stg-btn-primary" onclick="document.getElementById('stg-import-file-${target}').click()">
+        <i class="fas fa-folder-open"></i> Choose file
+      </button>
+      <input type="file" id="stg-import-file-${target}" accept=".csv,.xlsx,.xls" hidden onchange="stgImportFile('${target}', this)">
+    </div>`;
+  return `
+    <div class="stg-card">
+      <div class="stg-section-toolbar">
+        <div>
+          <h3>นำเข้าข้อมูลเพิ่มเติม</h3>
+          <p class="stg-subtitle">ข้อมูลใหม่จะต่อท้ายข้อมูลที่มีอยู่ และข้ามแถวที่ซ้ำกับข้อมูลเดิม</p>
+        </div>
+      </div>
+      ${fileRow('main', 'fa-file-import', 'Import Data')}
+      ${fileRow('retention', 'fa-rotate', 'Import Data for Retention')}
+      <div class="stg-import-row stg-import-row-sheet">
+        <span class="stg-import-icon"><i class="fas fa-table"></i></span>
+        <div class="stg-import-text">
+          <div class="stg-import-label">Import Data from Google Sheet</div>
+          <div class="stg-subtitle" id="stg-import-status-sheet">เพิ่มเข้าข้อมูลหลัก · แชร์ชีตเป็น "ทุกคนที่มีลิงก์ดูได้" ก่อนวางลิงก์</div>
+        </div>
+        <div class="stg-import-link">
+          <input type="url" id="stg-import-sheet-link" class="stg-input" placeholder="วางลิงก์ Google Sheet" aria-label="ลิงก์ Google Sheet" onkeydown="if(event.key==='Enter') stgImportSheet()">
+          <button class="stg-btn stg-btn-primary" onclick="stgImportSheet()"><i class="fas fa-link"></i> นำเข้า</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function stgRunImport(source, target, statusId, sourceName) {
+  return window.qmImportData(source, target, true).then(result => {
+    const skipped = result.skipped > 0 ? ' (ข้ามซ้ำ ' + result.skipped.toLocaleString() + ' แถว)' : '';
+    const message = sourceName + ' · เพิ่ม ' + result.added.toLocaleString() + ' แถวใหม่' + skipped + ' · รวม ' + result.total.toLocaleString() + ' แถว';
+    const status = document.getElementById(statusId);
+    if (status) { status.textContent = message; status.style.color = '#15803d'; }
+    stgToast('นำเข้าข้อมูลสำเร็จ', 'success');
+    return true;
+  }).catch(err => {
+    console.error('[Settings] นำเข้าข้อมูลไม่สำเร็จ', err);
+    const status = document.getElementById(statusId);
+    if (status) { status.textContent = sourceName + ' · ' + err.message; status.style.color = '#b91c1c'; }
+    stgToast('นำเข้าข้อมูลไม่สำเร็จ', 'error');
+    return false;
+  });
+}
+
+window.stgImportFile = function(target, input) {
+  const file = input.files[0];
+  if (file) stgRunImport({ file }, target, 'stg-import-status-' + target, file.name);
+  input.value = '';
+};
+
+window.stgImportSheet = function() {
+  const input = document.getElementById('stg-import-sheet-link');
+  if (!input.value.trim()) { input.focus(); return; }
+  stgRunImport({ sheetLink: input.value }, 'main', 'stg-import-status-sheet', 'Google Sheet').then(ok => {
+    if (ok) input.value = '';
+  });
 };
 
 // =====================================================
@@ -1352,6 +1433,19 @@ function stgInjectStyles() {
     .stg-btn:hover { opacity: 0.9; }
     .stg-btn-primary { background: #1e293b; color: #fff; }
     .stg-btn-ghost { background: #eee; color: #333; }
+
+    .stg-import-row { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; padding: 16px 0; border-top: 1px solid #f0ece6; }
+    .stg-import-row:last-child { padding-bottom: 0; }
+    .stg-import-icon {
+      flex-shrink: 0; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
+      border-radius: 10px; background: #f1f5f9; color: #1e293b; font-size: 15px;
+    }
+    .stg-import-text { flex: 1; min-width: 200px; }
+    .stg-import-label { font-size: 13.5px; font-weight: 600; color: #1e293b; margin-bottom: 3px; }
+    .stg-import-link { display: flex; gap: 10px; flex-basis: 100%; margin-left: 52px; }
+    .stg-import-link .stg-input { flex: 1; min-width: 0; }
+    .stg-import-link .stg-btn { flex-shrink: 0; }
+    @media (max-width: 560px) { .stg-import-link { margin-left: 0; } }
 
     .stg-table-wrapper { overflow-x: auto; }
     .stg-table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'Inter', sans-serif; }

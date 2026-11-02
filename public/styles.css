@@ -555,11 +555,6 @@ h1, h2, h3, .brand-name {
   background: #f8f9fa;
 }
 
-/* File Input (Hidden) */
-#fileInput {
-  display: none;
-}
-
 /* Loading Overlay */
 .loading-overlay {
   position: fixed;
