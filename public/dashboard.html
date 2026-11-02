@@ -652,6 +652,33 @@
       });
     }
 
+    // ข้อความในช่องตาราง -> ค่าในช่อง Excel ที่แสดงผลเหมือนบนหน้าจอทุกตัวอักษร: ตัวเลข/%/เงินเป็นตัวเลขจริงพร้อมรูปแบบ
+    // (12.5% เก็บ 0.125 รูปแบบ 0.0%) จึงยังคำนวณต่อใน Excel ได้ นอกนั้นเป็นข้อความ รวมถึงเลขที่มี 0 นำหน้า (เบอร์โทร)
+    function exportCellFromText(text) {
+      const m = text.trim().match(/^(-?)(฿?)(\d{1,3}(?:,\d{3})+|0|[1-9]\d{0,14})(?:\.(\d+))?(%?)$/);
+      if (!m) return { t: 's', v: text };
+      const [, sign, baht, whole, decimals = '', pct] = m;
+      const num = Number(sign + whole.replace(/,/g, '') + (decimals ? '.' + decimals : ''));
+      const format = (baht ? '"฿"' : '') + (whole.indexOf(',') !== -1 || baht ? '#,##0' : '0') + (decimals ? '.' + '0'.repeat(decimals.length) : '') + pct;
+      return { t: 'n', v: pct ? num / 100 : num, z: format };
+    }
+
+    function tableToExactSheet(table) {
+      const ws = XLSX.utils.table_to_sheet(table, { raw: true });
+      const colWidths = [];
+      Object.keys(ws).forEach(addr => {
+        if (addr[0] === '!') return;
+        // ขึ้นบรรทัดใหม่ในช่อง (<br> ของป้ายชื่อ 2 ภาษา) เป็นเว้นวรรค - Excel ไม่ตัดบรรทัดให้ถ้าไม่ได้ตั้ง Wrap Text คำจะติดกัน
+        const text = String(ws[addr].v === undefined || ws[addr].v === null ? '' : ws[addr].v).replace(/\s*\n\s*/g, ' ').trim();
+        ws[addr] = exportCellFromText(text);
+        // กว้างพอให้ตัวเลขไม่ขึ้น ##### ใน Excel
+        const col = XLSX.utils.decode_cell(addr).c;
+        colWidths[col] = Math.max(colWidths[col] || 0, text.length);
+      });
+      ws['!cols'] = Array.from(colWidths, w => ({ wch: Math.min((w || 0) + 2, 45) }));
+      return ws;
+    }
+
     async function exportCurrentView() {
       const user = window.currentUser;
       if (!user || EXPORT_ROLES.indexOf(user.role) === -1) { alert('เฉพาะ Super Admin และ Manager เท่านั้นที่ Export ข้อมูลได้'); return; }
@@ -677,7 +704,7 @@
           addSheet(XLSX.utils.json_to_sheet(buildMonthlyExportRows()), 'Monthly');
         } else {
           Array.from(document.querySelectorAll('#view-' + tab + ' table')).slice(0, 8).forEach((t, i) => {
-            addSheet(XLSX.utils.table_to_sheet(t), (pageLabel + ' ' + (i + 1)).slice(0, 31));
+            addSheet(tableToExactSheet(t), (pageLabel + ' ' + (i + 1)).slice(0, 31));
           });
         }
         addSheet(XLSX.utils.json_to_sheet(orders), 'Orders');
