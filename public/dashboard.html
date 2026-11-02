@@ -860,6 +860,15 @@
     }
 
     // --- นำแถวข้อมูลเข้าระบบ (ใช้ร่วมกันทั้งไฟล์ CSV และ Excel) ---
+    // แต่ละไฟล์ที่นำเข้ามีชุดคอลัมน์ของตัวเอง (ไฟล์หลักกับไฟล์ Retention คอลัมน์คนละแบบ) จึงต้องจำชื่อคอลัมน์แยกกันต่อไฟล์
+    // ถ้าใช้ keyCache ร่วมกัน แถวของไฟล์หนึ่งจะอ่านคอลัมน์ตามชื่อที่จำไว้จากอีกไฟล์ แล้วได้ค่าว่างทั้งหมด (ดู getRowValue)
+    // non-enumerable เพื่อไม่ให้ปนกับคอลัมน์จริงตอนเทียบแถวซ้ำหรือ Export
+    const ROW_KEY_CACHE = Symbol('rowKeyCache');
+    function attachRowKeyCache(rows) {
+      const cache = {};
+      rows.forEach(row => { if (row) Object.defineProperty(row, ROW_KEY_CACHE, { value: cache }); });
+    }
+
     function isNonEmptyRow(row) {
       return !!row && Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
     }
@@ -1036,6 +1045,7 @@
       try {
         const rows = await (source.file ? readImportFileRows(source.file) : readGoogleSheetRows(source.sheetLink));
         if (!rows.some(isNonEmptyRow)) throw new Error('ไม่พบแถวข้อมูล');
+        attachRowKeyCache(rows);
         try {
           if (target === 'retention') return ingestRetentionRows(rows);
           return append ? appendRows(rows) : ingestRows(rows);
@@ -1342,8 +1352,9 @@
     function getRowValue(row, possibleKeys) {
       if (!row) return '';
       const cacheKey = possibleKeys.join('|');
-      let mappedKey = keyCache[cacheKey];
-      
+      const cache = row[ROW_KEY_CACHE] || keyCache;
+      let mappedKey = cache[cacheKey];
+
       if (mappedKey === undefined) {
         const rowKeys = Object.keys(row);
         const cleanPossible = possibleKeys.map(k => k.toLowerCase().replace(/[^a-zA-Z0-9\u0e00-\u0e7f]/g, ''));
@@ -1359,7 +1370,7 @@
           }
           if (mappedKey) break;
         }
-        keyCache[cacheKey] = mappedKey;
+        cache[cacheKey] = mappedKey;
       }
       return mappedKey ? (row[mappedKey] || '').toString().trim() : '';
     }
