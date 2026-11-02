@@ -131,8 +131,12 @@
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-pie"></i>MUSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-ai-analytics" onclick="event.preventDefault(); switchTab('ai-analytics')"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
+        <!-- id="exportBtn" ต้องคงไว้เดิม - checkSessionOrRedirect() อ้างถึง id นี้ตรงๆ เพื่อโชว์/ซ่อนตามสิทธิ์
+             (เฉพาะ Super Admin/Manager ดู EXPORT_ROLES) ซ่อนไว้ก่อนด้วย display:none จนกว่าจะรู้ role ของผู้ใช้ -->
+        <li class="nav-item"><a href="#" class="nav-link" id="exportBtn" onclick="event.preventDefault(); exportCurrentView();" style="display:none;"><i class="fas fa-file-export"></i>EXPORT DATA</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-kpisetting" onclick="event.preventDefault(); switchTab('kpisetting')"><i class="fas fa-chart-line"></i>KPI SETTING</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-settings" onclick="event.preventDefault(); switchTab('settings')"><i class="fas fa-cog"></i>SETTINGS<span id="side-settings-badge" title="มีการ Export ข้อมูลใหม่ที่ยังไม่ได้ดู (Settings > Export Log)" style="display:none; margin-left:8px; background:#f59e0b; color:#fff; font-size:10.5px; font-weight:700; line-height:1; border-radius:999px; padding:3px 7px;"></span></a></li>
+        <li class="nav-item"><a href="#" class="nav-link" id="logoutBtn" onclick="event.preventDefault(); doLogout();"><i class="fas fa-right-from-bracket"></i>LOGOUT</a></li>
         <li class="nav-item" style="margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border-color);">
           <div style="display:flex; align-items:center; justify-content:center; gap:6px; padding: 4px 20px 0; font-size:11px; font-weight:600; letter-spacing:0.4px; color: var(--text-muted);">
             <i class="fas fa-crown" style="font-size:10px;"></i> Powered by Queenmaker
@@ -158,10 +162,6 @@
             <i class="fas fa-file-import"></i> <span id="importBtnLabel">Import Data</span>
           </button>
           <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display: none;">
-          <button id="exportBtn" class="btn" onclick="exportCurrentView()" style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 8px;">
-            <i class="fas fa-file-export"></i> Export Data
-          </button>
-          <a href="#" class="btn" id="logoutBtn" onclick="event.preventDefault(); doLogout();" style="background: #1e293b; color: #fff; text-decoration: none; border-radius: 20px; padding: 8px 20px; font-weight: 600;">Logout</a>
         </div>
       </header>
       <div class="dashboard-content">
