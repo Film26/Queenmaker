@@ -840,7 +840,7 @@ function renderRetention(filteredData, rawData) {
   window.RET._rawData = rawData;
 
   if (!rawData || rawData.length === 0) {
-    container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">ยังไม่มีข้อมูลสำหรับ Retention — กดปุ่ม "Import Data for Retention" มุมขวาบนเพื่อนำเข้าไฟล์</div>';
+    container.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">ยังไม่มีข้อมูลสำหรับ Retention — นำเข้าไฟล์ได้จากเมนู IMPORT DATA ด้านซ้าย หรือ Settings &gt; Import Data</div>';
     return;
   }
   retInjectStyles();

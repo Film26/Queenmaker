@@ -104,6 +104,40 @@
     .overview-stat-target.down { color: #dc3545; background: rgba(220,53,69,0.1); }
     .overview-stat-target.neutral { color: #6c757d; background: rgba(108,117,125,0.1); }
     @media (max-width: 1100px) { .overview-stat-row { grid-template-columns: repeat(3, 1fr); row-gap: 16px; } .overview-stat-cell:nth-child(3n+1) { border-left: none; } }
+
+    /* ป๊อปอัพนำเข้าข้อมูลตอนเข้าระบบ */
+    .import-popup-overlay { position: fixed; inset: 0; z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(15,23,42,0.45); backdrop-filter: blur(3px); }
+    .import-popup { position: relative; width: 100%; max-width: 580px; max-height: calc(100vh - 40px); overflow-y: auto; box-sizing: border-box; padding: 30px 32px 26px; background: #1e293b; color: #fff; border-radius: 20px; box-shadow: 0 24px 60px rgba(15,23,42,0.4); animation: import-popup-in 0.2s ease-out; }
+    @keyframes import-popup-in { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .import-popup-close { position: absolute; top: 18px; right: 18px; width: 32px; height: 32px; border: none; border-radius: 8px; background: transparent; color: #94a3b8; font-size: 15px; cursor: pointer; }
+    .import-popup-close:hover { background: rgba(255,255,255,0.08); color: #fff; }
+    .import-popup h2 { margin: 0 40px 6px 0; font-family: 'Outfit', sans-serif; font-size: 21px; font-weight: 600; letter-spacing: 0.2px; color: #fff; }
+    .import-popup-sub { margin: 0 0 20px; font-size: 13px; line-height: 1.5; color: #b9c6db; }
+    .import-popup-row { padding: 16px 0; border-top: 1px solid rgba(255,255,255,0.09); }
+    .import-popup-row-main { display: flex; align-items: center; gap: 14px; }
+    .import-popup-icon { flex-shrink: 0; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(255,255,255,0.08); color: #e2e8f0; font-size: 15px; }
+    .import-popup-text { flex: 1; min-width: 0; }
+    .import-popup-label { font-size: 14px; font-weight: 600; color: #fff; }
+    .import-popup-status { margin-top: 3px; font-size: 12px; line-height: 1.45; color: #94a3b8; overflow-wrap: anywhere; }
+    .import-popup-status.success { color: #4ade80; }
+    .import-popup-status.error { color: #fca5a5; }
+    .import-popup-btn { flex-shrink: 0; padding: 9px 16px; border: 1px solid rgba(255,255,255,0.28); border-radius: 10px; background: transparent; color: #fff; font-family: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .15s, border-color .15s; }
+    .import-popup-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.45); }
+    .import-popup-link { display: flex; gap: 10px; margin: 12px 0 0 52px; }
+    .import-popup-link input { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; background: rgba(15,23,42,0.45); color: #fff; font-family: inherit; font-size: 13px; }
+    .import-popup-link input::placeholder { color: #94a3b8; }
+    .import-popup-link input:focus { outline: none; border-color: #cbd5e1; }
+    .import-popup-footer { display: flex; justify-content: flex-end; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.09); }
+    .import-popup-done { padding: 10px 22px; border: none; border-radius: 10px; background: #fff; color: #1e293b; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background .15s; }
+    .import-popup-done:hover { background: #e2e8f0; }
+    @media (max-width: 560px) {
+      .import-popup { padding: 26px 20px 20px; }
+      .import-popup-row-main { flex-wrap: wrap; }
+      .import-popup-text { flex-basis: calc(100% - 52px); }
+      .import-popup-btn { margin-left: 52px; }
+      .import-popup-link { flex-direction: column; margin-left: 0; }
+      .import-popup-link .import-popup-btn { margin-left: 0; }
+    }
   </style>
 </head>
 <body>
@@ -131,6 +165,8 @@
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-pie"></i>MUSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-ai-analytics" onclick="event.preventDefault(); switchTab('ai-analytics')"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
+        <!-- เฉพาะ Manager/Sales Admin (ดู IMPORT_MENU_ROLES) ซ่อนไว้ก่อนจนกว่าจะรู้ role ของผู้ใช้ -->
+        <li class="nav-item" id="side-import-item" style="display:none;"><a href="#" class="nav-link" id="side-import" onclick="event.preventDefault(); openImportPopup();"><i class="fas fa-file-import"></i>IMPORT DATA</a></li>
         <!-- id="exportBtn" ต้องคงไว้เดิม - checkSessionOrRedirect() อ้างถึง id นี้ตรงๆ เพื่อโชว์/ซ่อนตามสิทธิ์
              (เฉพาะ Super Admin/Manager ดู EXPORT_ROLES) ซ่อนไว้ก่อนด้วย display:none จนกว่าจะรู้ role ของผู้ใช้ -->
         <li class="nav-item"><a href="#" class="nav-link" id="exportBtn" onclick="event.preventDefault(); exportCurrentView();" style="display:none;"><i class="fas fa-file-export"></i>EXPORT DATA</a></li>
@@ -156,13 +192,6 @@
          <!-- <img src="./369223.png" alt="QueenMaker" style="width: 42px; height: 42px; object-fit: contain; border-radius: 8px;" onerror="this.style.display='none'">
           <span style="font-family:'Outfit', sans-serif; font-size: 26px; font-weight: 700; color: #1e293b; letter-spacing: 0.3px;">QueenMaker</span>
         </div> -->
-
-        <div class="user-actions" style="justify-self: end; display: flex; gap: 15px; align-items: center;">
-          <button id="importBtn" class="btn" style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 8px 20px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-            <i class="fas fa-file-import"></i> <span id="importBtnLabel">Import Data</span>
-          </button>
-          <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display: none;">
-        </div>
       </header>
       <div class="dashboard-content">
         
@@ -457,6 +486,51 @@
       </div>
     </main>
   </div>
+  <div id="importPopup" class="import-popup-overlay" role="dialog" aria-modal="true" aria-labelledby="importPopupTitle">
+    <div class="import-popup">
+      <button type="button" id="importPopupClose" class="import-popup-close" aria-label="ปิด"><i class="fas fa-times"></i></button>
+      <h2 id="importPopupTitle">นำเข้าข้อมูล</h2>
+      <p class="import-popup-sub" id="importPopupSub">เลือกไฟล์ข้อมูลเพื่อเริ่มใช้งาน Dashboard</p>
+      <div class="import-popup-row">
+        <div class="import-popup-row-main">
+          <span class="import-popup-icon"><i class="fas fa-file-import"></i></span>
+          <div class="import-popup-text">
+            <div class="import-popup-label">Import Data</div>
+            <div class="import-popup-status" id="importStatusMain">รองรับไฟล์ .csv, .xlsx, .xls</div>
+          </div>
+          <button type="button" class="import-popup-btn" data-import-pick="importFileMain">Choose file</button>
+          <input type="file" id="importFileMain" accept=".csv,.xlsx,.xls" hidden>
+        </div>
+      </div>
+      <div class="import-popup-row">
+        <div class="import-popup-row-main">
+          <span class="import-popup-icon"><i class="fas fa-rotate"></i></span>
+          <div class="import-popup-text">
+            <div class="import-popup-label">Import Data for Retention</div>
+            <div class="import-popup-status" id="importStatusRetention">รองรับไฟล์ .csv, .xlsx, .xls</div>
+          </div>
+          <button type="button" class="import-popup-btn" data-import-pick="importFileRetention">Choose file</button>
+          <input type="file" id="importFileRetention" accept=".csv,.xlsx,.xls" hidden>
+        </div>
+      </div>
+      <div class="import-popup-row">
+        <div class="import-popup-row-main">
+          <span class="import-popup-icon"><i class="fas fa-table"></i></span>
+          <div class="import-popup-text">
+            <div class="import-popup-label">Import Data from Google Sheet</div>
+            <div class="import-popup-status" id="importStatusSheet">แชร์ชีตเป็น "ทุกคนที่มีลิงก์ดูได้" ก่อนวางลิงก์</div>
+          </div>
+        </div>
+        <div class="import-popup-link">
+          <input type="url" id="importSheetLink" placeholder="วางลิงก์ Google Sheet" aria-label="ลิงก์ Google Sheet">
+          <button type="button" id="importSheetBtn" class="import-popup-btn">นำเข้า</button>
+        </div>
+      </div>
+      <div class="import-popup-footer">
+        <button type="button" id="importPopupDone" class="import-popup-done">ข้ามไปก่อน</button>
+      </div>
+    </div>
+  </div>
   <div id="loadingOverlay" class="loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center;">
     <div class="spinner" style="width:40px; height:40px; border:4px solid #f3f3f3; border-top:4px solid #d95f1d; border-radius:50%; animation:spin 1s linear infinite;"></div>
   </div>
@@ -468,8 +542,8 @@
     // --- โครงสร้างตัวแปรหลักดั้งเดิม ---
     let rawData = [];
     let filteredData = [];
-    // ชุดข้อมูลแยกต่างหากสำหรับหน้า Retention โดยเฉพาะ (ดูปุ่ม Import - ใช้ปุ่ม/ตำแหน่งเดิม แต่ตอนอยู่แท็บ
-    // Retention จะนำเข้าเข้าชุดนี้แทน ไม่แตะ rawData หลัก) กด Import ซ้ำจะ "เพิ่มต่อ" (merge+dedupe) ไม่ใช่แทนที่
+    // ชุดข้อมูลแยกต่างหากสำหรับหน้า Retention โดยเฉพาะ (นำเข้าผ่านแถว "Import Data for Retention" ในป๊อปอัพตอนเข้าระบบ
+    // หรือ Settings > Import Data ไม่แตะ rawData หลัก) กด Import ซ้ำจะ "เพิ่มต่อ" (merge+dedupe) ไม่ใช่แทนที่
     // - ดู ingestRetentionRows ทุกแท็บอื่นยังคงใช้ rawData เดิมเหมือนก่อนมีฟีเจอร์นี้ทุกประการ
     let retentionRawData = [];
 
@@ -496,6 +570,8 @@
         // Export Data is limited to Super Admin/Manager (also enforced by api/audit/log.js) - Sales Admin never sees the button
         const exportBtn = document.getElementById('exportBtn');
         if (exportBtn) exportBtn.style.display = EXPORT_ROLES.indexOf(data.user.role) !== -1 ? 'flex' : 'none';
+        const importMenuItem = document.getElementById('side-import-item');
+        if (importMenuItem) importMenuItem.style.display = IMPORT_MENU_ROLES.indexOf(data.user.role) !== -1 ? '' : 'none';
         refreshExportBadge();
       }).catch(() => { /* transient network error - don't force logout */ });
     }
@@ -505,6 +581,8 @@
     // them in Settings > Export Log, and a badge on the SETTINGS menu counts exports by other people
     // since the log was last opened (last-seen timestamp is kept per browser in localStorage).
     const EXPORT_ROLES = ['Super Admin', 'Manager'];
+    // Super Admin นำเข้าเพิ่มเติมผ่าน Settings > Import Data ส่วน 2 Role นี้เข้า Settings ไม่ได้ จึงมีเมนูใน Sidebar แทน
+    const IMPORT_MENU_ROLES = ['Manager', 'Sales Admin'];
     const EXPORT_SEEN_KEY = 'qm_exportlog_seen';
     const EXPORT_PAGE_LABELS = { overview: 'Overview', executive1: 'Executive', executive2: 'Migration', retention: 'Retention', cohort: 'Cohort Heatmap', 'ai-analytics': 'AI Analytics' };
     window.qmExportUnseen = 0;
@@ -755,55 +833,59 @@
     }
 
     // --- นำแถวข้อมูลเข้าระบบ (ใช้ร่วมกันทั้งไฟล์ CSV และ Excel) ---
-    function ingestRows(rows) {
-      try {
-        for (let k in keyCache) delete keyCache[k];
-        window.userCohorts = null;
-        window.scFirstPurchase = null;
-
-        rawData = (rows || []).filter(row => {
-          if (!row) return false;
-          return Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
-        });
-
-        refreshGroupMenus();
-        precomputeGlobalFirstPurchases();
-        // เรียกตรงๆ ทุกครั้งที่ import (ไม่ใช่แค่ครั้งแรก) เพื่อให้ตัวเลือก Filter ทั้งหมด
-        // (Year/Month/Channel/SubChannel/Product/SubProduct/Admin) รีเฟรชตามไฟล์ที่ import เข้ามาใหม่เสมอ
-        // - ถ้าปล่อยให้ applyFilters() ตัดสินใจเอง (เช็คว่า menu-Year ว่างไหม) จะรีเฟรชแค่ตอน import ครั้งแรก
-        // ครั้งถัดๆ ไปตัวเลือกจะค้างเป็นของไฟล์เก่าทั้งที่ข้อมูลเปลี่ยนไปแล้ว
-        populateDropdowns();
-        applyFilters();
-      } catch (err) {
-        console.error(err);
-        alert('เกิดข้อผิดพลาดในการประมวลผลข้อมูล');
-      }
+    function isNonEmptyRow(row) {
+      return !!row && Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
+    }
+    function rowSignature(row) {
+      return Object.keys(row).sort().map(k => k + '=' + row[k]).join('|');
     }
 
-    // นำเข้าไฟล์เข้า retentionRawData (ชุดข้อมูลเฉพาะหน้า Retention) แทน rawData หลัก - ใช้ปุ่ม Import ปุ่มเดิม
-    // ตำแหน่งเดิม แค่สลับปลายทางตามแท็บที่เปิดอยู่ตอนกด (ดู fileInput change handler) ต่างจาก ingestRows ตรงที่
+    function ingestRows(rows) {
+      for (let k in keyCache) delete keyCache[k];
+      window.userCohorts = null;
+      window.scFirstPurchase = null;
+
+      rawData = (rows || []).filter(isNonEmptyRow);
+
+      refreshGroupMenus();
+      precomputeGlobalFirstPurchases();
+      // เรียกตรงๆ ทุกครั้งที่ import (ไม่ใช่แค่ครั้งแรก) เพื่อให้ตัวเลือก Filter ทั้งหมด
+      // (Year/Month/Channel/SubChannel/Product/SubProduct/Admin) รีเฟรชตามไฟล์ที่ import เข้ามาใหม่เสมอ
+      // - ถ้าปล่อยให้ applyFilters() ตัดสินใจเอง (เช็คว่า menu-Year ว่างไหม) จะรีเฟรชแค่ตอน import ครั้งแรก
+      // ครั้งถัดๆ ไปตัวเลือกจะค้างเป็นของไฟล์เก่าทั้งที่ข้อมูลเปลี่ยนไปแล้ว
+      populateDropdowns();
+      applyFilters();
+      return { added: rawData.length, skipped: 0, total: rawData.length };
+    }
+
+    // นำเข้าเพิ่มเติมจาก Settings: ต่อท้าย rawData เดิม ตัดเฉพาะแถวที่ซ้ำกับ "ของเดิม" (ไฟล์ช่วงวันที่ทับกัน) แถวที่ซ้ำกันเอง
+    // ในไฟล์ใหม่ยังเก็บไว้ทั้งหมด เหมือนตอนนำเข้าไฟล์นั้นตรงๆ (ออเดอร์ที่มีรายการเหมือนกันจริงจะได้ไม่หาย)
+    function appendRows(rows) {
+      const existing = new Set(rawData.map(rowSignature));
+      const cleaned = (rows || []).filter(isNonEmptyRow);
+      const fresh = cleaned.filter(row => !existing.has(rowSignature(row)));
+      ingestRows(rawData.concat(fresh));
+      return { added: fresh.length, skipped: cleaned.length - fresh.length, total: rawData.length };
+    }
+
+    // นำเข้าไฟล์เข้า retentionRawData (ชุดข้อมูลเฉพาะหน้า Retention) แทน rawData หลัก ต่างจาก ingestRows ตรงที่
     // กด Import ซ้ำจะ "เพิ่มต่อ" (merge) ไม่ใช่แทนที่ทั้งหมด - ตัดแถวที่ซ้ำกับของเดิมทิ้ง (เทียบทุกคอลัมน์/ค่าทุกตัว
     // ของแถว) กันข้อมูลซ้ำซ้อนเวลา import ไฟล์ที่มีช่วงวันที่ทับกับของเก่า
     function ingestRetentionRows(rows) {
-      try {
-        const cleaned = (rows || []).filter(row => row && Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== ''));
-        const sig = (row) => Object.keys(row).sort().map(k => k + '=' + row[k]).join('|');
-        const existing = new Set(retentionRawData.map(sig));
-        let added = 0;
-        cleaned.forEach(row => {
-          const s = sig(row);
-          if (!existing.has(s)) { existing.add(s); retentionRawData.push(row); added++; }
-        });
-        // ข้อมูลใหม่เข้ามาแล้ว ตัวเลือกใน dropdown ของ Filter บนสุด (Year/Channel/ฯลฯ) ต้องสร้างใหม่ ไม่งั้นจะยังว่าง
-        // เปล่าอยู่เหมือนตอนที่ retentionRawData ยังไม่มีข้อมูลเลย (ดู filterRowReaders/populateDropdowns)
-        populateDropdowns();
-        refreshGroupMenus();
-        refreshRetentionView();
-        alert('นำเข้าข้อมูลสำหรับ Retention สำเร็จ: เพิ่ม ' + added.toLocaleString() + ' แถวใหม่ (ข้ามซ้ำ ' + (cleaned.length - added).toLocaleString() + ' แถว) รวมทั้งหมด ' + retentionRawData.length.toLocaleString() + ' แถว');
-      } catch (err) {
-        console.error(err);
-        alert('เกิดข้อผิดพลาดในการประมวลผลข้อมูล Retention');
-      }
+      const cleaned = (rows || []).filter(isNonEmptyRow);
+      const existing = new Set(retentionRawData.map(rowSignature));
+      let added = 0;
+      cleaned.forEach(row => {
+        const s = rowSignature(row);
+        if (!existing.has(s)) { existing.add(s); retentionRawData.push(row); added++; }
+      });
+      // ข้อมูลใหม่เข้ามาแล้ว ตัวเลือกใน dropdown ของ Filter บนสุด (Year/Channel/ฯลฯ) ต้องสร้างใหม่ ไม่งั้นจะยังว่าง
+      // เปล่าอยู่เหมือนตอนที่ retentionRawData ยังไม่มีข้อมูลเลย (ดู filterRowReaders/populateDropdowns)
+      populateDropdowns();
+      refreshGroupMenus();
+      // แท็บอื่นยังไม่ต้องวาด (กราฟวาดลง view ที่ซ่อนอยู่ไม่ได้) - switchTab('retention') จะวาดให้ตอนเปิดแท็บ
+      if (window.currentTabId === 'retention') refreshRetentionView();
+      return { added, skipped: cleaned.length - added, total: retentionRawData.length };
     }
 
     // --- อ่านไฟล์ Excel (.xlsx/.xls) เป็นแถวข้อมูลหน้าตาเดียวกับที่ PapaParse ให้ (หัวคอลัมน์ = key, ค่าเป็นข้อความ) ---
@@ -873,60 +955,145 @@
       return rows;
     }
 
+    function parseCsvRows(input) {
+      return new Promise((resolve, reject) => {
+        Papa.parse(input, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => resolve(results.data),
+          error: (err) => { console.error(err); reject(new Error('อ่านไฟล์ CSV ไม่สำเร็จ')); }
+        });
+      });
+    }
+
+    function readImportFileRows(file) {
+      const ext = (file.name.split('.').pop() || '').toLowerCase();
+      if (ext !== 'xlsx' && ext !== 'xls') return parseCsvRows(file);
+      return file.arrayBuffer().then(readExcelRows);
+    }
+
+    // ลิงก์ชีตปกติ (/d/<id>/edit#gid=...) หรือลิงก์ Publish to web (/d/e/<id>/pub...) -> ลิงก์ดาวน์โหลด CSV ของแท็บที่อยู่ในลิงก์
+    function googleSheetCsvUrl(link) {
+      const text = String(link || '').trim();
+      const match = text.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/(e\/)?([\w-]+)/);
+      if (!match) throw new Error('ลิงก์ไม่ถูกต้อง กรุณาวางลิงก์ Google Sheet');
+      const gidMatch = text.match(/[#?&]gid=(\d+)/);
+      const gid = gidMatch ? '&gid=' + gidMatch[1] : '';
+      return match[1]
+        ? 'https://docs.google.com/spreadsheets/d/e/' + match[2] + '/pub?output=csv' + gid
+        : 'https://docs.google.com/spreadsheets/d/' + match[2] + '/export?format=csv' + gid;
+    }
+
+    // ชีตที่ไม่ได้แชร์สาธารณะ Google จะ redirect ไปหน้า login ซึ่งเบราว์เซอร์บล็อก (fetch reject) หรือได้ HTML กลับมา
+    async function readGoogleSheetRows(link) {
+      const url = googleSheetCsvUrl(link);
+      const accessError = 'เปิดชีตไม่ได้ กรุณาตรวจลิงก์ และแชร์ชีตเป็น "ทุกคนที่มีลิงก์ดูได้"';
+      let res;
+      try {
+        res = await fetch(url, { credentials: 'omit' });
+      } catch (err) {
+        console.error(err);
+        throw new Error(accessError);
+      }
+      if (!res.ok || (res.headers.get('content-type') || '').indexOf('text/csv') === -1) throw new Error(accessError);
+      return parseCsvRows(await res.text());
+    }
+
+    // ทางเข้าเดียวของการนำเข้าข้อมูล ใช้ร่วมกันทั้งป๊อปอัพตอนเข้าระบบและ Settings > Import Data
+    // source: { file } หรือ { sheetLink } | target: 'main' | 'retention' | append: ต่อท้าย rawData เดิมแทนการแทนที่
+    // (Retention ต่อท้ายเสมอ) คืน { added, skipped, total } ถ้าไม่สำเร็จจะ reject พร้อมข้อความให้ผู้ใช้
+    async function importData(source, target, append) {
+      showLoading(true);
+      // ให้ overlay "กำลังโหลด" แสดงก่อนเริ่มงานหนัก (อ่านไฟล์ Excel ขนาดใหญ่ใช้เวลาหลายวินาที)
+      await new Promise(r => setTimeout(r, 30));
+      try {
+        const rows = await (source.file ? readImportFileRows(source.file) : readGoogleSheetRows(source.sheetLink));
+        if (!rows.some(isNonEmptyRow)) throw new Error('ไม่พบแถวข้อมูล');
+        try {
+          if (target === 'retention') return ingestRetentionRows(rows);
+          return append ? appendRows(rows) : ingestRows(rows);
+        } catch (err) {
+          console.error(err);
+          throw new Error('เกิดข้อผิดพลาดในการประมวลผลข้อมูล');
+        }
+      } finally {
+        showLoading(false);
+      }
+    }
+    window.qmImportData = importData;
+    window.qmImportedRowCount = (target) => (target === 'retention' ? retentionRawData : rawData).length;
+
+    // ป๊อปอัพนำเข้าข้อมูลตอนเข้าระบบ - ข้อมูลอยู่ในหน่วยความจำของแท็บนี้เท่านั้น จึงเปิดทุกครั้งที่โหลดหน้า
+    // ไม่ปิดเองหลังนำเข้า เพราะอาจนำเข้าทั้งข้อมูลหลักและ Retention ต่อกันได้ และไม่ปิดเมื่อกดพื้นหลังกันกดพลาด
+    // เปิดจากเมนู IMPORT DATA ใน Sidebar (ดู IMPORT_MENU_ROLES) จะต่อท้าย rawData แทนการแทนที่ เพราะตอนนั้นอาจมี
+    // ข้อมูลที่กำลังใช้งานอยู่แล้ว
+    function initImportPopup() {
+      const popup = document.getElementById('importPopup');
+      const doneBtn = document.getElementById('importPopupDone');
+      const statuses = Array.from(popup.querySelectorAll('.import-popup-status'));
+      const statusDefaults = statuses.map(el => el.textContent);
+      let appendMode = false;
+      const closePopup = () => { popup.style.display = 'none'; };
+
+      window.openImportPopup = function () {
+        appendMode = true;
+        document.getElementById('importPopupTitle').textContent = 'นำเข้าข้อมูลเพิ่มเติม';
+        document.getElementById('importPopupSub').textContent = 'ข้อมูลใหม่จะต่อท้ายข้อมูลที่มีอยู่ และข้ามแถวที่ซ้ำกับข้อมูลเดิม';
+        statuses.forEach((el, i) => { el.textContent = statusDefaults[i]; el.className = 'import-popup-status'; });
+        doneBtn.textContent = 'กลับสู่ Dashboard';
+        document.querySelector('.sidebar').classList.remove('active');
+        document.getElementById('sidebarOverlay').classList.remove('active');
+        popup.style.display = 'flex';
+      };
+
+      async function runImport(source, target, statusId, sourceName) {
+        const status = document.getElementById(statusId);
+        try {
+          const result = await importData(source, target, appendMode);
+          const skipped = result.skipped > 0 ? ' (ข้ามซ้ำ ' + result.skipped.toLocaleString() + ' แถว)' : '';
+          const total = appendMode ? ' · รวม ' + result.total.toLocaleString() + ' แถว' : '';
+          status.textContent = sourceName + ' · นำเข้าแล้ว ' + result.added.toLocaleString() + ' แถว' + skipped + total;
+          status.className = 'import-popup-status success';
+          if (!appendMode) doneBtn.textContent = 'เข้าสู่ Dashboard';
+          return true;
+        } catch (err) {
+          console.error(err);
+          status.textContent = sourceName + ' · ' + err.message;
+          status.className = 'import-popup-status error';
+          return false;
+        }
+      }
+
+      popup.querySelectorAll('[data-import-pick]').forEach(btn => {
+        btn.addEventListener('click', () => document.getElementById(btn.dataset.importPick).click());
+      });
+      [['importFileMain', 'main', 'importStatusMain'], ['importFileRetention', 'retention', 'importStatusRetention']].forEach(([inputId, target, statusId]) => {
+        document.getElementById(inputId).addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if (file) runImport({ file }, target, statusId, file.name);
+          e.target.value = '';
+        });
+      });
+
+      const linkInput = document.getElementById('importSheetLink');
+      const importSheet = async () => {
+        if (!linkInput.value.trim()) { linkInput.focus(); return; }
+        if (await runImport({ sheetLink: linkInput.value }, 'main', 'importStatusSheet', 'Google Sheet')) linkInput.value = '';
+      };
+      document.getElementById('importSheetBtn').addEventListener('click', importSheet);
+      linkInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') importSheet(); });
+
+      document.getElementById('importPopupClose').addEventListener('click', closePopup);
+      doneBtn.addEventListener('click', closePopup);
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePopup(); });
+    }
+
     // --- DOMContentLoaded Section ---
     window.addEventListener('DOMContentLoaded', () => {
       checkSessionOrRedirect();
       setInterval(checkSessionOrRedirect, 5 * 60 * 1000);
 
-      const importBtn = document.getElementById('importBtn');
-      const fileInput = document.getElementById('fileInput');
-      
-      if (importBtn && fileInput) {
-        importBtn.addEventListener('click', () => fileInput.click());
-      }
-      
-      if (fileInput) {
-        fileInput.addEventListener('change', (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-          const ext = (file.name.split('.').pop() || '').toLowerCase();
-          // ปุ่ม Import ปุ่มเดียว ตำแหน่งเดิม - แต่ถ้ากดตอนอยู่แท็บ Retention ไฟล์ที่เลือกจะเข้า retentionRawData
-          // (merge) แทน ไม่แตะ rawData หลัก ส่วนทุกแท็บอื่นทำงานเหมือนเดิมทุกประการ
-          const ingest = window.currentTabId === 'retention' ? ingestRetentionRows : ingestRows;
-          showLoading(true);
-          if (ext === 'xlsx' || ext === 'xls') {
-            const reader = new FileReader();
-            reader.onerror = () => { showLoading(false); alert('อ่านไฟล์ Excel ไม่สำเร็จ'); };
-            reader.onload = () => {
-              // ให้ overlay "กำลังโหลด" แสดงก่อนเริ่มงานหนัก (อ่านไฟล์ Excel ขนาดใหญ่ใช้เวลาหลายวินาที)
-              setTimeout(() => {
-                try {
-                  ingest(readExcelRows(reader.result));
-                } catch (err) {
-                  console.error(err);
-                  alert('อ่านไฟล์ Excel ไม่สำเร็จ: ' + (err && err.message ? err.message : err));
-                } finally {
-                  showLoading(false);
-                }
-              }, 30);
-            };
-            reader.readAsArrayBuffer(file);
-          } else {
-            Papa.parse(file, {
-              header: true,
-              skipEmptyLines: true,
-              complete: (results) => {
-                try { ingest(results.data); }
-                catch (err) { console.error(err); alert('เกิดข้อผิดพลาดในการประมวลผลข้อมูล'); }
-                finally { showLoading(false); }
-              },
-              error: (err) => { console.error(err); showLoading(false); alert('Error parsing CSV'); }
-            });
-          }
-          e.target.value = '';
-        });
-      }
-
+      initImportPopup();
       initCharts();
     });
 
@@ -950,10 +1117,6 @@
         populateDropdowns();
         refreshGroupMenus();
       }
-      // ปุ่ม Import ปุ่มเดียวกัน แค่เปลี่ยนป้ายให้รู้ว่ากำลังจะนำเข้าเข้าชุดข้อมูลไหน (ดู fileInput change handler
-      // ด้านบนที่สลับปลายทางจริงตาม window.currentTabId)
-      const importBtnLabel = document.getElementById('importBtnLabel');
-      if (importBtnLabel) importBtnLabel.textContent = tabId === 'retention' ? 'Import Data for Retention' : 'Import Data';
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.view-content').forEach(view => view.style.display = 'none');
       document.getElementById('view-overview').style.display = 'none';
