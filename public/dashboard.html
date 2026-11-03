@@ -1020,22 +1020,26 @@
         : 'https://docs.google.com/spreadsheets/d/' + match[2] + '/export?format=csv' + gid;
     }
 
-    // ลิงก์ Web app จาก google-apps-script/QueenMaker-Data.gs - ใช้กับชีตที่ไม่ได้แชร์สาธารณะ ตอบ { ok, values } หรือ { ok: false, error }
-    // แปลง values ผ่าน CSV เพื่อให้จัดการหัวคอลัมน์ซ้ำ (_1, _2) เหมือนไฟล์ CSV ทุกประการ
+    // ลิงก์ Web app (/exec) ของ Apps Script - ใช้กับชีตที่ไม่ได้แชร์สาธารณะ รองรับ 2 แบบ:
+    // - สคริปต์ InsightHub (วางลิงก์เดียวกับที่ใช้ใน InsightHub ได้เลย): ?action=orders ตอบ { success, rows: [{หัวคอลัมน์: ค่า}] }
+    // - google-apps-script/QueenMaker-Data.gs: ตอบ { ok, values: [[แถว 1 = หัวคอลัมน์], ...] } (ไม่สนพารามิเตอร์ action)
+    // แปลงผ่าน CSV เพื่อให้ได้แถวหน้าตาเดียวกับไฟล์ CSV ทุกประการ
     const APPS_SCRIPT_LINK = /^https:\/\/script\.google\.com\/(?:a\/macros\/[^/]+|macros)\/s\/[\w-]+\/exec(?:\?\S*)?$/;
     async function readAppsScriptRows(link) {
       const accessError = 'เชื่อม Apps Script ไม่ได้ กรุณาตรวจลิงก์ และตั้ง Who has access เป็น Anyone';
+      const url = new URL(link);
+      if (!url.searchParams.has('action')) url.searchParams.set('action', 'orders');
       let data;
       try {
-        const res = await fetch(link, { credentials: 'omit' });
+        const res = await fetch(url.toString(), { credentials: 'omit' });
         data = await res.json();
       } catch (err) {
         console.error(err);
         throw new Error(accessError);
       }
-      if (!data || !data.ok) throw new Error(data && data.error ? 'Apps Script: ' + data.error : accessError);
-      if (!Array.isArray(data.values)) throw new Error(accessError);
-      return parseCsvRows(Papa.unparse(data.values));
+      if (data && data.success && Array.isArray(data.rows)) return parseCsvRows(Papa.unparse(data.rows));
+      if (data && data.ok && Array.isArray(data.values)) return parseCsvRows(Papa.unparse(data.values));
+      throw new Error(data && data.error ? 'Apps Script: ' + data.error : accessError);
     }
 
     // ชีตที่ไม่ได้แชร์สาธารณะ Google จะ redirect ไปหน้า login ซึ่งเบราว์เซอร์บล็อก (fetch reject) หรือได้ HTML กลับมา
