@@ -685,11 +685,12 @@
       const tab = window.currentTabId || 'overview';
       const pageLabel = EXPORT_PAGE_LABELS[tab];
       if (!pageLabel) { alert('หน้านี้ไม่มีข้อมูลให้ Export'); return; }
-      if (!rawData || rawData.length === 0) { alert('ยังไม่มีข้อมูล กรุณา Import Data ก่อน'); return; }
+      const isRetentionData = usesRetentionData(tab);
+      if ((isRetentionData ? retentionRawData : rawData).length === 0) { alert('ยังไม่มีข้อมูล กรุณา Import Data ก่อน'); return; }
 
       const isExec = tab === 'executive1';
       const activeFilters = isExec ? execFilters : filters;
-      const orders = isExec ? computeFilteredData(execFilters) : filteredData;
+      const orders = isExec ? computeFilteredData(execFilters) : isRetentionData ? computeFilteredRetentionData(filters) : filteredData;
       if (!orders || orders.length === 0) { alert('ไม่มีข้อมูลตาม Filter ที่เลือก'); return; }
 
       showLoading(true);
@@ -878,7 +879,6 @@
 
     function ingestRows(rows) {
       for (let k in keyCache) delete keyCache[k];
-      window.userCohorts = null;
       window.scFirstPurchase = null;
 
       rawData = (rows || []).filter(isNonEmptyRow);
@@ -921,6 +921,7 @@
       refreshGroupMenus();
       // แท็บอื่นยังไม่ต้องวาด (กราฟวาดลง view ที่ซ่อนอยู่ไม่ได้) - switchTab('retention') จะวาดให้ตอนเปิดแท็บ
       if (window.currentTabId === 'retention') refreshRetentionView();
+      if (window.currentTabId === 'cohort') refreshCohortView();
       return { added, skipped: cleaned.length - added, total: retentionRawData.length };
     }
 
@@ -1170,10 +1171,10 @@
     function switchTab(tabId) {
       const prevTabId = window.currentTabId;
       window.currentTabId = tabId;
-      // แท็บ Retention ใช้ Filter บนสุดเหมือนแท็บอื่น แต่ตัวเลือกใน dropdown (Year/Month/Channel/ฯลฯ) ต้องอ่านจาก
-      // retentionRawData แทน rawData ตอนอยู่แท็บนี้ (ดู filterRowReaders) - พอข้าม "เข้า/ออก" แท็บ Retention
+      // แท็บ Retention/Cohort ใช้ Filter บนสุดเหมือนแท็บอื่น แต่ตัวเลือกใน dropdown (Year/Month/Channel/ฯลฯ) ต้องอ่านจาก
+      // retentionRawData แทน rawData ตอนอยู่แท็บเหล่านี้ (ดู filterRowReaders) - พอข้ามระหว่างชุดข้อมูล
       // ต้องสร้าง dropdown ใหม่ทุกครั้ง ไม่งั้นตัวเลือก Year/Channel ฯลฯ จะค้างเป็นของชุดข้อมูลเดิมผิดแท็บ
-      if ((prevTabId === 'retention') !== (tabId === 'retention') && (rawData.length > 0 || retentionRawData.length > 0)) {
+      if (usesRetentionData(prevTabId) !== usesRetentionData(tabId) && (rawData.length > 0 || retentionRawData.length > 0)) {
         populateDropdowns();
         refreshGroupMenus();
       }
@@ -1264,7 +1265,7 @@
         } else if (tabId === 'cohort') {
           document.getElementById('tab-cohort').classList.add('active');
           document.getElementById('view-cohort').style.display = 'block';
-          if (typeof renderCohortHeatmap === 'function') { renderCohortHeatmap(filteredData, getScopedRawData()); }
+          refreshCohortView();
         } else if (tabId === 'executive1') {
           document.getElementById('tab-executive1').classList.add('active');
           document.getElementById('view-executive1').style.display = 'block';
@@ -1834,11 +1835,15 @@
       return scopedRetentionCache.data;
     }
 
+    // แท็บที่อ่านข้อมูลจาก retentionRawData (ไฟล์ "Import Data for Retention") แทน rawData หลัก
+    const RETENTION_DATA_TABS = ['retention', 'cohort'];
+    function usesRetentionData(tabId) { return RETENTION_DATA_TABS.indexOf(tabId) !== -1; }
+
     // ตัวช่วยกลาง: คืนชุดฟังก์ชันอ่านค่าจากแถว (วันที่/ช่องทาง/สินค้า/แอดมิน/กลุ่ม/ยอดขายจริงหรือไม่) ให้ตรงกับ
-    // แท็บที่เปิดอยู่ - แท็บ Retention ใช้ตัวอ่านเฉพาะของ retention.js (retChanName ฯลฯ) เพราะไฟล์ Retention เป็น
+    // แท็บที่เปิดอยู่ - แท็บ Retention/Cohort ใช้ตัวอ่านเฉพาะของ retention.js (retChanName ฯลฯ) เพราะไฟล์ Retention เป็น
     // คอลัมน์คนละแบบกับ rawData หลัก (ดูคอมเมนต์ใน retention.js) ส่วนแท็บอื่นใช้ตัวอ่านเดิมของแอปหลักเหมือนเดิมทุกอย่าง
     function filterRowReaders() {
-      const isRet = window.currentTabId === 'retention';
+      const isRet = usesRetentionData(window.currentTabId);
       return {
         isRet: isRet,
         fullSource: isRet ? retentionRawData : rawData,
@@ -1875,6 +1880,13 @@
       if (typeof renderRetention !== 'function') return;
       const filtered = retentionRawData.length > 0 ? computeFilteredRetentionData(filters) : [];
       renderRetention(filtered, retentionRawData);
+    }
+
+    // Cohort Heatmap อ่านเฉพาะข้อมูล Retention (ไม่ใช้ rawData หลักของ Overview) - Filter เหมือนหน้า Retention
+    // ส่วนเดือนแรกที่ซื้อ (cohort) หาจากข้อมูล Retention ทั้งหมดของกลุ่มที่เลือก ไม่ตัดตาม Year
+    function refreshCohortView() {
+      if (typeof renderCohortHeatmap !== 'function') return;
+      renderCohortHeatmap(retentionRawData.length > 0 ? computeFilteredRetentionData(filters) : [], getScopedRetentionData());
     }
 
     function getGroupOptionList() {
@@ -1923,7 +1935,6 @@
       filters.Group = val;
       execFilters.Group = val;
       syncGroupButtons();
-      window.userCohorts = null;
       window.scFirstPurchase = null;
       precomputeGlobalFirstPurchases();
       // ตัวเลือกของ filter อื่นทั้งหมดต้องมาจากข้อมูลของกลุ่มที่เลือกเท่านั้น (ค่าที่ไม่มีในกลุ่มนี้จะถูกรีเซ็ตเป็น All)
@@ -2324,7 +2335,7 @@
 
       processData(filteredData);
 
-      try { if (document.getElementById('view-cohort').style.display === 'block' && typeof renderCohortHeatmap === 'function') { renderCohortHeatmap(filteredData, getScopedRawData()); } } catch(e) { console.error(e); }
+      try { if (document.getElementById('view-cohort').style.display === 'block') { refreshCohortView(); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-executive2').style.display === 'block' && typeof renderExecutive2 === 'function') { renderExecutive2(getMigrationData(), getScopedRawData()); } } catch(e) { console.error(e); }
       // InsightHub deliberately NOT re-rendered here - it has its own data source (see
       // loadInsightHubDataFromAppsScript/window.refreshInsightHub above), unrelated to this
@@ -3001,7 +3012,7 @@
 
     window.switchTab = switchTab; window.applyFilters = applyFilters; window.setFilter = setFilter; window.clearFilters = clearFilters; window.toggleFilter = toggleFilter; window.toggleChartPctChange = toggleChartPctChange; window.toggleRetNewProportion = toggleRetNewProportion; window.setChartViewMode = setChartViewMode; window.setChartViewYear = setChartViewYear;
   </script>
-  <script src="cohort.js?v=13"></script>
+  <script src="cohort.js?v=14"></script>
   <script src="executive.js?v=20"></script>
   <script src="Migration.js?v=16"></script>
   <script src="ai-analytics.js?v=3"></script>

@@ -1,8 +1,17 @@
 // public/cohort.js
+// อ่านเฉพาะข้อมูล Retention (retentionRawData) ไม่ใช่ข้อมูลหลักของ Overview - ดู refreshCohortView ใน dashboard.html
+// filteredData: ข้อมูล Retention หลังผ่าน Filter บนสุด / rawData: ข้อมูล Retention ทั้งหมดของกลุ่มที่เลือก (ใช้หาเดือนแรกที่ซื้อ)
+// ยอดขายจริงตัดสินด้วย retIsSaleOrder ของ retention.js เหมือนหน้า Retention
 function renderCohortHeatmap(filteredData, rawData) {
   const container = document.getElementById('view-cohort');
-  
-  if (!filteredData || filteredData.length === 0) {
+
+  if (!rawData || rawData.length === 0) {
+    container.innerHTML = '<p style="text-align:center; padding: 50px; color: #888;">ยังไม่มีข้อมูลสำหรับ Cohort — หน้านี้ใช้ข้อมูลจาก Import Data for Retention นำเข้าไฟล์ได้จากเมนู IMPORT DATA ด้านซ้าย หรือ Settings &gt; Import Data</p>';
+    return;
+  }
+  const isSale = window.retIsSaleOrder;
+  filteredData = (filteredData || []).filter(isSale);
+  if (filteredData.length === 0) {
     container.innerHTML = '<p style="text-align:center; padding: 50px; color: #888;">No data available for cohort heatmap.</p>';
     return;
   }
@@ -21,27 +30,25 @@ function renderCohortHeatmap(filteredData, rawData) {
   };
 
   // 1. Find Cohort Month for each user using ALL rawData (True first purchase date)
-  if (!window.userCohorts) {
-    window.userCohorts = {};
-    rawData.forEach(row => {
-      if (window.isSaleOrder && !window.isSaleOrder(row)) return;
-      const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
-      const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
-      const dateStr = window.getRowDateStr(row);
-      if (!id || !dateStr) return;
-      
-      const parsed = parseDateStr(dateStr);
-      if (!parsed) return;
-      const y = parsed.y;
-      const m = parsed.m;
-      const val = y * 100 + m;
-      
-      if (!window.userCohorts[id] || val < window.userCohorts[id].val) {
-        window.userCohorts[id] = { val: val, monthStr: parsed.str, year: y, month: m };
-      }
-    });
-  }
-  const userCohorts = window.userCohorts;
+  // คำนวณใหม่ทุกครั้ง (ไม่เก็บไว้ใน window) เพราะ rawData เปลี่ยนตามกลุ่มที่เลือกและเมื่อนำเข้าไฟล์ Retention เพิ่ม
+  const userCohorts = {};
+  rawData.forEach(row => {
+    if (!isSale(row)) return;
+    const getVal = window.getRowValue || ((r, keys) => r[keys[0]]);
+    const id = window.getCustomerUniqueId ? window.getCustomerUniqueId(row) : getVal(row, ['Customer ID', 'รหัสลูกค้า', 'Phone', 'phone']);
+    const dateStr = window.getRowDateStr(row);
+    if (!id || !dateStr) return;
+
+    const parsed = parseDateStr(dateStr);
+    if (!parsed) return;
+    const y = parsed.y;
+    const m = parsed.m;
+    const val = y * 100 + m;
+
+    if (!userCohorts[id] || val < userCohorts[id].val) {
+      userCohorts[id] = { val: val, monthStr: parsed.str, year: y, month: m };
+    }
+  });
   // 2. Aggregate Active Users by Cohort Month and Lifetime Month based on filteredData
   const cohortData = {};
   let maxLifetime = 0;
