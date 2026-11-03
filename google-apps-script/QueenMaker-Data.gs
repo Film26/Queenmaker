@@ -5,7 +5,7 @@
 //   3. กด Run setupQueenMaker อีกครั้ง แล้วคัดลอกลิงก์ที่ขึ้นใน Execution log ไปวางในระบบ
 // รหัสลับเก็บใน Script Properties ไม่อยู่ในโค้ด ไฟล์นี้จึงขึ้น Git ได้ปลอดภัย
 
-const TOKEN_PROPERTY = 'ACCESS_TOKEN';
+const TOKEN_PROPERTY = 'Queen2026';
 // หัวคอลัมน์ที่ใช้หาแท็บข้อมูลอัตโนมัติ - ชุดเดียวกับที่ระบบใช้อ่านไฟล์ Excel (DATE_KEYS / REVENUE_KEYS ใน dashboard.html)
 const DATE_KEYS = ['วันที่โอนเงิน', 'วันที่สร้าง', 'OrderDate', 'Date', 'วันที่'];
 const REVENUE_KEYS = ['Revenue_Allocated', 'ราคาขาย', 'ราคารวม', 'ยอดรวม', 'ราคาสุทธิ', 'ยอดขาย', 'ราคาสินค้ายังไม่รวมภาษี', 'Net Sales', 'Revenue', 'Amount', 'ยอดโอน'];
@@ -42,7 +42,7 @@ function changeQueenMakerToken() {
 function logLink_() {
   const url = ScriptApp.getService().getUrl();
   if (!url) {
-    Logger.log('ตั้งรหัสลับแล้ว ขั้นต่อไป: Deploy > New deployment > Web app (Who has access: Anyone) แล้ว Run setupQueenMaker อีกครั้งเพื่อดูลิงก์');
+    Logger.log('Queen2026 แล้ว Run setupQueenMaker อีกครั้งเพื่อดูลิงก์');
     return;
   }
   Logger.log('ลิงก์สำหรับวางในระบบ QueenMaker (ห้ามแชร์ต่อ):\n' + url + '?token=' + getToken_());
