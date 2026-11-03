@@ -19,7 +19,9 @@
     .filter-content div:hover { background-color: #dbeafe; color: #1d4ed8;}
     .filter-content div.selected { background-color: #dbeafe; font-weight: bold; color: #1d4ed8;}
 
-    .clear-filters-btn { background: none; border: none; color: #1e293b; font-size: 13px; cursor: pointer; text-decoration: underline; margin-left: 10px; display: none;}
+    .clear-filters-btn { background-color: #fff; border: 1px solid #ddd; padding: 8px 15px; font-weight: 500; cursor: pointer; color: #1e293b; border-radius: 8px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    .clear-filters-btn:hover:not(:disabled) { background-color: #f9f9f9; border-color: #1e293b; }
+    .clear-filters-btn:disabled { opacity: 0.45; cursor: default; }
     /* Layout for 10 KPIs and 6 Charts - Beautiful Design */
     body { overflow-x: hidden; }
     .dashboard-content { padding: 30px 40px 180px 40px; background-color: #fbf9f4; min-height: 100vh;}
@@ -238,7 +240,7 @@
           <div class="filter-dropdown">
             <button class="filter-btn-new" id="btn-KPI" onclick="toggleKpiCompare()"><i class="fas fa-toggle-off" id="icon-KPI"></i> KPI Compare: <span id="lbl-KPI">Off</span></button>
           </div>
-          <button id="clearFiltersBtn" class="clear-filters-btn" onclick="clearFilters()">Clear Filters</button>
+          <button id="clearFiltersBtn" class="clear-filters-btn" onclick="clearFilters()" disabled><i class="fas fa-filter-circle-xmark"></i> Clear Filters</button>
         </div>
         <!-- Filter ของหน้า Executive แยกต่างหากจาก .filters-bar ด้านบนโดยสิ้นเชิง (คนละ state คนละ element)
              Year/Month ต้องเลือกค่าจริงเสมอ (ตาราง CRM Report เป็นรายเดือนของปีเดียว) ส่วน Channel/SubChannel/
@@ -276,6 +278,7 @@
             <button class="filter-btn-new" id="btn-Exec-Admin" onclick="toggleFilter('menu-Exec-Admin')">Admin: <span id="lbl-Exec-Admin">-</span> <i class="fas fa-caret-down"></i></button>
             <div id="menu-Exec-Admin" class="filter-content"></div>
           </div>
+          <button id="clearExecFiltersBtn" class="clear-filters-btn" onclick="clearExecFilters()" disabled><i class="fas fa-filter-circle-xmark"></i> Clear Filters</button>
         </div>
         <div id="view-overview">
           <div id="overview-empty-state" style="display:none; text-align:center; padding:60px 20px; color:#999; font-size:15px; background:#fff; border-radius:16px; margin-bottom:25px;">
@@ -2051,11 +2054,11 @@
     let execFilters = { Group: 'All', Year: '', Month: '', Channel: 'All', SubChannel: 'All', Product: 'All', SubProduct: 'All', Admin: 'All' };
     window.execFilters = execFilters;
     const EXEC_OPTION_FILTER_TYPES = ['Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'];
-    // หมายเหตุ: มีทุกคีย์ของ execFilters ยกเว้น Month (Month reset ตาม Year เสมออยู่แล้วโดยไม่ต้องพึ่ง touched
-    // ดู populateExecMonthMenu) แถว 13-15 ใน executive.js เช็คแค่ Channel/SubChannel (อย่างน้อย 1 ตัว) เท่านั้น
+    // หมายเหตุ: แถว 13-15 ใน executive.js เช็คแค่ Channel/SubChannel (อย่างน้อย 1 ตัว) เท่านั้น
     // ส่วน Product/SubProduct เก็บ touched ไว้เพื่อกันไม่ให้ค่าที่ผู้ใช้เลือกเองโดนรีเซ็ตทิ้งตอนเปลี่ยน Year
-    // (ดู setExecFilter: EXEC_OPTION_FILTER_TYPES.forEach reset เฉพาะตัวที่ยัง !touched)
-    let execFiltersTouched = { Year: false, Channel: false, SubChannel: false, Product: false, SubProduct: false, Admin: false };
+    // (ดู setExecFilter: EXEC_OPTION_FILTER_TYPES.forEach reset เฉพาะตัวที่ยัง !touched) ทุกคีย์ใช้กำหนดสีปุ่มด้วย
+    // (ดู syncExecFilterButtons) - Month กลับเป็น !touched เมื่อถูกรีเซ็ตเป็นเดือนล่าสุดตอนเปลี่ยน Year
+    let execFiltersTouched = { Year: false, Month: false, Channel: false, SubChannel: false, Product: false, SubProduct: false, Admin: false };
     window.execFiltersTouched = execFiltersTouched;
 
     function populateExecYearMenu() {
@@ -2087,6 +2090,7 @@
       const sortedMonths = Array.from(monthsSet).sort().reverse();
       if (!execFilters.Month || sortedMonths.indexOf(execFilters.Month) === -1) {
         execFilters.Month = sortedMonths.length > 0 ? sortedMonths[0] : '';
+        execFiltersTouched.Month = false;
       }
       const menu = document.getElementById('menu-Exec-Month');
       if (menu) menu.innerHTML = sortedMonths.map(val => `<div onclick="setExecFilter('Month', '${val}')">${val}</div>`).join('');
@@ -2121,11 +2125,30 @@
       populateExecYearMenu();
       populateExecMonthMenu();
       refreshExecOptionDropdowns();
+      syncExecFilterButtons();
+    }
+
+    // ปุ่มเป็นสีเข้มเฉพาะ Filter ที่ผู้ใช้กดเลือกเองแล้วและไม่ใช่ "All" - Year/Month ที่ระบบเลือกปี/เดือนล่าสุดให้
+    // อัตโนมัติตอนเปิดหน้า และตัวที่ยังเป็น All คงเป็นพื้นขาวปกติ (Group ดูที่ syncGroupButtons)
+    function syncExecFilterButtons() {
       ['Year', 'Month'].concat(EXEC_OPTION_FILTER_TYPES).forEach(type => {
         const btn = document.getElementById('btn-Exec-' + type);
-        if (btn) btn.classList.toggle('active', !!execFilters[type]);
+        if (btn) btn.classList.toggle('active', !!execFiltersTouched[type] && !!execFilters[type] && execFilters[type] !== 'All');
       });
     }
+
+    // กลับไปเป็นสถานะตอนเปิดหน้าครั้งแรก: ปี/เดือนล่าสุด, ตัวอื่นเป็น All และยังไม่มีตัวไหนถูกกดเลือก
+    function clearExecFilters() {
+      Object.keys(execFiltersTouched).forEach(type => { execFiltersTouched[type] = false; });
+      execFilters.Year = '';
+      execFilters.Month = '';
+      EXEC_OPTION_FILTER_TYPES.forEach(type => { execFilters[type] = 'All'; });
+      // Group ใช้ร่วมกับ Filter บนสุด - setGroup สร้าง dropdown ของหน้านี้ใหม่และ render ให้เอง
+      if (execFilters.Group !== 'All') { setGroup('All'); return; }
+      if (rawData.length > 0) populateExecDropdowns();
+      applyExecFilters();
+    }
+    window.clearExecFilters = clearExecFilters;
 
     function setExecFilter(type, val) {
       execFilters[type] = val;
@@ -2143,8 +2166,7 @@
       if (lbl) lbl.textContent = val;
       const menu = document.getElementById('menu-Exec-' + type);
       if (menu) menu.classList.remove('show');
-      const btn = document.getElementById('btn-Exec-' + type);
-      if (btn) btn.classList.add('active');
+      syncExecFilterButtons();
 
       applyExecFilters();
     }
@@ -2153,6 +2175,7 @@
     function applyExecFilters() {
       const execFilteredData = computeFilteredData(execFilters);
       if (typeof renderExecutive1 === 'function') { renderExecutive1(execFilteredData, getScopedRawData()); }
+      updateClearFilterButtons();
     }
 
     // อัปเดตแบบเรียลไทม์: หน้า Settings ยิง 'appDataChanged' ทุกครั้งที่ เพิ่ม/แก้ไข/ลบ/เปลี่ยนสถานะ
@@ -2232,9 +2255,6 @@
 
       if (val !== 'All' && val !== 'Off') {
         document.getElementById('btn-' + type).classList.add('active');
-        if(document.getElementById('clearFilterBtn')) {
-          document.getElementById('clearFilterBtn').style.display = 'inline-block';
-        }
       } else {
         document.getElementById('btn-' + type).classList.remove('active');
       }
@@ -2270,11 +2290,21 @@
       const kpiIcon = document.getElementById('icon-KPI');
       if (kpiIcon) kpiIcon.className = 'fas fa-toggle-off';
 
-      if(document.getElementById('clearFilterBtn')) {
-        document.getElementById('clearFilterBtn').style.display = 'none';
-      }
       populateMonthMenu('All');
-      applyFilters();
+      // Group ใช้ร่วมกับ Filter หน้า Executive - setGroup รีเฟรช dropdown ทุกตัวแล้วเรียก applyFilters ให้เอง
+      if (filters.Group !== 'All') setGroup('All');
+      else applyFilters();
+    }
+
+    // ปุ่ม Clear Filters ของทั้ง 2 แถบกดได้เฉพาะตอนมี Filter ที่ถูกเลือกไว้ (เรียกท้าย applyFilters/applyExecFilters)
+    function updateClearFilterButtons() {
+      const mainActive = filters.Group !== 'All' || filters.KPI === 'On' ||
+        ['Month', 'Year', 'Channel', 'SubChannel', 'Product', 'SubProduct', 'Admin'].some(type => filters[type] !== 'All');
+      const execActive = execFilters.Group !== 'All' || Object.keys(execFiltersTouched).some(type => execFiltersTouched[type]);
+      const mainBtn = document.getElementById('clearFiltersBtn');
+      if (mainBtn) mainBtn.disabled = !mainActive;
+      const execBtn = document.getElementById('clearExecFiltersBtn');
+      if (execBtn) execBtn.disabled = !execActive;
     }
 
     // กรอง rawData ด้วยชุด filter ที่ส่งเข้ามา (Year/Channel/SubChannel/Product/SubProduct/Admin - ไม่รวม Month
@@ -2355,6 +2385,7 @@
       } finally {
         __scrollBox.scrollTop = __savedScrollTop;
       }
+      updateClearFilterButtons();
     }
 
     // เปิด/ปิดข้อความ "ไม่พบข้อมูล" ในหน้า Overview และซ่อน/แสดงการ์ด+กราฟตามสถานะข้อมูลที่ผ่าน Filter
