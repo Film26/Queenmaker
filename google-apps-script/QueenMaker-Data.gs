@@ -42,7 +42,7 @@ function changeQueenMakerToken() {
 function logLink_() {
   const url = ScriptApp.getService().getUrl();
   if (!url) {
-    Logger.log('Queen2026 แล้ว Run setupQueenMaker อีกครั้งเพื่อดูลิงก์');
+    Logger.log('ตั้งรหัสลับแล้ว ขั้นต่อไป: Deploy > New deployment > Web app (Who has access: Anyone) แล้ว Run setupQueenMaker อีกครั้งเพื่อดูลิงก์');
     return;
   }
   Logger.log('ลิงก์สำหรับวางในระบบ QueenMaker (ห้ามแชร์ต่อ):\n' + url + '?token=' + getToken_());
