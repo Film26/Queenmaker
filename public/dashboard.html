@@ -518,11 +518,11 @@
           <span class="import-popup-icon"><i class="fas fa-table"></i></span>
           <div class="import-popup-text">
             <div class="import-popup-label">Import Data from Google Sheet</div>
-            <div class="import-popup-status" id="importStatusSheet">แชร์ชีตเป็น "ทุกคนที่มีลิงก์ดูได้" ก่อนวางลิงก์</div>
+            <div class="import-popup-status" id="importStatusSheet">ใช้ลิงก์ Apps Script หรือแชร์ชีตเป็น "ทุกคนที่มีลิงก์ดูได้"</div>
           </div>
         </div>
         <div class="import-popup-link">
-          <input type="url" id="importSheetLink" placeholder="วางลิงก์ Google Sheet" aria-label="ลิงก์ Google Sheet">
+          <input type="url" id="importSheetLink" placeholder="วางลิงก์ Google Sheet หรือ Apps Script" aria-label="ลิงก์ Google Sheet หรือ Apps Script">
           <button type="button" id="importSheetBtn" class="import-popup-btn">นำเข้า</button>
         </div>
       </div>
@@ -1020,8 +1020,27 @@
         : 'https://docs.google.com/spreadsheets/d/' + match[2] + '/export?format=csv' + gid;
     }
 
+    // ลิงก์ Web app จาก google-apps-script/QueenMaker-Data.gs - ใช้กับชีตที่ไม่ได้แชร์สาธารณะ ตอบ { ok, values } หรือ { ok: false, error }
+    // แปลง values ผ่าน CSV เพื่อให้จัดการหัวคอลัมน์ซ้ำ (_1, _2) เหมือนไฟล์ CSV ทุกประการ
+    const APPS_SCRIPT_LINK = /^https:\/\/script\.google\.com\/(?:a\/macros\/[^/]+|macros)\/s\/[\w-]+\/exec(?:\?\S*)?$/;
+    async function readAppsScriptRows(link) {
+      const accessError = 'เชื่อม Apps Script ไม่ได้ กรุณาตรวจลิงก์ และตั้ง Who has access เป็น Anyone';
+      let data;
+      try {
+        const res = await fetch(link, { credentials: 'omit' });
+        data = await res.json();
+      } catch (err) {
+        console.error(err);
+        throw new Error(accessError);
+      }
+      if (!data || !data.ok) throw new Error(data && data.error ? 'Apps Script: ' + data.error : accessError);
+      if (!Array.isArray(data.values)) throw new Error(accessError);
+      return parseCsvRows(Papa.unparse(data.values));
+    }
+
     // ชีตที่ไม่ได้แชร์สาธารณะ Google จะ redirect ไปหน้า login ซึ่งเบราว์เซอร์บล็อก (fetch reject) หรือได้ HTML กลับมา
     async function readGoogleSheetRows(link) {
+      if (APPS_SCRIPT_LINK.test(String(link || '').trim())) return readAppsScriptRows(link.trim());
       const url = googleSheetCsvUrl(link);
       const accessError = 'เปิดชีตไม่ได้ กรุณาตรวจลิงก์ และแชร์ชีตเป็น "ทุกคนที่มีลิงก์ดูได้"';
       let res;

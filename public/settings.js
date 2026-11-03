@@ -485,10 +485,10 @@ function stgBuildImportSection() {
         <span class="stg-import-icon"><i class="fas fa-table"></i></span>
         <div class="stg-import-text">
           <div class="stg-import-label">Import Data from Google Sheet</div>
-          <div class="stg-subtitle" id="stg-import-status-sheet">เพิ่มเข้าข้อมูลหลัก · แชร์ชีตเป็น "ทุกคนที่มีลิงก์ดูได้" ก่อนวางลิงก์</div>
+          <div class="stg-subtitle" id="stg-import-status-sheet">เพิ่มเข้าข้อมูลหลัก · ใช้ลิงก์ Apps Script หรือแชร์ชีตเป็น "ทุกคนที่มีลิงก์ดูได้"</div>
         </div>
         <div class="stg-import-link">
-          <input type="url" id="stg-import-sheet-link" class="stg-input" placeholder="วางลิงก์ Google Sheet" aria-label="ลิงก์ Google Sheet" onkeydown="if(event.key==='Enter') stgImportSheet()">
+          <input type="url" id="stg-import-sheet-link" class="stg-input" placeholder="วางลิงก์ Google Sheet หรือ Apps Script" aria-label="ลิงก์ Google Sheet หรือ Apps Script" onkeydown="if(event.key==='Enter') stgImportSheet()">
           <button class="stg-btn stg-btn-primary" onclick="stgImportSheet()"><i class="fas fa-link"></i> นำเข้า</button>
         </div>
       </div>
