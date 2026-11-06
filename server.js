@@ -4,7 +4,8 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+// Import Data uploads arrive in chunks of up to ~4MB (see lib/datasetStore.js)
+app.use(express.json({ limit: '5mb' }));
 
 // The same handler modules Vercel calls as serverless functions (api/**) are mounted
 // here directly for local development, so behavior is identical on both platforms -
@@ -38,6 +39,8 @@ app.delete('/api/kpi', kpiHandler);
 const configHandler = require('./api/config/index');
 app.get('/api/config', configHandler);
 app.put('/api/config', configHandler);
+// Mirrors vercel.json's rewrite of /api/data to /api/config?resource=data (imported datasets)
+app.all('/api/data', (req, res) => { req.query.resource = 'data'; configHandler(req, res); });
 app.get('/api/notes', require('./api/notes/index'));
 app.put('/api/notes', require('./api/notes/index'));
 app.get('/api/notes/status-options', require('./api/notes/status-options'));

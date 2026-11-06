@@ -154,3 +154,32 @@ ALTER TABLE access_requests ALTER COLUMN org_id SET NOT NULL;
 -- conflicting with old decided rows.
 CREATE UNIQUE INDEX IF NOT EXISTS access_requests_pending_email_idx
   ON access_requests (email) WHERE status = 'pending';
+
+-- Imported data (Import Data) shared by everyone in an organization - see lib/datasetStore.js.
+-- Only Super Admin/CEO import; every other role only reads. `dataset` is 'main' (Overview,
+-- Executive, Migration, AI Analytics) or 'retention' (Retention, Cohort). One row per org+dataset
+-- points at the committed `version`; its rows live in org_dataset_chunks (gzip JSON
+-- { rows, admins }, split so each upload/download stays under Vercel's ~4.5MB body limit).
+-- A new import uploads a whole new version and switches the pointer in one statement, so
+-- readers never see a half-uploaded dataset.
+CREATE TABLE IF NOT EXISTS org_datasets (
+  org_id TEXT NOT NULL,
+  dataset TEXT NOT NULL,
+  version TEXT NOT NULL,
+  row_count INTEGER NOT NULL,
+  chunk_count INTEGER NOT NULL,
+  source_name TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by TEXT,
+  PRIMARY KEY (org_id, dataset)
+);
+
+CREATE TABLE IF NOT EXISTS org_dataset_chunks (
+  version TEXT NOT NULL,
+  idx INTEGER NOT NULL,
+  org_id TEXT NOT NULL,
+  dataset TEXT NOT NULL,
+  data BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (version, idx)
+);

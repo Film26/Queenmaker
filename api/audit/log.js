@@ -7,7 +7,8 @@ const auditLog = require('../../lib/auditLog');
 const { getAuthorizedUser } = require('../../lib/session');
 const { getClientIp } = require('../../lib/reqUtils');
 
-const EXPORT_ROLES = ['Super Admin', 'Manager'];
+// same roles that may import (lib/datasetStore.js IMPORT_ROLES) - Manager/Sales Admin only view
+const EXPORT_ROLES = require('../../lib/datasetStore').IMPORT_ROLES;
 
 const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 

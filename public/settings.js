@@ -80,17 +80,18 @@ function stgGroupNameById(category, id) {
   return it ? it.name : '';
 }
 
-const SETTINGS_ROLES = ['Super Admin', 'Manager', 'Sales Admin'];
+const SETTINGS_ROLES = ['Super Admin', 'CEO', 'Manager', 'Sales Admin'];
 
 // หน้าที่ (สิทธิ์การเข้าถึง) ของแต่ละ Role — อิงตามสิทธิ์จริงที่ระบบบังคับใช้อยู่ตอนนี้:
 // เมนู Settings ถูกจำกัดให้ Super Admin เห็น/เข้าถึงได้เท่านั้น (ดู checkSessionOrRedirect ใน dashboard.html)
-// ส่วน Sales Admin จะเห็นข้อมูล (Overview/Executive/Retention/Cohort ฯลฯ) เฉพาะของตัวเองเท่านั้น กรองด้วย
-// ชื่อแอดมิน (adminName) ที่ตั้งไว้ตอนสร้าง/แก้ไขผู้ใช้งาน (ดู scopeRowsForCurrentUser ใน dashboard.html) -
-// Super Admin/Manager เห็นข้อมูลทั้งหมดเหมือนเดิม
+// Import/Export ข้อมูลได้เฉพาะ Super Admin/CEO (บังคับที่เซิร์ฟเวอร์: lib/datasetStore.js IMPORT_ROLES) ส่วน
+// Sales Admin ได้รับจากเซิร์ฟเวอร์เฉพาะแถวที่ชื่อแอดมินตรงกับ adminName ที่ตั้งไว้ตอนสร้าง/แก้ไขผู้ใช้งาน
+// (ดู handleData ใน api/config/index.js) - Role อื่นเห็นข้อมูลทั้งหมด
 const SETTINGS_ROLE_PERMISSIONS = {
-  'Super Admin': 'เข้าถึงข้อมูลทั้งหมด และจัดการระบบ (Settings)',
-  'Manager': 'เข้าถึงข้อมูลทั้งหมด ยกเว้นหน้า Settings',
-  'Sales Admin': 'เข้าถึงเฉพาะข้อมูลของตัวเอง (ตามชื่อแอดมิน) ยกเว้นหน้า Settings'
+  'Super Admin': 'เข้าถึงข้อมูลทั้งหมด จัดการระบบ (Settings) และ Import/Export ข้อมูล',
+  'CEO': 'เข้าถึงข้อมูลทั้งหมด และ Import/Export ข้อมูล ยกเว้นหน้า Settings',
+  'Manager': 'ดูข้อมูลทั้งหมดได้อย่างเดียว (Import/Export ไม่ได้) ยกเว้นหน้า Settings',
+  'Sales Admin': 'ดูเฉพาะข้อมูลของตัวเอง (ตามชื่อแอดมิน) ได้อย่างเดียว (Import/Export ไม่ได้)'
 };
 
 function stgRolePermission(role) {
@@ -450,8 +451,8 @@ window.stgSwitchMainTab = function(tab) {
 };
 
 // =====================================================
-// Import Data: นำเข้าข้อมูลเพิ่มเติม (ต่อท้ายข้อมูลเดิม ตัดแถวที่ซ้ำกับของเดิม) - ใช้ window.qmImportData ใน dashboard.html
-// ตัวเดียวกับป๊อปอัพตอนเข้าระบบ
+// Import Data: นำเข้าข้อมูล (เพิ่มต่อท้าย หรือ แทนที่ทั้งหมด) - ใช้ window.qmImportData ใน dashboard.html ตัวเดียวกับ
+// ป๊อปอัพนำเข้า ข้อมูลบันทึกบนเซิร์ฟเวอร์ขององค์กร ทุกคนเห็นชุดเดียวกัน
 // =====================================================
 function stgImportCountText(target) {
   const count = typeof window.qmImportedRowCount === 'function' ? window.qmImportedRowCount(target) : 0;
@@ -475,8 +476,12 @@ function stgBuildImportSection() {
     <div class="stg-card">
       <div class="stg-section-toolbar">
         <div>
-          <h3>นำเข้าข้อมูลเพิ่มเติม</h3>
-          <p class="stg-subtitle">ข้อมูลใหม่จะต่อท้ายข้อมูลที่มีอยู่ และข้ามแถวที่ซ้ำกับข้อมูลเดิม</p>
+          <h3>นำเข้าข้อมูล</h3>
+          <p class="stg-subtitle">ข้อมูลที่นำเข้าจะบันทึกไว้ในระบบ ทุกคนในองค์กรเห็นข้อมูลชุดเดียวกัน</p>
+        </div>
+        <div class="stg-import-mode" role="radiogroup" aria-label="วิธีนำเข้า">
+          <label><input type="radio" name="stgImportMode" value="append" checked> เพิ่มต่อท้ายข้อมูลเดิม</label>
+          <label><input type="radio" name="stgImportMode" value="replace"> แทนที่ข้อมูลเดิมทั้งหมด</label>
         </div>
       </div>
       ${fileRow('main', 'fa-file-import', 'Import Data')}
@@ -496,9 +501,10 @@ function stgBuildImportSection() {
 }
 
 function stgRunImport(source, target, statusId, sourceName) {
-  return window.qmImportData(source, target, true).then(result => {
+  const mode = document.querySelector('input[name="stgImportMode"]:checked');
+  return window.qmImportData(source, target, !mode || mode.value !== 'replace').then(result => {
     const skipped = result.skipped > 0 ? ' (ข้ามซ้ำ ' + result.skipped.toLocaleString() + ' แถว)' : '';
-    const message = sourceName + ' · เพิ่ม ' + result.added.toLocaleString() + ' แถวใหม่' + skipped + ' · รวม ' + result.total.toLocaleString() + ' แถว';
+    const message = sourceName + ' · นำเข้าแล้ว ' + result.added.toLocaleString() + ' แถว' + skipped + ' · รวม ' + result.total.toLocaleString() + ' แถว';
     const status = document.getElementById(statusId);
     if (status) { status.textContent = message; status.style.color = '#15803d'; }
     stgToast('นำเข้าข้อมูลสำเร็จ', 'success');
@@ -1308,7 +1314,7 @@ function stgBuildExportLogSection() {
       <div class="stg-card-header">
         <h3><i class="fas fa-file-export"></i> บันทึกการ Export ไฟล์ออกจากระบบ</h3>
         <p style="font-size:12px; color:#7a665e; margin:4px 0 0 0;">
-          ทุกครั้งที่ Super Admin/Manager กด Export Data ระบบจะบันทึกไว้ที่นี่ก่อนดาวน์โหลดไฟล์ (แสดงล่าสุดไม่เกิน 500 รายการ)
+          ทุกครั้งที่ Super Admin/CEO กด Export Data ระบบจะบันทึกไว้ที่นี่ก่อนดาวน์โหลดไฟล์ (แสดงล่าสุดไม่เกิน 500 รายการ)
         </p>
       </div>
 
@@ -1434,6 +1440,11 @@ function stgInjectStyles() {
     .stg-btn-primary { background: #1e293b; color: #fff; }
     .stg-btn-ghost { background: #eee; color: #333; }
 
+    .stg-import-mode { display: inline-flex; gap: 4px; padding: 4px; background: #f1f5f9; border-radius: 12px; }
+    .stg-import-mode label { position: relative; padding: 7px 14px; border-radius: 9px; font-size: 12.5px; font-weight: 600; color: #64748b; cursor: pointer; }
+    .stg-import-mode input { position: absolute; opacity: 0; pointer-events: none; }
+    .stg-import-mode label:has(input:checked) { background: #1e293b; color: #fff; }
+    .stg-import-mode label:has(input:focus-visible) { outline: 2px solid #94a3b8; outline-offset: 1px; }
     .stg-import-row { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; padding: 16px 0; border-top: 1px solid #f0ece6; }
     .stg-import-row:last-child { padding-bottom: 0; }
     .stg-import-icon {

@@ -5,7 +5,7 @@
 // of the prototype's own pre-indexed HOLISTA_DATA format, so it works directly on real imported rows.
 //
 // This page has its own imported dataset (retentionRawData, via its own "Import Data for Retention"
-// button — see dashboard.html's ingestRetentionRows) but DOES use the app's shared top filter bar
+// button — see dashboard.html's setRetentionRows) but DOES use the app's shared top filter bar
 // (Group/Year/Month/Channel/SubChannel/Product/Admin) same as Overview/Cohort/Migration. dashboard.html's
 // filterRowReaders()/computeFilteredRetentionData() apply that filter against retentionRawData using this
 // file's own column readers (retChanName, retAdminName, ...) since the Retention import format's columns

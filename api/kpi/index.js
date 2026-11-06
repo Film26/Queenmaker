@@ -20,7 +20,7 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === 'PUT' || req.method === 'DELETE') {
-    if (sessionUser.role !== 'Super Admin' && sessionUser.role !== 'Manager') {
+    if (['Super Admin', 'CEO', 'Manager'].indexOf(sessionUser.role) === -1) {
       auditLog.append({ type: 'unauthorized_access', reason: 'forbidden_role', userId: sessionUser.id, username: sessionUser.username, role: sessionUser.role, path: req.url, method: req.method, ip: getClientIp(req) });
       return res.status(403).json({ error: 'Forbidden' });
     }
