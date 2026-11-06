@@ -478,7 +478,6 @@ function stgBuildImportSection() {
         <div>
           <h3>นำเข้าข้อมูล</h3>
           <p class="stg-subtitle">ไฟล์ที่นำเข้าจะแทนที่ข้อมูลเดิมของชุดนั้นทั้งหมด</p>
-          <p class="stg-subtitle"><i class="fas fa-clock"></i> ข้อมูลเก่าถูกล้างทุกครั้งที่คุณเข้าระบบ และจะถูกลบเมื่อ Logout หรือครบ 8 ชั่วโมงหลังนำเข้า</p>
         </div>
       </div>
       ${fileRow('main', 'fa-file-import', 'Import Data')}
