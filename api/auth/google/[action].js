@@ -17,7 +17,7 @@ const userStore = require('../../../lib/userStore');
 const accessRequestStore = require('../../../lib/accessRequestStore');
 const orgStore = require('../../../lib/orgStore');
 const auditLog = require('../../../lib/auditLog');
-const { createSessionCookie, createStateCookie, getStateFromRequest, clearStateCookie } = require('../../../lib/session');
+const { createSessionCookie, createStateCookie, getStateFromRequest, clearStateCookie, getAuthorizedUser } = require('../../../lib/session');
 const { getClientIp } = require('../../../lib/reqUtils');
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -159,9 +159,65 @@ async function handleCallback(req, res) {
   }
 }
 
+// --- Import Data from Google Sheet with the user's own Google account ---------------------------
+// The dashboard reads a non-public sheet through the Sheets API using a short-lived, read-only
+// access token that Google issues to the browser (Google Identity Services token flow) - Google
+// itself decides whether that account can open the sheet, so the sheet can stay Restricted. The
+// token never comes back here except for this one identity check and is never stored.
+//
+// Policy: only Google Workspace (company) accounts may import this way, plus the founding
+// organization's own users (DEFAULT_ORG_ID), who may be on plain Gmail. Workspace accounts are
+// recognised by the `hd` (hosted domain) claim Google returns for them; consumer Gmail has none.
+const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+
+async function handleSheetsConfig(req, res) {
+  if (!(await getAuthorizedUser(req))) return res.status(401).json({ error: 'Not authenticated' });
+  return res.status(200).json({ clientId: CLIENT_ID || '', scope: SHEETS_SCOPE });
+}
+
+async function handleSheetsVerify(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const sessionUser = await getAuthorizedUser(req);
+  if (!sessionUser) return res.status(401).json({ error: 'Not authenticated' });
+  const accessToken = req.body && typeof req.body.accessToken === 'string' ? req.body.accessToken : '';
+  if (!CLIENT_ID || !accessToken) return res.status(400).json({ error: 'bad_request' });
+
+  try {
+    // tokeninfo proves the token is live and was issued to *our* client (not replayed from another app)
+    const infoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`);
+    if (!infoRes.ok) return res.status(401).json({ error: 'token_invalid' });
+    const info = await infoRes.json();
+    if (info.aud !== CLIENT_ID && info.azp !== CLIENT_ID) return res.status(401).json({ error: 'token_invalid' });
+    if (!String(info.scope || '').split(' ').includes(SHEETS_SCOPE)) return res.status(403).json({ error: 'scope_missing' });
+
+    const userRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!userRes.ok) return res.status(401).json({ error: 'token_invalid' });
+    const profile = await userRes.json();
+    const email = String(profile.email || '').toLowerCase();
+    if (!email || (profile.email_verified !== true && profile.email_verified !== 'true')) return res.status(403).json({ error: 'email_not_verified' });
+
+    const isWorkspace = !!profile.hd;
+    let allowed = isWorkspace;
+    if (!allowed) {
+      const user = await userStore.findByUsername(email);
+      allowed = !!(user && user.active && (user.orgId || orgStore.DEFAULT_ORG_ID) === orgStore.DEFAULT_ORG_ID);
+    }
+    if (!allowed) {
+      await auditLog.append({ type: 'unauthorized_access', reason: 'sheets_import_non_workspace', userId: sessionUser.id, username: sessionUser.username, googleEmail: email, ip: getClientIp(req) });
+      return res.status(403).json({ error: 'workspace_only', email });
+    }
+    return res.status(200).json({ ok: true, email, workspace: isWorkspace });
+  } catch (e) {
+    console.error('[google-sheets-verify] Unexpected error:', e.message);
+    return res.status(502).json({ error: 'verify_failed' });
+  }
+}
+
 module.exports = async function handler(req, res) {
   const action = req.query && req.query.action;
   if (action === 'start') return handleStart(req, res);
   if (action === 'callback') return handleCallback(req, res);
+  if (action === 'sheets-config') return handleSheetsConfig(req, res);
+  if (action === 'sheets-verify') return handleSheetsVerify(req, res);
   return res.status(404).send('Not found');
 };

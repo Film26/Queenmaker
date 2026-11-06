@@ -16,7 +16,8 @@ app.get('/api/auth/me', require('./api/auth/me'));
 // dynamic-route file - Express has no [param].js filename convention, so the :action
 // route param is copied onto req.query.action here to match what that module expects.
 const googleAuthHandler = require('./api/auth/google/[action]');
-app.get('/api/auth/google/:action', (req, res) => {
+// .all: the sheets-verify action is a POST (the others are GETs)
+app.all('/api/auth/google/:action', (req, res) => {
   req.query.action = req.params.action;
   googleAuthHandler(req, res);
 });

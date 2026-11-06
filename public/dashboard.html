@@ -521,7 +521,7 @@
           <span class="import-popup-icon"><i class="fas fa-table"></i></span>
           <div class="import-popup-text">
             <div class="import-popup-label">Import Data from Google Sheet</div>
-            <div class="import-popup-status" id="importStatusSheet">ใช้ลิงก์ Apps Script หรือแชร์ชีตเป็น "ทุกคนที่มีลิงก์ดูได้"</div>
+            <div class="import-popup-status" id="importStatusSheet">วางลิงก์ชีตปกติ แล้วเข้าสู่ระบบด้วยอีเมลบริษัทที่มีสิทธิ์เปิดชีต</div>
           </div>
         </div>
         <div class="import-popup-link">
@@ -541,6 +541,7 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
     // --- โครงสร้างตัวแปรหลักดั้งเดิม ---
     let rawData = [];
@@ -1046,11 +1047,114 @@
       throw new Error(data && data.error ? 'Apps Script: ' + data.error : accessError);
     }
 
-    // ชีตที่ไม่ได้แชร์สาธารณะ Google จะ redirect ไปหน้า login ซึ่งเบราว์เซอร์บล็อก (fetch reject) หรือได้ HTML กลับมา
+    // ลิงก์ชีตปกติ (/d/<id>/...) เปิดด้วยบัญชี Google ของผู้ใช้ผ่าน Sheets API (สิทธิ์อ่านอย่างเดียว) ชีตจึงตั้งเป็น Restricted
+    // ได้ - Google ตัดสินเองว่าบัญชีนั้นเปิดชีตได้ไหม ส่วนเซิร์ฟเวอร์ตรวจเพิ่มว่าเป็นบัญชี Google Workspace หรือผู้ใช้ขององค์กร
+    // ก่อตั้ง (ดู handleSheetsVerify ใน api/auth/google/[action].js) token อยู่ในหน่วยความจำของแท็บนี้เท่านั้น ไม่บันทึกที่ไหน
+    const googleSheetsAuth = { clientId: '', scope: '', token: '', email: '', expiresAt: 0, chooseAccount: false };
+    function loadGoogleSheetsConfig() {
+      fetch('/api/auth/google/sheets-config', { credentials: 'same-origin' })
+        .then(res => res.ok ? res.json() : null)
+        .then(cfg => { if (cfg) { googleSheetsAuth.clientId = cfg.clientId || ''; googleSheetsAuth.scope = cfg.scope || ''; } })
+        .catch(() => { /* ไม่มีการตั้งค่า - ปุ่มนำเข้าจะแจ้งเองตอนกด */ });
+    }
+
+    // ต้องเรียกภายในไม่กี่วินาทีหลังผู้ใช้กดปุ่ม ไม่งั้นเบราว์เซอร์บล็อกหน้าต่าง Google (config โหลดไว้ตั้งแต่เปิดหน้าแล้ว)
+    function requestGoogleSheetsToken() {
+      return new Promise((resolve, reject) => {
+        const oauth2 = window.google && window.google.accounts && window.google.accounts.oauth2;
+        if (!googleSheetsAuth.clientId || !googleSheetsAuth.scope) return reject(new Error('ระบบยังไม่ได้ตั้งค่าการเชื่อม Google Sheet กรุณาติดต่อผู้ดูแลระบบ'));
+        if (!oauth2) return reject(new Error('กำลังโหลดการเข้าสู่ระบบ Google กรุณากดนำเข้าอีกครั้ง'));
+        oauth2.initTokenClient({
+          client_id: googleSheetsAuth.clientId,
+          scope: googleSheetsAuth.scope + ' openid email',
+          prompt: googleSheetsAuth.chooseAccount ? 'select_account' : '',
+          callback: resp => {
+            if (resp.error) return reject(new Error('Google ไม่อนุญาต: ' + resp.error));
+            if (!oauth2.hasGrantedAllScopes(resp, googleSheetsAuth.scope)) return reject(new Error('ต้องติ๊กอนุญาตให้ระบบ "ดูสเปรดชีต Google" ก่อน จึงจะนำเข้าได้'));
+            resolve(resp);
+          },
+          error_callback: err => reject(new Error(err && err.type === 'popup_failed_to_open'
+            ? 'เบราว์เซอร์บล็อกหน้าต่าง Google กรุณาอนุญาต Pop-up ของเว็บนี้แล้วลองอีกครั้ง'
+            : 'ยกเลิกการเข้าสู่ระบบ Google'))
+        }).requestAccessToken();
+      });
+    }
+
+    async function getGoogleSheetsToken() {
+      if (googleSheetsAuth.token && Date.now() < googleSheetsAuth.expiresAt) return googleSheetsAuth;
+      const resp = await requestGoogleSheetsToken();
+      let verify = null;
+      try {
+        const res = await fetch('/api/auth/google/sheets-verify', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken: resp.access_token })
+        });
+        verify = await res.json().catch(() => ({}));
+        if (!res.ok) verify.ok = false;
+      } catch (err) {
+        console.error(err);
+      }
+      if (!verify || !verify.ok) {
+        window.google.accounts.oauth2.revoke(resp.access_token, () => {});
+        googleSheetsAuth.chooseAccount = true; // ครั้งหน้าให้เลือกบัญชีใหม่ ไม่ใช้บัญชีเดิมอัตโนมัติ
+        throw new Error(verify && verify.error === 'workspace_only'
+          ? 'บัญชี ' + verify.email + ' เป็น Gmail ทั่วไป ระบบรับเฉพาะอีเมลบริษัท (Google Workspace) กรุณากดนำเข้าอีกครั้งแล้วเลือกบัญชีบริษัท'
+          : 'ยืนยันบัญชี Google ไม่สำเร็จ กรุณาลองอีกครั้ง');
+      }
+      Object.assign(googleSheetsAuth, {
+        token: resp.access_token,
+        email: verify.email,
+        expiresAt: Date.now() + (Number(resp.expires_in) || 3600) * 1000 - 60000,
+        chooseAccount: false
+      });
+      return googleSheetsAuth;
+    }
+
+    async function sheetsApiErrorMessage(res, email) {
+      const body = await res.json().catch(() => ({}));
+      const err = body.error || {};
+      const detail = JSON.stringify(err.details || []) + ' ' + (err.message || '');
+      if (/SERVICE_DISABLED|accessNotConfigured|has not been used|is disabled/.test(detail)) return 'ยังไม่ได้เปิด Google Sheets API ในโปรเจกต์ Google Cloud ของระบบ กรุณาติดต่อผู้ดูแลระบบ';
+      if (/not supported for this document/.test(detail)) return 'ลิงก์นี้เป็นไฟล์ Excel ใน Google Drive กรุณาเปิดไฟล์แล้วเลือก File > Save as Google Sheets ก่อน';
+      if (res.status === 401) { googleSheetsAuth.token = ''; return 'สิทธิ์ Google หมดอายุ กรุณากดนำเข้าอีกครั้ง'; }
+      if (res.status === 403) return 'บัญชี ' + email + ' ไม่มีสิทธิ์เปิดชีตนี้ กรุณาขอให้เจ้าของชีตแชร์ให้บัญชีนี้';
+      if (res.status === 404) return 'ไม่พบชีตนี้ กรุณาตรวจลิงก์';
+      return 'อ่านชีตไม่สำเร็จ (' + res.status + ')';
+    }
+
+    async function readSheetWithGoogleAccount(spreadsheetId, gid) {
+      const auth = await getGoogleSheetsToken();
+      const api = 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(spreadsheetId);
+      const get = async url => {
+        const res = await fetch(url, { headers: { Authorization: 'Bearer ' + auth.token } });
+        if (!res.ok) throw new Error(await sheetsApiErrorMessage(res, auth.email));
+        return res.json();
+      };
+      const meta = await get(api + '?fields=sheets.properties(sheetId,title)');
+      const tabs = (meta.sheets || []).map(s => s.properties);
+      const tab = gid === null ? tabs[0] : tabs.find(p => String(p.sheetId) === gid);
+      if (!tab) throw new Error('ไม่พบแท็บที่อยู่ในลิงก์ กรุณาเปิดแท็บที่ต้องการแล้วคัดลอกลิงก์ใหม่');
+      // FORMATTED_VALUE = ค่าตามที่เห็นในชีต (วันที่/เบอร์โทรไม่เปลี่ยนรูป) เหมือนดาวน์โหลดเป็น CSV
+      const data = await get(api + '/values/' + encodeURIComponent("'" + tab.title.replace(/'/g, "''") + "'") + '?valueRenderOption=FORMATTED_VALUE');
+      const values = data.values || [];
+      // Sheets API ตัดช่องว่างท้ายแถวทิ้ง - เติมให้ทุกแถวกว้างเท่ากันก่อนแปลงเป็น CSV
+      const width = values.reduce((w, row) => Math.max(w, row.length), 0);
+      return parseCsvRows(Papa.unparse(values.map(row => row.concat(Array(width - row.length).fill('')))));
+    }
+
     async function readGoogleSheetRows(link) {
-      if (APPS_SCRIPT_LINK.test(String(link || '').trim())) return readAppsScriptRows(link.trim());
-      const url = googleSheetCsvUrl(link);
-      const accessError = 'เปิดชีตไม่ได้ กรุณาตรวจลิงก์ และแชร์ชีตเป็น "ทุกคนที่มีลิงก์ดูได้"';
+      const text = String(link || '').trim();
+      if (APPS_SCRIPT_LINK.test(text)) return readAppsScriptRows(text);
+      const own = text.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([\w-]+)/);
+      if (own && own[1] !== 'e') {
+        const gidMatch = text.match(/[#?&]gid=(\d+)/);
+        return readSheetWithGoogleAccount(own[1], gidMatch ? gidMatch[1] : null);
+      }
+      // ลิงก์ Publish to web (/d/e/...) ผู้ทำชีตตั้งใจเผยแพร่ไว้แล้ว อ่านเป็น CSV ได้ตรงๆ
+      const url = googleSheetCsvUrl(text);
+      const accessError = 'เปิดชีตที่เผยแพร่ (Publish to web) ไม่ได้ กรุณาตรวจลิงก์';
       let res;
       try {
         res = await fetch(url, { credentials: 'omit' });
@@ -1158,6 +1262,7 @@
       setInterval(checkSessionOrRedirect, 5 * 60 * 1000);
 
       initImportPopup();
+      loadGoogleSheetsConfig();
       initCharts();
     });
 
