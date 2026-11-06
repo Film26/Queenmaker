@@ -451,8 +451,8 @@ window.stgSwitchMainTab = function(tab) {
 };
 
 // =====================================================
-// Import Data: นำเข้าข้อมูลเพิ่มเติม (ต่อท้ายข้อมูลเดิม ตัดแถวที่ซ้ำกับของเดิม) - ใช้ window.qmImportData ใน dashboard.html
-// ตัวเดียวกับป๊อปอัพนำเข้า ข้อมูลบันทึกบนเซิร์ฟเวอร์ขององค์กร ทุกคนเห็นชุดเดียวกัน
+// Import Data: นำเข้าข้อมูล (แทนที่ข้อมูลชุดนั้นทั้งหมด) - ใช้ window.qmImportData ใน dashboard.html ตัวเดียวกับป๊อปอัพนำเข้า
+// ข้อมูลบันทึกบนเซิร์ฟเวอร์ขององค์กร ทุกคนเห็นชุดเดียวกัน
 // =====================================================
 function stgImportCountText(target) {
   const count = typeof window.qmImportedRowCount === 'function' ? window.qmImportedRowCount(target) : 0;
@@ -476,8 +476,8 @@ function stgBuildImportSection() {
     <div class="stg-card">
       <div class="stg-section-toolbar">
         <div>
-          <h3>นำเข้าข้อมูลเพิ่มเติม</h3>
-          <p class="stg-subtitle">ข้อมูลใหม่จะต่อท้ายข้อมูลที่มีอยู่ และข้ามแถวที่ซ้ำกับข้อมูลเดิม</p>
+          <h3>นำเข้าข้อมูล</h3>
+          <p class="stg-subtitle">ไฟล์ที่นำเข้าจะแทนที่ข้อมูลเดิมของชุดนั้นทั้งหมด</p>
           <p class="stg-subtitle"><i class="fas fa-clock"></i> ข้อมูลจะถูกลบออกจากระบบเมื่อคุณ Logout หรือครบ 8 ชั่วโมงหลังนำเข้า</p>
         </div>
       </div>
@@ -498,9 +498,8 @@ function stgBuildImportSection() {
 }
 
 function stgRunImport(source, target, statusId, sourceName) {
-  return window.qmImportData(source, target, true).then(result => {
-    const skipped = result.skipped > 0 ? ' (ข้ามซ้ำ ' + result.skipped.toLocaleString() + ' แถว)' : '';
-    const message = sourceName + ' · เพิ่ม ' + result.added.toLocaleString() + ' แถวใหม่' + skipped + ' · รวม ' + result.total.toLocaleString() + ' แถว';
+  return window.qmImportData(source, target).then(result => {
+    const message = sourceName + ' · นำเข้าแล้ว ' + result.total.toLocaleString() + ' แถว';
     const status = document.getElementById(statusId);
     if (status) { status.textContent = message; status.style.color = '#15803d'; }
     stgToast('นำเข้าข้อมูลสำเร็จ', 'success');

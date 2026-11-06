@@ -117,6 +117,7 @@
     .import-popup-sub { margin: 0 0 20px; font-size: 13px; line-height: 1.5; color: #b9c6db; }
     .import-popup-expiry { margin-top: -12px; font-size: 12px; color: #94a3b8; }
     .import-popup-expiry i { margin-right: 4px; }
+    .import-popup-load-error { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: rgba(239,68,68,0.15); color: #fca5a5; font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; }
     .import-popup-row { padding: 16px 0; border-top: 1px solid rgba(255,255,255,0.09); }
     .import-popup-row-main { display: flex; align-items: center; gap: 14px; }
     .import-popup-icon { flex-shrink: 0; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(255,255,255,0.08); color: #e2e8f0; font-size: 15px; }
@@ -495,8 +496,9 @@
     <div class="import-popup">
       <button type="button" id="importPopupClose" class="import-popup-close" aria-label="ปิด"><i class="fas fa-times"></i></button>
       <h2 id="importPopupTitle">นำเข้าข้อมูล</h2>
-      <p class="import-popup-sub" id="importPopupSub">เลือกไฟล์ข้อมูลเพื่อเริ่มใช้งาน Dashboard</p>
+      <p class="import-popup-sub" id="importPopupSub">เลือกไฟล์ข้อมูลเพื่อเริ่มใช้งาน Dashboard ไฟล์ที่นำเข้าจะแทนที่ข้อมูลเดิมของชุดนั้นทั้งหมด</p>
       <p class="import-popup-sub import-popup-expiry"><i class="fas fa-clock"></i> ข้อมูลจะถูกลบออกจากระบบเมื่อคุณ Logout หรือครบ 8 ชั่วโมงหลังนำเข้า</p>
+      <p class="import-popup-load-error" id="importLoadError" hidden></p>
       <div class="import-popup-row">
         <div class="import-popup-row-main">
           <span class="import-popup-icon"><i class="fas fa-file-import"></i></span>
@@ -886,9 +888,6 @@
     function isNonEmptyRow(row) {
       return !!row && Object.values(row).some(v => v !== null && v !== undefined && v.toString().trim() !== '');
     }
-    function rowSignature(row) {
-      return Object.keys(row).sort().map(k => k + '=' + row[k]).join('|');
-    }
 
     function ingestRows(rows) {
       for (let k in keyCache) delete keyCache[k];
@@ -907,21 +906,7 @@
       return { added: rawData.length, skipped: 0, total: rawData.length };
     }
 
-    // "เพิ่มต่อท้าย": ตัดแถวที่ซ้ำกับ "ของเดิม" (ไฟล์ช่วงวันที่ทับกัน) - ข้อมูลหลักเก็บแถวที่ซ้ำกันเองในไฟล์ใหม่ไว้ทั้งหมด
-    // (ออเดอร์ที่มีรายการเหมือนกันจริงจะได้ไม่หาย) ส่วน Retention ตัดซ้ำภายในไฟล์ด้วยเหมือนเดิม
-    function mergeRows(existingRows, newRows, dedupeWithinFile) {
-      const existing = new Set(existingRows.map(rowSignature));
-      const cleaned = (newRows || []).filter(isNonEmptyRow);
-      const fresh = cleaned.filter(row => {
-        const s = rowSignature(row);
-        if (existing.has(s)) return false;
-        if (dedupeWithinFile) existing.add(s);
-        return true;
-      });
-      return { rows: existingRows.concat(fresh), added: fresh.length, skipped: cleaned.length - fresh.length };
-    }
-
-    // แทนที่ retentionRawData (ชุดข้อมูลเฉพาะหน้า Retention/Cohort) ทั้งชุด - การต่อท้ายทำที่ mergeRows ก่อนเรียก
+    // แทนที่ retentionRawData (ชุดข้อมูลเฉพาะหน้า Retention/Cohort) ทั้งชุด
     function setRetentionRows(rows) {
       retentionRawData = (rows || []).filter(isNonEmptyRow);
       // ข้อมูลใหม่เข้ามาแล้ว ตัวเลือกใน dropdown ของ Filter บนสุด (Year/Channel/ฯลฯ) ต้องสร้างใหม่ ไม่งั้นจะยังว่าง
@@ -1254,12 +1239,12 @@
       throw new Error('version_changed');
     }
 
-    // โหลดข้อมูลขององค์กรครั้งเดียวหลังรู้ role (เรียกจาก checkSessionOrRedirect) ถ้ายังไม่มีข้อมูลหลัก: คนที่นำเข้าได้
-    // เห็นป๊อปอัพนำเข้า ส่วน Manager/Sales Admin เห็นข้อความรอ Super Admin/CEO นำเข้า
+    // โหลดข้อมูลขององค์กรครั้งเดียวหลังรู้ role (เรียกจาก checkSessionOrRedirect) แล้ว Super Admin/CEO เห็นป๊อปอัพ
+    // "นำเข้าข้อมูล" ทุกครั้งที่เข้าระบบ (โหลดไม่สำเร็จ = แจ้งสาเหตุไว้ในป๊อปอัพ) ส่วน Manager/Sales Admin ไม่มีป๊อปอัพ เห็นข้อความแทน
     async function loadSharedData() {
       const canImport = IMPORT_ROLES.indexOf(window.currentUser.role) !== -1;
       showLoading(true);
-      let main = null;
+      let main = null, loadError = null;
       try {
         const [mainRows, retentionRows] = await Promise.all([loadSharedDataset('main'), loadSharedDataset('retention')]);
         main = mainRows;
@@ -1267,14 +1252,18 @@
         if (mainRows) { attachRowKeyCache(mainRows); ingestRows(mainRows); }
       } catch (err) {
         console.error('[Data] โหลดข้อมูลจากระบบไม่สำเร็จ', err);
-        showOverviewNotice('โหลดข้อมูลจากระบบไม่สำเร็จ กรุณารีเฟรชหน้า');
-        return;
+        loadError = err;
       } finally {
         showLoading(false);
       }
-      if (main && main.length) return;
-      if (canImport) window.openImportPopup(true);
-      else showOverviewNotice('ยังไม่มีข้อมูลในระบบ — รอ Super Admin หรือ CEO นำเข้าข้อมูล');
+      const hasMain = !!(main && main.length);
+      if (canImport) {
+        window.openImportPopup();
+        if (loadError) window.showImportLoadError('โหลดข้อมูลเดิมจากระบบไม่สำเร็จ (' + loadError.message + ') - นำเข้าไฟล์ได้ตามปกติ หรือรีเฟรชหน้าเพื่อลองโหลดใหม่');
+        return;
+      }
+      if (loadError) showOverviewNotice('โหลดข้อมูลจากระบบไม่สำเร็จ กรุณารีเฟรชหน้า');
+      else if (!hasMain) showOverviewNotice('ยังไม่มีข้อมูลในระบบ — รอ Super Admin หรือ CEO นำเข้าข้อมูล');
     }
 
     function showOverviewNotice(text) {
@@ -1284,11 +1273,10 @@
     }
 
     // ทางเข้าเดียวของการนำเข้าข้อมูล ใช้ร่วมกันทั้งป๊อปอัพและ Settings > Import Data
-    // source: { file } หรือ { sheetLink } | target: 'main' | 'retention' | append: ต่อท้ายข้อมูลหลักเดิม (false = แทนที่ ใช้
-    // เฉพาะป๊อปอัพที่เปิดเองตอนองค์กรยังไม่มีข้อมูล เลือกไฟล์ผิดแล้วเลือกใหม่ได้) - Retention ต่อท้ายเสมอ
-    // บันทึกขึ้นระบบก่อน แล้วค่อยแสดงผล - ถ้าบันทึกไม่สำเร็จ ข้อมูลเดิมไม่เปลี่ยน
-    // คืน { added, skipped, total } ถ้าไม่สำเร็จจะ reject พร้อมข้อความให้ผู้ใช้
-    async function importData(source, target, append) {
+    // source: { file } หรือ { sheetLink } | target: 'main' | 'retention' - ไฟล์ที่นำเข้า "แทนที่" ข้อมูลชุดนั้นทั้งหมดเสมอ
+    // (นำเข้าไฟล์เดิมซ้ำก็ได้ข้อมูลชุดเดิม ไม่ซ้ำซ้อน) บันทึกขึ้นระบบก่อน แล้วค่อยแสดงผล - ถ้าบันทึกไม่สำเร็จ ข้อมูลเดิมไม่เปลี่ยน
+    // คืน { total } ถ้าไม่สำเร็จจะ reject พร้อมข้อความให้ผู้ใช้
+    async function importData(source, target) {
       showLoading(true);
       // ให้ overlay "กำลังโหลด" แสดงก่อนเริ่มงานหนัก (อ่านไฟล์ Excel ขนาดใหญ่ใช้เวลาหลายวินาที)
       await new Promise(r => setTimeout(r, 30));
@@ -1296,22 +1284,17 @@
         const rows = await (source.file ? readImportFileRows(source.file) : readGoogleSheetRows(source.sheetLink));
         if (!rows.some(isNonEmptyRow)) throw new Error('ไม่พบแถวข้อมูล');
         attachRowKeyCache(rows);
-        if (target === 'retention') append = true;
-        const current = target === 'retention' ? retentionRawData : rawData;
-        const next = append ? mergeRows(current, rows, target === 'retention') : (() => {
-          const cleaned = rows.filter(isNonEmptyRow);
-          return { rows: cleaned, added: cleaned.length, skipped: 0 };
-        })();
-        await saveSharedDataset(target, next.rows, append ? 'append' : 'replace', source.file ? source.file.name : 'Google Sheet');
+        const next = rows.filter(isNonEmptyRow);
+        await saveSharedDataset(target, next, 'replace', source.file ? source.file.name : 'Google Sheet');
         try {
-          if (target === 'retention') setRetentionRows(next.rows);
-          else ingestRows(next.rows);
+          if (target === 'retention') setRetentionRows(next);
+          else ingestRows(next);
         } catch (err) {
           console.error(err);
           throw new Error('บันทึกแล้ว แต่แสดงผลไม่สำเร็จ กรุณารีเฟรชหน้า');
         }
         if (target === 'main') setOverviewEmptyState(false);
-        return { added: next.added, skipped: next.skipped, total: next.rows.length };
+        return { total: next.length };
       } finally {
         showLoading(false);
       }
@@ -1319,25 +1302,26 @@
     window.qmImportData = importData;
     window.qmImportedRowCount = (target) => (target === 'retention' ? retentionRawData : rawData).length;
 
-    // ป๊อปอัพนำเข้าข้อมูล (เฉพาะ Super Admin/CEO) - เปิดเองตอนเข้าระบบถ้าองค์กรยังไม่มีข้อมูล (firstRun: ข้อมูลหลักที่เลือก
-    // แทนที่ของเดิม เลือกไฟล์ผิดแล้วเลือกใหม่ได้) หรือจากเมนู IMPORT DATA (ต่อท้ายข้อมูลเดิม ข้ามแถวที่ซ้ำ)
-    // ไม่ปิดเองหลังนำเข้า เพราะอาจนำเข้าทั้งข้อมูลหลักและ Retention ต่อกันได้ และไม่ปิดเมื่อกดพื้นหลังกันกดพลาด
+    // ป๊อปอัพ "นำเข้าข้อมูล" (เฉพาะ Super Admin/CEO) - เปิดเองทุกครั้งที่เข้าระบบ และจากเมนู IMPORT DATA ทุกไฟล์ที่เลือก
+    // แทนที่ข้อมูลชุดนั้น (เลือกไฟล์ผิดแล้วเลือกใหม่ได้) ไม่ปิดเองหลังนำเข้า เพราะอาจนำเข้าทั้งข้อมูลหลักและ Retention ต่อกันได้
+    // และไม่ปิดเมื่อกดพื้นหลังกันกดพลาด
     function initImportPopup() {
       const popup = document.getElementById('importPopup');
       const doneBtn = document.getElementById('importPopupDone');
       const statuses = Array.from(popup.querySelectorAll('.import-popup-status'));
       const statusDefaults = statuses.map(el => el.textContent);
-      let appendMode = true;
       const closePopup = () => { popup.style.display = 'none'; };
 
-      window.openImportPopup = function (firstRun) {
-        appendMode = !firstRun;
-        document.getElementById('importPopupTitle').textContent = firstRun ? 'นำเข้าข้อมูล' : 'นำเข้าข้อมูลเพิ่มเติม';
-        document.getElementById('importPopupSub').textContent = firstRun
-          ? 'เลือกไฟล์ข้อมูลเพื่อเริ่มใช้งาน Dashboard'
-          : 'ข้อมูลใหม่จะต่อท้ายข้อมูลที่มีอยู่ และข้ามแถวที่ซ้ำกับข้อมูลเดิม';
+      const loadErrorBox = document.getElementById('importLoadError');
+      window.showImportLoadError = function (text) {
+        loadErrorBox.textContent = text;
+        loadErrorBox.hidden = false;
+      };
+
+      window.openImportPopup = function () {
+        loadErrorBox.hidden = true;
         statuses.forEach((el, i) => { el.textContent = statusDefaults[i]; el.className = 'import-popup-status'; });
-        doneBtn.textContent = firstRun ? 'ข้ามไปก่อน' : 'กลับสู่ Dashboard';
+        doneBtn.textContent = 'ข้ามไปก่อน';
         document.querySelector('.sidebar').classList.remove('active');
         document.getElementById('sidebarOverlay').classList.remove('active');
         popup.style.display = 'flex';
@@ -1346,12 +1330,10 @@
       async function runImport(source, target, statusId, sourceName) {
         const status = document.getElementById(statusId);
         try {
-          const result = await importData(source, target, appendMode);
-          const skipped = result.skipped > 0 ? ' (ข้ามซ้ำ ' + result.skipped.toLocaleString() + ' แถว)' : '';
-          const total = appendMode ? ' · รวม ' + result.total.toLocaleString() + ' แถว' : '';
-          status.textContent = sourceName + ' · นำเข้าแล้ว ' + result.added.toLocaleString() + ' แถว' + skipped + total;
+          const result = await importData(source, target);
+          status.textContent = sourceName + ' · นำเข้าแล้ว ' + result.total.toLocaleString() + ' แถว';
           status.className = 'import-popup-status success';
-          if (!appendMode) doneBtn.textContent = 'เข้าสู่ Dashboard';
+          doneBtn.textContent = 'เข้าสู่ Dashboard';
           return true;
         } catch (err) {
           console.error(err);
