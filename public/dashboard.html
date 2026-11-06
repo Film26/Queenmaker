@@ -492,7 +492,7 @@
       <button type="button" id="importPopupClose" class="import-popup-close" aria-label="ปิด"><i class="fas fa-times"></i></button>
       <h2 id="importPopupTitle">นำเข้าข้อมูล</h2>
       <p class="import-popup-sub" id="importPopupSub">เลือกไฟล์ข้อมูลเพื่อเริ่มใช้งาน Dashboard ไฟล์ที่นำเข้าจะแทนที่ข้อมูลเดิมของชุดนั้นทั้งหมด</p>
-      <p class="import-popup-sub import-popup-expiry"><i class="fas fa-clock"></i> ข้อมูลจะถูกลบออกจากระบบเมื่อคุณ Logout หรือครบ 8 ชั่วโมงหลังนำเข้า</p>
+      <p class="import-popup-sub import-popup-expiry"><i class="fas fa-clock"></i> ข้อมูลเก่าถูกล้างทุกครั้งที่คุณเข้าระบบ และจะถูกลบเมื่อ Logout หรือครบ 8 ชั่วโมงหลังนำเข้า</p>
       <p class="import-popup-load-error" id="importLoadError" hidden></p>
       <div class="import-popup-row">
         <div class="import-popup-row-main">
@@ -1229,10 +1229,28 @@
       throw new Error('version_changed');
     }
 
-    // โหลดข้อมูลขององค์กรครั้งเดียวหลังรู้ role (เรียกจาก checkSessionOrRedirect) แล้ว Super Admin/CEO เห็นป๊อปอัพ
-    // "นำเข้าข้อมูล" ทุกครั้งที่เข้าระบบ (โหลดไม่สำเร็จ = แจ้งสาเหตุไว้ในป๊อปอัพ) ส่วน Manager/Sales Admin ไม่มีป๊อปอัพ เห็นข้อความแทน
+    // เรียกครั้งเดียวหลังรู้ role (จาก checkSessionOrRedirect) - Super Admin/CEO: ล้างข้อมูลเก่าทั้งหมดขององค์กรบนเซิร์ฟเวอร์
+    // ก่อนทุกครั้งที่เปิดระบบ (ไม่ให้เหลือข้อมูลจากรอบก่อน ต้องนำเข้าใหม่เองทุกครั้ง) แล้วเปิดป๊อปอัพ "นำเข้าข้อมูล"
+    // (ล้างไม่สำเร็จ = แจ้งสาเหตุไว้ในป๊อปอัพ) ส่วน Manager/Sales Admin โหลดข้อมูลที่ Super Admin/CEO นำเข้าไว้ในรอบปัจจุบันมาดู
     async function loadSharedData() {
       const canImport = IMPORT_ROLES.indexOf(window.currentUser.role) !== -1;
+      if (canImport) {
+        let clearError = null;
+        showLoading(true);
+        try {
+          await dataApi({ action: 'clear' }, {});
+          sharedDatasetVersion.main = null;
+          sharedDatasetVersion.retention = null;
+        } catch (err) {
+          console.error('[Data] ล้างข้อมูลเก่าไม่สำเร็จ', err);
+          clearError = err;
+        } finally {
+          showLoading(false);
+        }
+        window.openImportPopup();
+        if (clearError) window.showImportLoadError('ล้างข้อมูลเก่าในระบบไม่สำเร็จ (' + clearError.message + ') - กรุณารีเฟรชหน้าเพื่อลองใหม่');
+        return;
+      }
       showLoading(true);
       let main = null, loadError = null;
       try {
@@ -1247,11 +1265,6 @@
         showLoading(false);
       }
       const hasMain = !!(main && main.length);
-      if (canImport) {
-        window.openImportPopup();
-        if (loadError) window.showImportLoadError('โหลดข้อมูลเดิมจากระบบไม่สำเร็จ (' + loadError.message + ') - นำเข้าไฟล์ได้ตามปกติ หรือรีเฟรชหน้าเพื่อลองโหลดใหม่');
-        return;
-      }
       if (loadError) showOverviewNotice('โหลดข้อมูลจากระบบไม่สำเร็จ กรุณารีเฟรชหน้า');
       else if (!hasMain) showOverviewNotice('ยังไม่มีข้อมูลในระบบ — รอ Super Admin หรือ CEO นำเข้าข้อมูล');
     }

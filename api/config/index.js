@@ -19,9 +19,11 @@ const { getClientIp } = require('../../lib/reqUtils');
 // GET  ?dataset=..&version=..&chunk=N            -> that chunk's rows (a Sales Admin gets only rows of their adminName)
 // POST ?dataset=..&action=chunk  { version, index, rows, admins }                     (Super Admin / CEO)
 // POST ?dataset=..&action=commit { version, chunkCount, rowCount, baseVersion, mode, sourceName } (Super Admin / CEO)
+// POST ?action=clear                             -> deletes all of the org's imported data (Super Admin / CEO, on dashboard open)
 async function handleData(req, res, sessionUser) {
   const q = req.query || {};
   const dataset = q.dataset;
+  if (q.action === 'clear' && req.method === 'POST') return handleClear(req, res, sessionUser);
   if (datasetStore.DATASETS.indexOf(dataset) === -1) return res.status(400).json({ error: 'Unknown dataset' });
 
   if (req.method === 'GET') {
@@ -63,6 +65,16 @@ async function handleData(req, res, sessionUser) {
     if (e instanceof datasetStore.VersionConflictError) return res.status(409).json({ error: 'version_changed' });
     return res.status(400).json({ error: e.message });
   }
+}
+
+async function handleClear(req, res, sessionUser) {
+  if (datasetStore.IMPORT_ROLES.indexOf(sessionUser.role) === -1) {
+    auditLog.append({ type: 'unauthorized_access', reason: 'forbidden_role', userId: sessionUser.id, username: sessionUser.username, role: sessionUser.role, path: req.url, method: req.method, ip: getClientIp(req) });
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  const cleared = await datasetStore.clearOrg(sessionUser.orgId);
+  if (cleared.length) await auditLog.append({ type: 'data_cleared', reason: 'importer_opened_dashboard', orgId: sessionUser.orgId, userId: sessionUser.id, username: sessionUser.username, datasets: cleared, ip: getClientIp(req) });
+  return res.status(200).json({ ok: true, cleared });
 }
 
 module.exports = async function handler(req, res) {
