@@ -170,11 +170,6 @@
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-pie"></i>MUSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-ai-analytics" onclick="event.preventDefault(); switchTab('ai-analytics')"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
-        <!-- เฉพาะ Super Admin/CEO (ดู IMPORT_ROLES) ซ่อนไว้ก่อนจนกว่าจะรู้ role ของผู้ใช้ -->
-        <li class="nav-item" id="side-import-item" style="display:none;"><a href="#" class="nav-link" id="side-import" onclick="event.preventDefault(); openImportPopup();"><i class="fas fa-file-import"></i>IMPORT DATA</a></li>
-        <!-- id="exportBtn" ต้องคงไว้เดิม - checkSessionOrRedirect() อ้างถึง id นี้ตรงๆ เพื่อโชว์/ซ่อนตามสิทธิ์
-             (เฉพาะ Super Admin/CEO ดู EXPORT_ROLES) ซ่อนไว้ก่อนด้วย display:none จนกว่าจะรู้ role ของผู้ใช้ -->
-        <li class="nav-item"><a href="#" class="nav-link" id="exportBtn" onclick="event.preventDefault(); exportCurrentView();" style="display:none;"><i class="fas fa-file-export"></i>EXPORT DATA</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-kpisetting" onclick="event.preventDefault(); switchTab('kpisetting')"><i class="fas fa-chart-line"></i>KPI SETTING</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-settings" onclick="event.preventDefault(); switchTab('settings')"><i class="fas fa-cog"></i>SETTINGS<span id="side-settings-badge" title="มีการ Export ข้อมูลใหม่ที่ยังไม่ได้ดู (Settings > Export Log)" style="display:none; margin-left:8px; background:#f59e0b; color:#fff; font-size:10.5px; font-weight:700; line-height:1; border-radius:999px; padding:3px 7px;"></span></a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="logoutBtn" onclick="event.preventDefault(); doLogout();"><i class="fas fa-right-from-bracket"></i>LOGOUT</a></li>
@@ -575,12 +570,7 @@
         if (sideSettingsItem && data.user.role !== 'Super Admin') {
           sideSettingsItem.closest('.nav-item').style.display = 'none';
         }
-        // Import/Export Data is limited to Super Admin/CEO (also enforced by api/audit/log.js and /api/data) -
-        // Manager/Sales Admin only view what they imported
-        const exportBtn = document.getElementById('exportBtn');
-        if (exportBtn) exportBtn.style.display = EXPORT_ROLES.indexOf(data.user.role) !== -1 ? 'flex' : 'none';
-        const importMenuItem = document.getElementById('side-import-item');
-        if (importMenuItem) importMenuItem.style.display = IMPORT_ROLES.indexOf(data.user.role) !== -1 ? '' : 'none';
+        // ไม่มีเมนู Import/Export ใน Sidebar - Super Admin/CEO นำเข้าผ่านป๊อปอัพตอนเข้าระบบ (ดู loadSharedData)
         refreshExportBadge();
         if (!sharedDataRequested) { sharedDataRequested = true; loadSharedData(); }
       }).catch(() => { /* transient network error - don't force logout */ });
