@@ -478,6 +478,7 @@ function stgBuildImportSection() {
         <div>
           <h3>นำเข้าข้อมูลเพิ่มเติม</h3>
           <p class="stg-subtitle">ข้อมูลใหม่จะต่อท้ายข้อมูลที่มีอยู่ และข้ามแถวที่ซ้ำกับข้อมูลเดิม</p>
+          <p class="stg-subtitle"><i class="fas fa-clock"></i> ข้อมูลจะถูกลบออกจากระบบเมื่อคุณ Logout หรือครบ 8 ชั่วโมงหลังนำเข้า</p>
         </div>
       </div>
       ${fileRow('main', 'fa-file-import', 'Import Data')}

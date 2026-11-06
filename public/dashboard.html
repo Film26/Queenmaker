@@ -115,6 +115,8 @@
     .import-popup-close:hover { background: rgba(255,255,255,0.08); color: #fff; }
     .import-popup h2 { margin: 0 40px 6px 0; font-family: 'Outfit', sans-serif; font-size: 21px; font-weight: 600; letter-spacing: 0.2px; color: #fff; }
     .import-popup-sub { margin: 0 0 20px; font-size: 13px; line-height: 1.5; color: #b9c6db; }
+    .import-popup-expiry { margin-top: -12px; font-size: 12px; color: #94a3b8; }
+    .import-popup-expiry i { margin-right: 4px; }
     .import-popup-row { padding: 16px 0; border-top: 1px solid rgba(255,255,255,0.09); }
     .import-popup-row-main { display: flex; align-items: center; gap: 14px; }
     .import-popup-icon { flex-shrink: 0; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(255,255,255,0.08); color: #e2e8f0; font-size: 15px; }
@@ -494,6 +496,7 @@
       <button type="button" id="importPopupClose" class="import-popup-close" aria-label="ปิด"><i class="fas fa-times"></i></button>
       <h2 id="importPopupTitle">นำเข้าข้อมูล</h2>
       <p class="import-popup-sub" id="importPopupSub">เลือกไฟล์ข้อมูลเพื่อเริ่มใช้งาน Dashboard</p>
+      <p class="import-popup-sub import-popup-expiry"><i class="fas fa-clock"></i> ข้อมูลจะถูกลบออกจากระบบเมื่อคุณ Logout หรือครบ 8 ชั่วโมงหลังนำเข้า</p>
       <div class="import-popup-row">
         <div class="import-popup-row-main">
           <span class="import-popup-icon"><i class="fas fa-file-import"></i></span>
@@ -1168,7 +1171,8 @@
     }
 
     // --- ข้อมูลที่นำเข้าเก็บบนเซิร์ฟเวอร์ขององค์กร (lib/datasetStore.js ผ่าน /api/data) ---
-    // Super Admin/CEO นำเข้าครั้งเดียว ทุกคนในองค์กรโหลดชุดเดียวกันตอนเปิดระบบ (Sales Admin ได้เฉพาะแถวของชื่อแอดมินตัวเอง
+    // Super Admin/CEO นำเข้า ทุกคนในองค์กรโหลดชุดเดียวกันตอนเปิดระบบ - ข้อมูลถูกลบเมื่อคนนำเข้า Logout หรือครบ 8 ชั่วโมง
+    // (เซิร์ฟเวอร์จัดการเอง ดู lib/datasetStore.js) (Sales Admin ได้เฉพาะแถวของชื่อแอดมินตัวเอง
     // ซึ่งเซิร์ฟเวอร์คัดให้จาก admins ที่ส่งไปพร้อมแถว) อัปโหลดเป็นก้อนละไม่เกิน ~2MB เพราะ Vercel รับ body ได้ไม่เกิน ~4.5MB
     const DATA_API = '/api/data';
     const UPLOAD_CHUNK_BYTES = 2 * 1024 * 1024;
