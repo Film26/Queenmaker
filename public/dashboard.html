@@ -115,13 +115,6 @@
     .import-popup-close:hover { background: rgba(255,255,255,0.08); color: #fff; }
     .import-popup h2 { margin: 0 40px 6px 0; font-family: 'Outfit', sans-serif; font-size: 21px; font-weight: 600; letter-spacing: 0.2px; color: #fff; }
     .import-popup-sub { margin: 0 0 20px; font-size: 13px; line-height: 1.5; color: #b9c6db; }
-    .import-popup-mode { display: flex; gap: 4px; padding: 4px; margin: 0 0 6px; background: rgba(15,23,42,0.45); border-radius: 12px; }
-    .import-popup-mode label { position: relative; flex: 1; text-align: center; padding: 8px 10px; border-radius: 9px; font-size: 13px; font-weight: 600; color: #94a3b8; cursor: pointer; transition: background .15s, color .15s; }
-    .import-popup-mode input { position: absolute; opacity: 0; pointer-events: none; }
-    .import-popup-mode label:has(input:checked) { background: #fff; color: #1e293b; }
-    .import-popup-mode label:has(input:focus-visible) { outline: 2px solid #cbd5e1; outline-offset: 1px; }
-    .import-popup-mode-hint { margin: 0 0 14px; font-size: 12px; line-height: 1.5; color: #94a3b8; }
-    .import-popup-mode-hint.replace { color: #fca5a5; }
     .import-popup-row { padding: 16px 0; border-top: 1px solid rgba(255,255,255,0.09); }
     .import-popup-row-main { display: flex; align-items: center; gap: 14px; }
     .import-popup-icon { flex-shrink: 0; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(255,255,255,0.08); color: #e2e8f0; font-size: 15px; }
@@ -500,12 +493,7 @@
     <div class="import-popup">
       <button type="button" id="importPopupClose" class="import-popup-close" aria-label="ปิด"><i class="fas fa-times"></i></button>
       <h2 id="importPopupTitle">นำเข้าข้อมูล</h2>
-      <p class="import-popup-sub" id="importPopupSub">ข้อมูลที่นำเข้าจะบันทึกไว้ในระบบ ทุกคนในองค์กรเห็นข้อมูลชุดเดียวกัน</p>
-      <div class="import-popup-mode" role="radiogroup" aria-label="วิธีนำเข้า">
-        <label><input type="radio" name="importMode" value="append" checked> เพิ่มต่อท้ายข้อมูลเดิม</label>
-        <label><input type="radio" name="importMode" value="replace"> แทนที่ข้อมูลเดิมทั้งหมด</label>
-      </div>
-      <p class="import-popup-mode-hint" id="importModeHint">ข้ามแถวที่ซ้ำกับข้อมูลเดิมให้อัตโนมัติ</p>
+      <p class="import-popup-sub" id="importPopupSub">เลือกไฟล์ข้อมูลเพื่อเริ่มใช้งาน Dashboard</p>
       <div class="import-popup-row">
         <div class="import-popup-row-main">
           <span class="import-popup-icon"><i class="fas fa-file-import"></i></span>
@@ -542,7 +530,7 @@
         </div>
       </div>
       <div class="import-popup-footer">
-        <button type="button" id="importPopupDone" class="import-popup-done">ปิด</button>
+        <button type="button" id="importPopupDone" class="import-popup-done">ข้ามไปก่อน</button>
       </div>
     </div>
   </div>
@@ -1281,7 +1269,7 @@
         showLoading(false);
       }
       if (main && main.length) return;
-      if (canImport) window.openImportPopup();
+      if (canImport) window.openImportPopup(true);
       else showOverviewNotice('ยังไม่มีข้อมูลในระบบ — รอ Super Admin หรือ CEO นำเข้าข้อมูล');
     }
 
@@ -1292,7 +1280,8 @@
     }
 
     // ทางเข้าเดียวของการนำเข้าข้อมูล ใช้ร่วมกันทั้งป๊อปอัพและ Settings > Import Data
-    // source: { file } หรือ { sheetLink } | target: 'main' | 'retention' | append: ต่อท้ายข้อมูลเดิม (false = แทนที่ทั้งหมด)
+    // source: { file } หรือ { sheetLink } | target: 'main' | 'retention' | append: ต่อท้ายข้อมูลหลักเดิม (false = แทนที่ ใช้
+    // เฉพาะป๊อปอัพที่เปิดเองตอนองค์กรยังไม่มีข้อมูล เลือกไฟล์ผิดแล้วเลือกใหม่ได้) - Retention ต่อท้ายเสมอ
     // บันทึกขึ้นระบบก่อน แล้วค่อยแสดงผล - ถ้าบันทึกไม่สำเร็จ ข้อมูลเดิมไม่เปลี่ยน
     // คืน { added, skipped, total } ถ้าไม่สำเร็จจะ reject พร้อมข้อความให้ผู้ใช้
     async function importData(source, target, append) {
@@ -1303,12 +1292,8 @@
         const rows = await (source.file ? readImportFileRows(source.file) : readGoogleSheetRows(source.sheetLink));
         if (!rows.some(isNonEmptyRow)) throw new Error('ไม่พบแถวข้อมูล');
         attachRowKeyCache(rows);
+        if (target === 'retention') append = true;
         const current = target === 'retention' ? retentionRawData : rawData;
-        // ยืนยันตรงนี้ (หลังอ่านไฟล์/เข้าสู่ระบบ Google เสร็จแล้ว) ไม่ใช่ตอนกดปุ่ม - หน้าต่าง confirm คั่นกลางจะทำให้
-        // เบราว์เซอร์บล็อกหน้าต่าง Google ที่ต้องเปิดทันทีหลังกดปุ่ม
-        if (!append && current.length > 0 && !confirm('แทนที่ข้อมูล' + (target === 'retention' ? ' Retention' : '') + ' เดิม ' + current.length.toLocaleString() + ' แถวที่ทุกคนในองค์กรเห็น ด้วยข้อมูลใหม่ ' + rows.length.toLocaleString() + ' แถว?')) {
-          throw new Error('ยกเลิกการแทนที่ ข้อมูลเดิมยังอยู่ครบ');
-        }
         const next = append ? mergeRows(current, rows, target === 'retention') : (() => {
           const cleaned = rows.filter(isNonEmptyRow);
           return { rows: cleaned, added: cleaned.length, skipped: 0 };
@@ -1330,24 +1315,25 @@
     window.qmImportData = importData;
     window.qmImportedRowCount = (target) => (target === 'retention' ? retentionRawData : rawData).length;
 
-    // ป๊อปอัพนำเข้าข้อมูล (เฉพาะ Super Admin/CEO) - เปิดเองตอนเข้าระบบถ้ายังไม่มีข้อมูล หรือจากเมนู IMPORT DATA
+    // ป๊อปอัพนำเข้าข้อมูล (เฉพาะ Super Admin/CEO) - เปิดเองตอนเข้าระบบถ้าองค์กรยังไม่มีข้อมูล (firstRun: ข้อมูลหลักที่เลือก
+    // แทนที่ของเดิม เลือกไฟล์ผิดแล้วเลือกใหม่ได้) หรือจากเมนู IMPORT DATA (ต่อท้ายข้อมูลเดิม ข้ามแถวที่ซ้ำ)
     // ไม่ปิดเองหลังนำเข้า เพราะอาจนำเข้าทั้งข้อมูลหลักและ Retention ต่อกันได้ และไม่ปิดเมื่อกดพื้นหลังกันกดพลาด
     function initImportPopup() {
       const popup = document.getElementById('importPopup');
       const doneBtn = document.getElementById('importPopupDone');
       const statuses = Array.from(popup.querySelectorAll('.import-popup-status'));
       const statusDefaults = statuses.map(el => el.textContent);
-      const modeHint = document.getElementById('importModeHint');
-      const isAppend = () => (popup.querySelector('input[name="importMode"]:checked') || {}).value !== 'replace';
+      let appendMode = true;
       const closePopup = () => { popup.style.display = 'none'; };
 
-      popup.querySelectorAll('input[name="importMode"]').forEach(input => input.addEventListener('change', () => {
-        modeHint.textContent = isAppend() ? 'ข้ามแถวที่ซ้ำกับข้อมูลเดิมให้อัตโนมัติ' : 'ข้อมูลเดิมของชุดที่นำเข้าจะถูกลบ แล้วแทนด้วยข้อมูลจากไฟล์ใหม่ทั้งหมด';
-        modeHint.className = 'import-popup-mode-hint' + (isAppend() ? '' : ' replace');
-      }));
-
-      window.openImportPopup = function () {
+      window.openImportPopup = function (firstRun) {
+        appendMode = !firstRun;
+        document.getElementById('importPopupTitle').textContent = firstRun ? 'นำเข้าข้อมูล' : 'นำเข้าข้อมูลเพิ่มเติม';
+        document.getElementById('importPopupSub').textContent = firstRun
+          ? 'เลือกไฟล์ข้อมูลเพื่อเริ่มใช้งาน Dashboard'
+          : 'ข้อมูลใหม่จะต่อท้ายข้อมูลที่มีอยู่ และข้ามแถวที่ซ้ำกับข้อมูลเดิม';
         statuses.forEach((el, i) => { el.textContent = statusDefaults[i]; el.className = 'import-popup-status'; });
+        doneBtn.textContent = firstRun ? 'ข้ามไปก่อน' : 'กลับสู่ Dashboard';
         document.querySelector('.sidebar').classList.remove('active');
         document.getElementById('sidebarOverlay').classList.remove('active');
         popup.style.display = 'flex';
@@ -1356,10 +1342,12 @@
       async function runImport(source, target, statusId, sourceName) {
         const status = document.getElementById(statusId);
         try {
-          const result = await importData(source, target, isAppend());
+          const result = await importData(source, target, appendMode);
           const skipped = result.skipped > 0 ? ' (ข้ามซ้ำ ' + result.skipped.toLocaleString() + ' แถว)' : '';
-          status.textContent = sourceName + ' · นำเข้าแล้ว ' + result.added.toLocaleString() + ' แถว' + skipped + ' · รวม ' + result.total.toLocaleString() + ' แถว';
+          const total = appendMode ? ' · รวม ' + result.total.toLocaleString() + ' แถว' : '';
+          status.textContent = sourceName + ' · นำเข้าแล้ว ' + result.added.toLocaleString() + ' แถว' + skipped + total;
           status.className = 'import-popup-status success';
+          if (!appendMode) doneBtn.textContent = 'เข้าสู่ Dashboard';
           return true;
         } catch (err) {
           console.error(err);
