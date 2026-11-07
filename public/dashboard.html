@@ -24,7 +24,16 @@
     .clear-filters-btn:disabled { opacity: 0.45; cursor: default; }
     /* Layout for 10 KPIs and 6 Charts - Beautiful Design */
     body { overflow-x: hidden; }
-    .dashboard-content { padding: 30px 40px 180px 40px; background-color: #fbf9f4; min-height: 100vh;}
+    /* flex-shrink: 0 - .main-content เป็น flex column สูงเท่าจอ ถ้าปล่อยให้หดตัว เนื้อหาจะล้นออกนอกกล่อง แล้ว Footer ไปต่อท้าย
+       กล่องที่ถูกบีบ (ลอยทับกลางหน้า) แทนที่จะอยู่ท้ายเนื้อหาจริง */
+    .dashboard-content { padding: 30px 40px 60px 40px; background-color: #fbf9f4; min-height: 100vh; flex-shrink: 0; }
+
+    .site-footer { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; padding: 18px 40px; background: #1e293b; color: #cbd5e1; font-size: 12.5px; }
+    .site-footer-brand { display: flex; align-items: center; gap: 8px; font-family: 'Outfit', 'Inter', sans-serif; font-size: 14px; font-weight: 600; color: #fff; }
+    .site-footer-brand i { color: #d95f1d; font-size: 12px; }
+    .site-footer-brand span { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 400; color: #94a3b8; }
+    .site-footer-copy { color: #94a3b8; }
+    @media (max-width: 600px) { .site-footer { flex-direction: column; align-items: flex-start; padding: 16px 20px; } }
     
     .cards-grid {
       display: grid;
@@ -486,6 +495,10 @@
         <div id="view-settings" class="view-content" style="display:none; padding: 20px;"></div>
 
       </div>
+      <footer class="site-footer">
+        <div class="site-footer-brand"><i class="fas fa-crown"></i> QueenMaker <span>Your CRM Dashboard</span></div>
+        <div class="site-footer-copy">© <span id="footerYear">2026</span> QueenMaker. All rights reserved.</div>
+      </footer>
     </main>
   </div>
   <div id="importPopup" class="import-popup-overlay" role="dialog" aria-modal="true" aria-labelledby="importPopupTitle" style="display:none;">
@@ -1378,6 +1391,7 @@
       checkSessionOrRedirect();
       setInterval(checkSessionOrRedirect, 5 * 60 * 1000);
 
+      document.getElementById('footerYear').textContent = new Date().getFullYear();
       initImportPopup();
       loadGoogleSheetsConfig();
       initCharts();
