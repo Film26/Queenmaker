@@ -339,11 +339,23 @@ async function settingsMaybeImportLegacy() {
 }
 
 // --- Entry point (called by dashboard.html switchTab('settings')) ---
+// CEO เปิด Settings ได้เฉพาะแท็บ Import Data (Super Admin เห็นทุกแท็บ) - API ส่วนอื่น (ผู้ใช้/ตัวเลือก ฯลฯ) ยังเป็นของ
+// Super Admin เท่านั้นที่เซิร์ฟเวอร์ จึงไม่โหลดเลยสำหรับ CEO
+function stgIsImportOnly() {
+  return !!(window.currentUser && window.currentUser.role === 'CEO');
+}
+
 function renderSettings() {
   const container = document.getElementById('view-settings');
   if (!container) return;
 
   stgInjectStyles();
+  if (stgIsImportOnly()) {
+    __settingsUi.mainTab = 'import';
+    stgRenderAll(container);
+    stgLoadSheetSources();
+    return;
+  }
   container.innerHTML = stgLoadingSkeleton();
 
   let importedLegacy = false;
@@ -352,6 +364,7 @@ function renderSettings() {
     window.AppData.users = users;
     window.AppData.accessRequests = accessRequests;
     stgRenderAll(container);
+    if (__settingsUi.mainTab === 'import') stgLoadSheetSources();
     // tell the Dashboard (Product/SubProduct mapping, filters) only now that AppData holds the imported lists
     if (importedLegacy) stgNotifyChange('config', { source: 'legacy-import' });
   }).catch(err => {
@@ -376,21 +389,21 @@ function stgRenderAll(container) {
       </div>
     </div>
 
-    <div class="stg-maintabs">
-      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'config' ? 'active' : ''}" onclick="stgSwitchMainTab('config')">
+    <div class="stg-maintabs${stgIsImportOnly() ? ' stg-import-only' : ''}">
+      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'config' ? 'active' : ''}" data-tab="config" onclick="stgSwitchMainTab('config')">
         <i class="fas fa-list-check"></i> จัดการข้อมูลตัวเลือก
       </button>
-      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'users' ? 'active' : ''}" onclick="stgSwitchMainTab('users')">
+      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'users' ? 'active' : ''}" data-tab="users" onclick="stgSwitchMainTab('users')">
         <i class="fas fa-users-gear"></i> จัดการผู้ใช้งานระบบ
         ${(window.AppData.accessRequests || []).length > 0 ? `<span class="stg-tab-badge">${window.AppData.accessRequests.length}</span>` : ''}
       </button>
-      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'migration' ? 'active' : ''}" onclick="stgSwitchMainTab('migration')">
+      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'migration' ? 'active' : ''}" data-tab="migration" onclick="stgSwitchMainTab('migration')">
         <i class="fas fa-route"></i> Migration
       </button>
-      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'import' ? 'active' : ''}" onclick="stgSwitchMainTab('import')">
+      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'import' ? 'active' : ''}" data-tab="import" onclick="stgSwitchMainTab('import')">
         <i class="fas fa-file-import"></i> Import Data
       </button>
-      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'exportlog' ? 'active' : ''}" onclick="stgSwitchMainTab('exportlog')">
+      <button class="stg-maintab-btn ${__settingsUi.mainTab === 'exportlog' ? 'active' : ''}" data-tab="exportlog" onclick="stgSwitchMainTab('exportlog')">
         <i class="fas fa-file-export"></i> Export Log
         ${(window.qmExportUnseen || 0) > 0 ? `<span class="stg-tab-badge" id="stg-exportlog-tab-badge">${window.qmExportUnseen}</span>` : ''}
       </button>
@@ -427,8 +440,7 @@ function stgBuildMainTabBody(tab) {
 window.stgSwitchMainTab = function(tab) {
   __settingsUi.mainTab = tab;
   const body = document.getElementById('stg-maintab-body');
-  const tabOrder = ['config', 'users', 'migration', 'import', 'exportlog'];
-  document.querySelectorAll('.stg-maintab-btn').forEach((b, i) => b.classList.toggle('active', tabOrder[i] === tab));
+  document.querySelectorAll('.stg-maintab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   if (!body) return;
   if (tab === 'exportlog') {
     stgOpenExportLog();
@@ -448,52 +460,92 @@ window.stgSwitchMainTab = function(tab) {
     return;
   }
   body.innerHTML = stgBuildMainTabBody(tab);
+  if (tab === 'import') stgLoadSheetSources();
 };
 
 // =====================================================
-// Import Data: นำเข้าข้อมูล (แทนที่ข้อมูลชุดนั้นทั้งหมด) - ใช้ window.qmImportData ใน dashboard.html ตัวเดียวกับป๊อปอัพนำเข้า
-// ข้อมูลบันทึกบนเซิร์ฟเวอร์ขององค์กร ทุกคนเห็นชุดเดียวกัน
+// Import Data: ไฟล์ (แทนที่ข้อมูลชุดนั้นทั้งหมด - window.qmImportData ใน dashboard.html ตัวเดียวกับป๊อปอัพนำเข้า) หรือ
+// ลิงก์ Google Sheet ที่ระบบจำไว้และดึงข้อมูลล่าสุดให้เองทุกนาที (window.qmLinkSheet ฯลฯ - ดู lib/sheetSource.js)
+// ข้อมูลบันทึกบนเซิร์ฟเวอร์ขององค์กร ทุกคนเห็นชุดเดียวกัน - นำเข้าไฟล์ = ยกเลิกการเชื่อมชีตของชุดนั้น
 // =====================================================
+const STG_IMPORT_TARGETS = [
+  { id: 'main', icon: 'fa-file-import', label: 'Import Data' },
+  { id: 'retention', icon: 'fa-rotate', label: 'Import Data for Retention' }
+];
+
 function stgImportCountText(target) {
   const count = typeof window.qmImportedRowCount === 'function' ? window.qmImportedRowCount(target) : 0;
   return 'ตอนนี้มีข้อมูล ' + count.toLocaleString() + ' แถว';
 }
 
 function stgBuildImportSection() {
-  const fileRow = (target, icon, label) => `
+  const block = t => `
     <div class="stg-import-row">
-      <span class="stg-import-icon"><i class="fas ${icon}"></i></span>
+      <span class="stg-import-icon"><i class="fas ${t.icon}"></i></span>
       <div class="stg-import-text">
-        <div class="stg-import-label">${label}</div>
-        <div class="stg-subtitle" id="stg-import-status-${target}">${stgImportCountText(target)} · รองรับไฟล์ .csv, .xlsx, .xls</div>
+        <div class="stg-import-label">${t.label}</div>
+        <div class="stg-subtitle" id="stg-import-status-${t.id}">${stgImportCountText(t.id)} · รองรับไฟล์ .csv, .xlsx, .xls</div>
       </div>
-      <button class="stg-btn stg-btn-primary" onclick="document.getElementById('stg-import-file-${target}').click()">
+      <button class="stg-btn stg-btn-primary" onclick="document.getElementById('stg-import-file-${t.id}').click()">
         <i class="fas fa-folder-open"></i> Choose file
       </button>
-      <input type="file" id="stg-import-file-${target}" accept=".csv,.xlsx,.xls" hidden onchange="stgImportFile('${target}', this)">
+      <input type="file" id="stg-import-file-${t.id}" accept=".csv,.xlsx,.xls" hidden onchange="stgImportFile('${t.id}', this)">
+      <div class="stg-import-link">
+        <i class="fas fa-table stg-import-link-icon" title="Google Sheet"></i>
+        <input type="url" id="stg-sheet-link-${t.id}" class="stg-input" placeholder="หรือวางลิงก์ Google Sheet ให้ระบบดึงข้อมูลอัตโนมัติ" aria-label="ลิงก์ Google Sheet สำหรับ ${t.label}" onkeydown="if(event.key==='Enter') stgLinkSheet('${t.id}')">
+        <button class="stg-btn stg-btn-primary" onclick="stgLinkSheet('${t.id}')"><i class="fas fa-link"></i> เชื่อมลิงก์</button>
+        <button class="stg-btn stg-btn-ghost" id="stg-sheet-unlink-${t.id}" onclick="stgUnlinkSheet('${t.id}')" hidden><i class="fas fa-link-slash"></i> ยกเลิกการเชื่อมต่อ</button>
+      </div>
+      <div class="stg-subtitle stg-sheet-status" id="stg-sheet-status-${t.id}"></div>
     </div>`;
   return `
     <div class="stg-card">
       <div class="stg-section-toolbar">
         <div>
           <h3>นำเข้าข้อมูล</h3>
-          <p class="stg-subtitle">ไฟล์ที่นำเข้าจะแทนที่ข้อมูลเดิมของชุดนั้นทั้งหมด</p>
+          <p class="stg-subtitle">เลือกไฟล์ (แทนที่ข้อมูลเดิมของชุดนั้นทั้งหมด) หรือเชื่อมลิงก์ Google Sheet ให้ระบบดึงข้อมูลล่าสุดให้เองทุก 1 นาที</p>
+          <p class="stg-subtitle" id="stg-sheet-share-hint"></p>
         </div>
       </div>
-      ${fileRow('main', 'fa-file-import', 'Import Data')}
-      ${fileRow('retention', 'fa-rotate', 'Import Data for Retention')}
-      <div class="stg-import-row stg-import-row-sheet">
-        <span class="stg-import-icon"><i class="fas fa-table"></i></span>
-        <div class="stg-import-text">
-          <div class="stg-import-label">Import Data from Google Sheet</div>
-          <div class="stg-subtitle" id="stg-import-status-sheet">เพิ่มเข้าข้อมูลหลัก · วางลิงก์ชีตปกติ แล้วเข้าสู่ระบบด้วยอีเมลบริษัทที่มีสิทธิ์เปิดชีต</div>
-        </div>
-        <div class="stg-import-link">
-          <input type="url" id="stg-import-sheet-link" class="stg-input" placeholder="วางลิงก์ Google Sheet หรือ Apps Script" aria-label="ลิงก์ Google Sheet หรือ Apps Script" onkeydown="if(event.key==='Enter') stgImportSheet()">
-          <button class="stg-btn stg-btn-primary" onclick="stgImportSheet()"><i class="fas fa-link"></i> นำเข้า</button>
-        </div>
-      </div>
+      ${STG_IMPORT_TARGETS.map(block).join('')}
     </div>`;
+}
+
+function stgFormatTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+// ลิงก์ที่เชื่อมอยู่ของแต่ละชุด + อีเมล Service Account ที่ต้องแชร์ชีตให้ (โหลดหลังวาดแท็บ Import Data)
+function stgLoadSheetSources() {
+  if (typeof window.qmGetSheetSources !== 'function') return;
+  window.qmGetSheetSources().then(data => {
+    const hint = document.getElementById('stg-sheet-share-hint');
+    if (hint) {
+      hint.innerHTML = data.serviceAccountEmail
+        ? '<i class="fas fa-circle-info"></i> ลิงก์ชีตปกติ: แชร์ชีตให้ <b>' + stgEscapeHtml(data.serviceAccountEmail) + '</b> (สิทธิ์ Viewer) ก่อนวางลิงก์'
+        : '<i class="fas fa-triangle-exclamation"></i> ยังไม่ได้ตั้งค่า Service Account ของ Google ในระบบ - ใช้ได้เฉพาะลิงก์ Publish to web / Apps Script';
+    }
+    STG_IMPORT_TARGETS.forEach(t => stgShowSheetSource(t.id, data.sources && data.sources[t.id]));
+  }).catch(err => console.error('[Settings] โหลดลิงก์ Google Sheet ไม่สำเร็จ', err));
+}
+
+function stgShowSheetSource(target, src) {
+  const input = document.getElementById('stg-sheet-link-' + target);
+  const unlink = document.getElementById('stg-sheet-unlink-' + target);
+  const status = document.getElementById('stg-sheet-status-' + target);
+  if (!input || !status) return;
+  if (unlink) unlink.hidden = !src;
+  if (!src) { status.textContent = ''; return; }
+  if (document.activeElement !== input) input.value = src.url;
+  if (src.lastError) {
+    status.textContent = 'เชื่อมลิงก์อยู่ แต่ดึงข้อมูลครั้งล่าสุดไม่สำเร็จ: ' + src.lastError;
+    status.style.color = '#b91c1c';
+  } else {
+    status.textContent = 'เชื่อมลิงก์อยู่ · อัปเดตล่าสุด ' + (stgFormatTime(src.lastSyncedAt) || '-') + ' · ระบบดึงข้อมูลใหม่ให้อัตโนมัติทุก 1 นาที';
+    status.style.color = '#15803d';
+  }
 }
 
 function stgRunImport(source, target, statusId, sourceName) {
@@ -502,6 +554,7 @@ function stgRunImport(source, target, statusId, sourceName) {
     const status = document.getElementById(statusId);
     if (status) { status.textContent = message; status.style.color = '#15803d'; }
     stgToast('นำเข้าข้อมูลสำเร็จ', 'success');
+    stgLoadSheetSources(); // นำเข้าไฟล์ = ยกเลิกการเชื่อมชีตของชุดนั้น
     return true;
   }).catch(err => {
     console.error('[Settings] นำเข้าข้อมูลไม่สำเร็จ', err);
@@ -518,12 +571,30 @@ window.stgImportFile = function(target, input) {
   input.value = '';
 };
 
-window.stgImportSheet = function() {
-  const input = document.getElementById('stg-import-sheet-link');
+window.stgLinkSheet = function(target) {
+  const input = document.getElementById('stg-sheet-link-' + target);
+  const status = document.getElementById('stg-sheet-status-' + target);
   if (!input.value.trim()) { input.focus(); return; }
-  stgRunImport({ sheetLink: input.value }, 'main', 'stg-import-status-sheet', 'Google Sheet').then(ok => {
-    if (ok) input.value = '';
+  window.qmLinkSheet(target, input.value).then(result => {
+    const count = document.getElementById('stg-import-status-' + target);
+    if (count) { count.textContent = 'Google Sheet · นำเข้าแล้ว ' + result.total.toLocaleString() + ' แถว'; count.style.color = '#15803d'; }
+    stgToast('เชื่อมลิงก์ Google Sheet สำเร็จ', 'success');
+    stgLoadSheetSources();
+  }).catch(err => {
+    console.error('[Settings] เชื่อมลิงก์ไม่สำเร็จ', err);
+    if (status) { status.textContent = err.message; status.style.color = '#b91c1c'; }
+    stgToast('เชื่อมลิงก์ไม่สำเร็จ', 'error');
   });
+};
+
+window.stgUnlinkSheet = function(target) {
+  if (!confirm('ยกเลิกการเชื่อมลิงก์ Google Sheet? ข้อมูลที่มีอยู่จะยังอยู่ แต่จะไม่อัปเดตตามชีตอีก')) return;
+  window.qmUnlinkSheet(target).then(() => {
+    const input = document.getElementById('stg-sheet-link-' + target);
+    if (input) input.value = '';
+    stgToast('ยกเลิกการเชื่อมต่อแล้ว', 'success');
+    stgLoadSheetSources();
+  }).catch(err => stgToast('ยกเลิกการเชื่อมต่อไม่สำเร็จ: ' + err.message, 'error'));
 };
 
 // =====================================================
@@ -1442,10 +1513,14 @@ function stgInjectStyles() {
     }
     .stg-import-text { flex: 1; min-width: 200px; }
     .stg-import-label { font-size: 13.5px; font-weight: 600; color: #1e293b; margin-bottom: 3px; }
-    .stg-import-link { display: flex; gap: 10px; flex-basis: 100%; margin-left: 52px; }
+    .stg-import-link { display: flex; align-items: center; gap: 10px; flex-basis: 100%; margin-left: 52px; }
+    .stg-import-link-icon { color: #15803d; font-size: 15px; }
+    .stg-sheet-status { flex-basis: 100%; margin-left: 52px; }
+    .stg-sheet-status:empty { display: none; }
+    .stg-import-only .stg-maintab-btn:not([data-tab="import"]) { display: none; }
     .stg-import-link .stg-input { flex: 1; min-width: 0; }
     .stg-import-link .stg-btn { flex-shrink: 0; }
-    @media (max-width: 560px) { .stg-import-link { margin-left: 0; } }
+    @media (max-width: 560px) { .stg-import-link, .stg-sheet-status { margin-left: 0; } .stg-import-link { flex-wrap: wrap; } }
 
     .stg-table-wrapper { overflow-x: auto; }
     .stg-table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: 'Inter', sans-serif; }

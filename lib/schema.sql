@@ -183,3 +183,19 @@ CREATE TABLE IF NOT EXISTS org_dataset_chunks (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (version, idx)
 );
+
+-- Google Sheet linked to an org's dataset (see lib/sheetSource.js): the server re-reads it so the
+-- dataset always follows the sheet. last_checked_at throttles re-reads to about once a minute;
+-- source_modified is Drive's modifiedTime of the last read (unchanged sheet = no re-download).
+CREATE TABLE IF NOT EXISTS org_sheet_sources (
+  org_id TEXT NOT NULL,
+  dataset TEXT NOT NULL,
+  url TEXT NOT NULL,
+  last_checked_at TIMESTAMPTZ,
+  last_synced_at TIMESTAMPTZ,
+  source_modified TEXT,
+  last_error TEXT,
+  updated_by TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (org_id, dataset)
+);

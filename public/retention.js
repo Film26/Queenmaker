@@ -56,11 +56,9 @@ function retSubChanName(row) {
   if (clean) return clean;
   return window.getNormalizedSubChannel ? window.getNormalizedSubChannel(row) : 'Other';
 }
+// คอลัมน์ Note ก่อน แล้วค่อยกติกาเดียวกับข้อมูลหลัก - อยู่ใน public/admin-name.js ซึ่งเซิร์ฟเวอร์ใช้ร่วมกันตอนดึงชีต
 function retAdminName(row) {
-  const note = retReadCol(row, 'Note');
-  if (note && note.toString().trim()) return note.toString().trim();
-  const a = window.getNormalizedAdmin(row);
-  return a === 'Unknown' ? null : a;
+  return QMAdminName.retentionAdmin(row, window.getRowValue);
 }
 function retParsedDate(row) { return window.parseDate(window.getRowDateStr(row)); }
 function retDayNum(row) { const d = retParsedDate(row); return d ? Math.floor(Date.UTC(d.y, d.m - 1, d.d) / 86400000) : null; }

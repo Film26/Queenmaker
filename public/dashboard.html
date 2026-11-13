@@ -533,13 +533,26 @@
         <div class="import-popup-row-main">
           <span class="import-popup-icon"><i class="fas fa-table"></i></span>
           <div class="import-popup-text">
-            <div class="import-popup-label">Import Data from Google Sheet</div>
-            <div class="import-popup-status" id="importStatusSheet">วางลิงก์ชีตปกติ แล้วเข้าสู่ระบบด้วยอีเมลบริษัทที่มีสิทธิ์เปิดชีต</div>
+            <div class="import-popup-label">Google Sheet (ข้อมูลหลัก)</div>
+            <div class="import-popup-status" id="importStatusSheet">วางลิงก์ครั้งเดียว ระบบจำลิงก์และดึงข้อมูลล่าสุดให้เองทุก 1 นาที</div>
           </div>
         </div>
         <div class="import-popup-link">
-          <input type="url" id="importSheetLink" placeholder="วางลิงก์ Google Sheet หรือ Apps Script" aria-label="ลิงก์ Google Sheet หรือ Apps Script">
-          <button type="button" id="importSheetBtn" class="import-popup-btn">นำเข้า</button>
+          <input type="url" id="importSheetLink" placeholder="วางลิงก์ Google Sheet" aria-label="ลิงก์ Google Sheet ข้อมูลหลัก">
+          <button type="button" id="importSheetBtn" class="import-popup-btn">เชื่อมลิงก์</button>
+        </div>
+      </div>
+      <div class="import-popup-row">
+        <div class="import-popup-row-main">
+          <span class="import-popup-icon"><i class="fas fa-table"></i></span>
+          <div class="import-popup-text">
+            <div class="import-popup-label">Google Sheet (Retention)</div>
+            <div class="import-popup-status" id="importStatusSheetRetention">วางลิงก์ครั้งเดียว ระบบจำลิงก์และดึงข้อมูลล่าสุดให้เองทุก 1 นาที</div>
+          </div>
+        </div>
+        <div class="import-popup-link">
+          <input type="url" id="importSheetLinkRetention" placeholder="วางลิงก์ Google Sheet" aria-label="ลิงก์ Google Sheet ข้อมูล Retention">
+          <button type="button" id="importSheetBtnRetention" class="import-popup-btn">เชื่อมลิงก์</button>
         </div>
       </div>
       <div class="import-popup-footer">
@@ -554,7 +567,7 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="admin-name.js?v=1"></script>
   <script>
     // --- โครงสร้างตัวแปรหลักดั้งเดิม ---
     let rawData = [];
@@ -580,7 +593,7 @@
         if (!data) return;
         window.currentUser = data.user;
         const sideSettingsItem = document.getElementById('side-settings');
-        if (sideSettingsItem && data.user.role !== 'Super Admin') {
+        if (sideSettingsItem && ['Super Admin', 'CEO'].indexOf(data.user.role) === -1) {
           sideSettingsItem.closest('.nav-item').style.display = 'none';
         }
         // Export Data เฉพาะ Super Admin/CEO (บังคับที่เซิร์ฟเวอร์ด้วย: api/audit/log.js) - ไม่มีเมนู Import ใน Sidebar
@@ -1008,162 +1021,9 @@
       return file.arrayBuffer().then(readExcelRows);
     }
 
-    // ลิงก์ชีตปกติ (/d/<id>/edit#gid=...) หรือลิงก์ Publish to web (/d/e/<id>/pub...) -> ลิงก์ดาวน์โหลด CSV ของแท็บที่อยู่ในลิงก์
-    function googleSheetCsvUrl(link) {
-      const text = String(link || '').trim();
-      const match = text.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/(e\/)?([\w-]+)/);
-      if (!match) throw new Error('ลิงก์ไม่ถูกต้อง กรุณาวางลิงก์ Google Sheet');
-      const gidMatch = text.match(/[#?&]gid=(\d+)/);
-      const gid = gidMatch ? '&gid=' + gidMatch[1] : '';
-      return match[1]
-        ? 'https://docs.google.com/spreadsheets/d/e/' + match[2] + '/pub?output=csv' + gid
-        : 'https://docs.google.com/spreadsheets/d/' + match[2] + '/export?format=csv' + gid;
-    }
-
-    // ลิงก์ Web app (/exec) ของ Apps Script - ใช้กับชีตที่ไม่ได้แชร์สาธารณะ รองรับ 2 แบบ:
-    // - สคริปต์ InsightHub (วางลิงก์เดียวกับที่ใช้ใน InsightHub ได้เลย): ?action=orders ตอบ { success, rows: [{หัวคอลัมน์: ค่า}] }
-    // - google-apps-script/QueenMaker-Data.gs: ตอบ { ok, values: [[แถว 1 = หัวคอลัมน์], ...] } (ไม่สนพารามิเตอร์ action)
-    // แปลงผ่าน CSV เพื่อให้ได้แถวหน้าตาเดียวกับไฟล์ CSV ทุกประการ
-    const APPS_SCRIPT_LINK = /^https:\/\/script\.google\.com\/(?:a\/macros\/[^/]+|macros)\/s\/[\w-]+\/exec(?:\?\S*)?$/;
-    async function readAppsScriptRows(link) {
-      const accessError = 'เชื่อม Apps Script ไม่ได้ กรุณาตรวจลิงก์ และตั้ง Who has access เป็น Anyone';
-      const url = new URL(link);
-      if (!url.searchParams.has('action')) url.searchParams.set('action', 'orders');
-      let data;
-      try {
-        const res = await fetch(url.toString(), { credentials: 'omit' });
-        data = await res.json();
-      } catch (err) {
-        console.error(err);
-        throw new Error(accessError);
-      }
-      if (data && data.success && Array.isArray(data.rows)) return parseCsvRows(Papa.unparse(data.rows));
-      if (data && data.ok && Array.isArray(data.values)) return parseCsvRows(Papa.unparse(data.values));
-      throw new Error(data && data.error ? 'Apps Script: ' + data.error : accessError);
-    }
-
-    // ลิงก์ชีตปกติ (/d/<id>/...) เปิดด้วยบัญชี Google ของผู้ใช้ผ่าน Sheets API (สิทธิ์อ่านอย่างเดียว) ชีตจึงตั้งเป็น Restricted
-    // ได้ - Google ตัดสินเองว่าบัญชีนั้นเปิดชีตได้ไหม ส่วนเซิร์ฟเวอร์ตรวจเพิ่มว่าเป็นบัญชี Google Workspace หรือผู้ใช้ขององค์กร
-    // ก่อตั้ง (ดู handleSheetsVerify ใน api/auth/google/[action].js) token อยู่ในหน่วยความจำของแท็บนี้เท่านั้น ไม่บันทึกที่ไหน
-    const googleSheetsAuth = { clientId: '', scope: '', token: '', email: '', expiresAt: 0, chooseAccount: false };
-    function loadGoogleSheetsConfig() {
-      fetch('/api/auth/google/sheets-config', { credentials: 'same-origin' })
-        .then(res => res.ok ? res.json() : null)
-        .then(cfg => { if (cfg) { googleSheetsAuth.clientId = cfg.clientId || ''; googleSheetsAuth.scope = cfg.scope || ''; } })
-        .catch(() => { /* ไม่มีการตั้งค่า - ปุ่มนำเข้าจะแจ้งเองตอนกด */ });
-    }
-
-    // ต้องเรียกภายในไม่กี่วินาทีหลังผู้ใช้กดปุ่ม ไม่งั้นเบราว์เซอร์บล็อกหน้าต่าง Google (config โหลดไว้ตั้งแต่เปิดหน้าแล้ว)
-    function requestGoogleSheetsToken() {
-      return new Promise((resolve, reject) => {
-        const oauth2 = window.google && window.google.accounts && window.google.accounts.oauth2;
-        if (!googleSheetsAuth.clientId || !googleSheetsAuth.scope) return reject(new Error('ระบบยังไม่ได้ตั้งค่าการเชื่อม Google Sheet กรุณาติดต่อผู้ดูแลระบบ'));
-        if (!oauth2) return reject(new Error('กำลังโหลดการเข้าสู่ระบบ Google กรุณากดนำเข้าอีกครั้ง'));
-        oauth2.initTokenClient({
-          client_id: googleSheetsAuth.clientId,
-          scope: googleSheetsAuth.scope + ' openid email',
-          prompt: googleSheetsAuth.chooseAccount ? 'select_account' : '',
-          callback: resp => {
-            if (resp.error) return reject(new Error('Google ไม่อนุญาต: ' + resp.error));
-            if (!oauth2.hasGrantedAllScopes(resp, googleSheetsAuth.scope)) return reject(new Error('ต้องติ๊กอนุญาตให้ระบบ "ดูสเปรดชีต Google" ก่อน จึงจะนำเข้าได้'));
-            resolve(resp);
-          },
-          error_callback: err => reject(new Error(err && err.type === 'popup_failed_to_open'
-            ? 'เบราว์เซอร์บล็อกหน้าต่าง Google กรุณาอนุญาต Pop-up ของเว็บนี้แล้วลองอีกครั้ง'
-            : 'ยกเลิกการเข้าสู่ระบบ Google'))
-        }).requestAccessToken();
-      });
-    }
-
-    async function getGoogleSheetsToken() {
-      if (googleSheetsAuth.token && Date.now() < googleSheetsAuth.expiresAt) return googleSheetsAuth;
-      const resp = await requestGoogleSheetsToken();
-      let verify = null;
-      try {
-        const res = await fetch('/api/auth/google/sheets-verify', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accessToken: resp.access_token })
-        });
-        verify = await res.json().catch(() => ({}));
-        if (!res.ok) verify.ok = false;
-      } catch (err) {
-        console.error(err);
-      }
-      if (!verify || !verify.ok) {
-        window.google.accounts.oauth2.revoke(resp.access_token, () => {});
-        googleSheetsAuth.chooseAccount = true; // ครั้งหน้าให้เลือกบัญชีใหม่ ไม่ใช้บัญชีเดิมอัตโนมัติ
-        throw new Error(verify && verify.error === 'workspace_only'
-          ? 'บัญชี ' + verify.email + ' เป็น Gmail ทั่วไป ระบบรับเฉพาะอีเมลบริษัท (Google Workspace) กรุณากดนำเข้าอีกครั้งแล้วเลือกบัญชีบริษัท'
-          : 'ยืนยันบัญชี Google ไม่สำเร็จ กรุณาลองอีกครั้ง');
-      }
-      Object.assign(googleSheetsAuth, {
-        token: resp.access_token,
-        email: verify.email,
-        expiresAt: Date.now() + (Number(resp.expires_in) || 3600) * 1000 - 60000,
-        chooseAccount: false
-      });
-      return googleSheetsAuth;
-    }
-
-    async function sheetsApiErrorMessage(res, email) {
-      const body = await res.json().catch(() => ({}));
-      const err = body.error || {};
-      const detail = JSON.stringify(err.details || []) + ' ' + (err.message || '');
-      if (/SERVICE_DISABLED|accessNotConfigured|has not been used|is disabled/.test(detail)) return 'ยังไม่ได้เปิด Google Sheets API ในโปรเจกต์ Google Cloud ของระบบ กรุณาติดต่อผู้ดูแลระบบ';
-      if (/not supported for this document/.test(detail)) return 'ลิงก์นี้เป็นไฟล์ Excel ใน Google Drive กรุณาเปิดไฟล์แล้วเลือก File > Save as Google Sheets ก่อน';
-      if (res.status === 401) { googleSheetsAuth.token = ''; return 'สิทธิ์ Google หมดอายุ กรุณากดนำเข้าอีกครั้ง'; }
-      if (res.status === 403) return 'บัญชี ' + email + ' ไม่มีสิทธิ์เปิดชีตนี้ กรุณาขอให้เจ้าของชีตแชร์ให้บัญชีนี้';
-      if (res.status === 404) return 'ไม่พบชีตนี้ กรุณาตรวจลิงก์';
-      return 'อ่านชีตไม่สำเร็จ (' + res.status + ')';
-    }
-
-    async function readSheetWithGoogleAccount(spreadsheetId, gid) {
-      const auth = await getGoogleSheetsToken();
-      const api = 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(spreadsheetId);
-      const get = async url => {
-        const res = await fetch(url, { headers: { Authorization: 'Bearer ' + auth.token } });
-        if (!res.ok) throw new Error(await sheetsApiErrorMessage(res, auth.email));
-        return res.json();
-      };
-      const meta = await get(api + '?fields=sheets.properties(sheetId,title)');
-      const tabs = (meta.sheets || []).map(s => s.properties);
-      const tab = gid === null ? tabs[0] : tabs.find(p => String(p.sheetId) === gid);
-      if (!tab) throw new Error('ไม่พบแท็บที่อยู่ในลิงก์ กรุณาเปิดแท็บที่ต้องการแล้วคัดลอกลิงก์ใหม่');
-      // FORMATTED_VALUE = ค่าตามที่เห็นในชีต (วันที่/เบอร์โทรไม่เปลี่ยนรูป) เหมือนดาวน์โหลดเป็น CSV
-      const data = await get(api + '/values/' + encodeURIComponent("'" + tab.title.replace(/'/g, "''") + "'") + '?valueRenderOption=FORMATTED_VALUE');
-      const values = data.values || [];
-      // Sheets API ตัดช่องว่างท้ายแถวทิ้ง - เติมให้ทุกแถวกว้างเท่ากันก่อนแปลงเป็น CSV
-      const width = values.reduce((w, row) => Math.max(w, row.length), 0);
-      return parseCsvRows(Papa.unparse(values.map(row => row.concat(Array(width - row.length).fill('')))));
-    }
-
-    async function readGoogleSheetRows(link) {
-      const text = String(link || '').trim();
-      if (APPS_SCRIPT_LINK.test(text)) return readAppsScriptRows(text);
-      const own = text.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([\w-]+)/);
-      if (own && own[1] !== 'e') {
-        const gidMatch = text.match(/[#?&]gid=(\d+)/);
-        return readSheetWithGoogleAccount(own[1], gidMatch ? gidMatch[1] : null);
-      }
-      // ลิงก์ Publish to web (/d/e/...) ผู้ทำชีตตั้งใจเผยแพร่ไว้แล้ว อ่านเป็น CSV ได้ตรงๆ
-      const url = googleSheetCsvUrl(text);
-      const accessError = 'เปิดชีตที่เผยแพร่ (Publish to web) ไม่ได้ กรุณาตรวจลิงก์';
-      let res;
-      try {
-        res = await fetch(url, { credentials: 'omit' });
-      } catch (err) {
-        console.error(err);
-        throw new Error(accessError);
-      }
-      if (!res.ok || (res.headers.get('content-type') || '').indexOf('text/csv') === -1) throw new Error(accessError);
-      return parseCsvRows(await res.text());
-    }
-
     // --- ข้อมูลที่นำเข้าเก็บบนเซิร์ฟเวอร์ขององค์กร (lib/datasetStore.js ผ่าน /api/data) ---
-    // Super Admin/CEO นำเข้า ทุกคนในองค์กรโหลดชุดเดียวกันตอนเปิดระบบ - ข้อมูลถูกลบเมื่อคนนำเข้า Logout หรือครบ 8 ชั่วโมง
-    // (เซิร์ฟเวอร์จัดการเอง ดู lib/datasetStore.js) (Sales Admin ได้เฉพาะแถวของชื่อแอดมินตัวเอง
+    // Super Admin/CEO นำเข้าครั้งเดียว ทุกคนในองค์กรโหลดชุดเดียวกันตอนเปิดระบบ ข้อมูลอยู่จนกว่าจะนำเข้าชุดใหม่ หรือถ้าเชื่อม
+    // ลิงก์ Google Sheet ไว้ เซิร์ฟเวอร์ดึงชีตใหม่ให้เอง (ดู startLiveSync) (Sales Admin ได้เฉพาะแถวของชื่อแอดมินตัวเอง
     // ซึ่งเซิร์ฟเวอร์คัดให้จาก admins ที่ส่งไปพร้อมแถว) อัปโหลดเป็นก้อนละไม่เกิน ~2MB เพราะ Vercel รับ body ได้ไม่เกิน ~4.5MB
     const DATA_API = '/api/data';
     const UPLOAD_CHUNK_BYTES = 2 * 1024 * 1024;
@@ -1245,45 +1105,90 @@
       throw new Error('version_changed');
     }
 
-    // เรียกครั้งเดียวหลังรู้ role (จาก checkSessionOrRedirect) - Super Admin/CEO: ล้างข้อมูลเก่าทั้งหมดขององค์กรบนเซิร์ฟเวอร์
-    // ก่อนทุกครั้งที่เปิดระบบ (ไม่ให้เหลือข้อมูลจากรอบก่อน ต้องนำเข้าใหม่เองทุกครั้ง) แล้วเปิดป๊อปอัพ "นำเข้าข้อมูล"
-    // (ล้างไม่สำเร็จ = แจ้งสาเหตุไว้ในป๊อปอัพ) ส่วน Manager/Sales Admin โหลดข้อมูลที่ Super Admin/CEO นำเข้าไว้ในรอบปัจจุบันมาดู
+    function showDataset(target, rows) {
+      attachRowKeyCache(rows);
+      if (target === 'retention') setRetentionRows(rows);
+      else { ingestRows(rows); if (rows.length) setOverviewEmptyState(false); }
+    }
+
+    // เรียกครั้งเดียวหลังรู้ role (จาก checkSessionOrRedirect) - โหลดข้อมูลขององค์กรมาแสดง แล้ว Super Admin/CEO เห็นป๊อปอัพ
+    // "นำเข้าข้อมูล" เฉพาะตอนที่ยังไม่มีข้อมูลหลักในระบบ (นำเข้าครั้งเดียว ครั้งต่อไปเข้า Dashboard เลย นำเข้าใหม่ได้ที่
+    // Settings > Import Data) ส่วน Manager/Sales Admin ไม่มีป๊อปอัพ ถ้ายังไม่มีข้อมูลเห็นข้อความรอแทน
     async function loadSharedData() {
       const canImport = IMPORT_ROLES.indexOf(window.currentUser.role) !== -1;
-      if (canImport) {
-        let clearError = null;
-        showLoading(true);
-        try {
-          await dataApi({ action: 'clear' }, {});
-          sharedDatasetVersion.main = null;
-          sharedDatasetVersion.retention = null;
-        } catch (err) {
-          console.error('[Data] ล้างข้อมูลเก่าไม่สำเร็จ', err);
-          clearError = err;
-        } finally {
-          showLoading(false);
-        }
-        window.openImportPopup();
-        if (clearError) window.showImportLoadError('ล้างข้อมูลเก่าในระบบไม่สำเร็จ (' + clearError.message + ') - กรุณารีเฟรชหน้าเพื่อลองใหม่');
-        return;
-      }
       showLoading(true);
       let main = null, loadError = null;
       try {
         const [mainRows, retentionRows] = await Promise.all([loadSharedDataset('main'), loadSharedDataset('retention')]);
         main = mainRows;
-        if (retentionRows) { attachRowKeyCache(retentionRows); setRetentionRows(retentionRows); }
-        if (mainRows) { attachRowKeyCache(mainRows); ingestRows(mainRows); }
+        if (retentionRows) showDataset('retention', retentionRows);
+        if (mainRows) showDataset('main', mainRows);
       } catch (err) {
         console.error('[Data] โหลดข้อมูลจากระบบไม่สำเร็จ', err);
         loadError = err;
       } finally {
         showLoading(false);
       }
+      startLiveSync();
       const hasMain = !!(main && main.length);
+      if (canImport) {
+        if (!hasMain || loadError) window.openImportPopup();
+        if (loadError) window.showImportLoadError('โหลดข้อมูลจากระบบไม่สำเร็จ (' + loadError.message + ') - นำเข้าไฟล์ได้ตามปกติ หรือรีเฟรชหน้าเพื่อลองโหลดใหม่');
+        return;
+      }
       if (loadError) showOverviewNotice('โหลดข้อมูลจากระบบไม่สำเร็จ กรุณารีเฟรชหน้า');
       else if (!hasMain) showOverviewNotice('ยังไม่มีข้อมูลในระบบ — รอ Super Admin หรือ CEO นำเข้าข้อมูล');
     }
+
+    // --- Google Sheet ที่เชื่อมไว้: เซิร์ฟเวอร์จำลิงก์และดึงชีตเอง (lib/sheetSource.js ผ่าน Service Account) ---
+    // หน้าเปิดค้างไว้: ขอให้เซิร์ฟเวอร์ดึงชีตทุก LIVE_SYNC_MS (เซิร์ฟเวอร์อ่านชีตจริงไม่เกินนาทีละครั้งต่อองค์กร และข้ามถ้าชีต
+    // ไม่เปลี่ยน) ถ้าได้ข้อมูลชุดใหม่ก็โหลดมาแสดงทันที - ทุก Role ใช้ได้ Manager/Sales Admin จึงเห็นข้อมูลล่าสุดตามชีตด้วย
+    const LIVE_SYNC_MS = 60 * 1000;
+    let liveSyncTimer = null, liveSyncBusy = false;
+
+    async function liveSyncTick() {
+      if (liveSyncBusy || document.hidden || document.getElementById('loadingOverlay').style.display === 'flex') return;
+      liveSyncBusy = true;
+      try {
+        for (const target of ['main', 'retention']) {
+          const result = await dataApi({ dataset: target, action: 'sync' }, {});
+          if (result.version && result.version !== sharedDatasetVersion[target]) {
+            const rows = await loadSharedDataset(target);
+            if (rows) showDataset(target, rows);
+          }
+        }
+      } catch (err) {
+        console.warn('[Data] อัปเดตข้อมูลจาก Google Sheet ไม่สำเร็จ', err);
+      } finally {
+        liveSyncBusy = false;
+      }
+    }
+
+    function startLiveSync() {
+      if (liveSyncTimer) return;
+      liveSyncTick();
+      liveSyncTimer = setInterval(liveSyncTick, LIVE_SYNC_MS);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) liveSyncTick(); });
+    }
+
+    // เชื่อมลิงก์ (Super Admin/CEO): เซิร์ฟเวอร์จำลิงก์ อ่านชีตทันที แล้วโหลดข้อมูลชุดนั้นมาแสดง -> { total }
+    async function linkSheet(target, url) {
+      showLoading(true);
+      try {
+        await dataApi({ dataset: target, action: 'link' }, { url: String(url || '').trim() });
+        const rows = (await loadSharedDataset(target)) || [];
+        showDataset(target, rows);
+        return { total: rows.length };
+      } catch (err) {
+        console.error(err);
+        throw new Error(err.status === 403 ? 'บัญชีนี้ไม่มีสิทธิ์นำเข้าข้อมูล (เฉพาะ Super Admin และ CEO)' : err.message);
+      } finally {
+        showLoading(false);
+      }
+    }
+    window.qmLinkSheet = linkSheet;
+    window.qmUnlinkSheet = target => dataApi({ dataset: target, action: 'unlink' }, {});
+    window.qmGetSheetSources = () => dataApi({ action: 'sources' });
 
     function showOverviewNotice(text) {
       const label = document.getElementById('overview-empty-text');
@@ -1291,8 +1196,8 @@
       setOverviewEmptyState(true);
     }
 
-    // ทางเข้าเดียวของการนำเข้าข้อมูล ใช้ร่วมกันทั้งป๊อปอัพและ Settings > Import Data
-    // source: { file } หรือ { sheetLink } | target: 'main' | 'retention' - ไฟล์ที่นำเข้า "แทนที่" ข้อมูลชุดนั้นทั้งหมดเสมอ
+    // นำเข้าไฟล์ ใช้ร่วมกันทั้งป๊อปอัพและ Settings > Import Data (Google Sheet ใช้ linkSheet แทน)
+    // source: { file } | target: 'main' | 'retention' - ไฟล์ที่นำเข้า "แทนที่" ข้อมูลชุดนั้นทั้งหมดเสมอ และยกเลิกการเชื่อมชีตของชุดนั้น
     // (นำเข้าไฟล์เดิมซ้ำก็ได้ข้อมูลชุดเดิม ไม่ซ้ำซ้อน) บันทึกขึ้นระบบก่อน แล้วค่อยแสดงผล - ถ้าบันทึกไม่สำเร็จ ข้อมูลเดิมไม่เปลี่ยน
     // คืน { total } ถ้าไม่สำเร็จจะ reject พร้อมข้อความให้ผู้ใช้
     async function importData(source, target) {
@@ -1300,11 +1205,11 @@
       // ให้ overlay "กำลังโหลด" แสดงก่อนเริ่มงานหนัก (อ่านไฟล์ Excel ขนาดใหญ่ใช้เวลาหลายวินาที)
       await new Promise(r => setTimeout(r, 30));
       try {
-        const rows = await (source.file ? readImportFileRows(source.file) : readGoogleSheetRows(source.sheetLink));
+        const rows = await readImportFileRows(source.file);
         if (!rows.some(isNonEmptyRow)) throw new Error('ไม่พบแถวข้อมูล');
         attachRowKeyCache(rows);
         const next = rows.filter(isNonEmptyRow);
-        await saveSharedDataset(target, next, 'replace', source.file ? source.file.name : 'Google Sheet');
+        await saveSharedDataset(target, next, 'replace', source.file.name);
         try {
           if (target === 'retention') setRetentionRows(next);
           else ingestRows(next);
@@ -1321,9 +1226,9 @@
     window.qmImportData = importData;
     window.qmImportedRowCount = (target) => (target === 'retention' ? retentionRawData : rawData).length;
 
-    // ป๊อปอัพ "นำเข้าข้อมูล" (เฉพาะ Super Admin/CEO) - เปิดเองทุกครั้งที่เข้าระบบ และจากเมนู IMPORT DATA ทุกไฟล์ที่เลือก
-    // แทนที่ข้อมูลชุดนั้น (เลือกไฟล์ผิดแล้วเลือกใหม่ได้) ไม่ปิดเองหลังนำเข้า เพราะอาจนำเข้าทั้งข้อมูลหลักและ Retention ต่อกันได้
-    // และไม่ปิดเมื่อกดพื้นหลังกันกดพลาด
+    // ป๊อปอัพ "นำเข้าข้อมูล" (เฉพาะ Super Admin/CEO) - เปิดเองตอนเข้าระบบเฉพาะเมื่อยังไม่มีข้อมูลหลัก ไฟล์ที่เลือกแทนที่ข้อมูล
+    // ชุดนั้น (เลือกไฟล์ผิดแล้วเลือกใหม่ได้) ลิงก์ Google Sheet ระบบจำไว้และดึงข้อมูลล่าสุดให้เอง ไม่ปิดเองหลังนำเข้า เพราะอาจ
+    // นำเข้าทั้งข้อมูลหลักและ Retention ต่อกันได้ และไม่ปิดเมื่อกดพื้นหลังกันกดพลาด
     function initImportPopup() {
       const popup = document.getElementById('importPopup');
       const doneBtn = document.getElementById('importPopupDone');
@@ -1373,13 +1278,24 @@
         });
       });
 
-      const linkInput = document.getElementById('importSheetLink');
-      const importSheet = async () => {
-        if (!linkInput.value.trim()) { linkInput.focus(); return; }
-        if (await runImport({ sheetLink: linkInput.value }, 'main', 'importStatusSheet', 'Google Sheet')) linkInput.value = '';
-      };
-      document.getElementById('importSheetBtn').addEventListener('click', importSheet);
-      linkInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') importSheet(); });
+      [['importSheetLink', 'importSheetBtn', 'main', 'importStatusSheet'], ['importSheetLinkRetention', 'importSheetBtnRetention', 'retention', 'importStatusSheetRetention']].forEach(([inputId, btnId, target, statusId]) => {
+        const input = document.getElementById(inputId);
+        const status = document.getElementById(statusId);
+        const link = async () => {
+          if (!input.value.trim()) { input.focus(); return; }
+          try {
+            const result = await linkSheet(target, input.value);
+            status.textContent = 'Google Sheet · นำเข้าแล้ว ' + result.total.toLocaleString() + ' แถว · ระบบจะดึงข้อมูลล่าสุดให้เองทุก 1 นาที';
+            status.className = 'import-popup-status success';
+            doneBtn.textContent = 'เข้าสู่ Dashboard';
+          } catch (err) {
+            status.textContent = 'Google Sheet · ' + err.message;
+            status.className = 'import-popup-status error';
+          }
+        };
+        document.getElementById(btnId).addEventListener('click', link);
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') link(); });
+      });
 
       document.getElementById('importPopupClose').addEventListener('click', closePopup);
       doneBtn.addEventListener('click', closePopup);
@@ -1393,7 +1309,6 @@
 
       document.getElementById('footerYear').textContent = new Date().getFullYear();
       initImportPopup();
-      loadGoogleSheetsConfig();
       initCharts();
     });
 
@@ -1985,48 +1900,10 @@
       return findMappedGroupName('SubProduct', p) || p.toString().trim();
     }
 
+    // กติกาอยู่ใน public/admin-name.js ซึ่งเซิร์ฟเวอร์ใช้ร่วมกันตอนดึงข้อมูลจาก Google Sheet (lib/sheetSource.js) - ผลจึงตรงกัน
+    // เสมอ และ Sales Admin ได้รับเฉพาะแถวของตัวเองไม่ว่าข้อมูลจะมาจากไฟล์หรือจากชีต
     function getNormalizedAdmin(row) {
-      if (!row) return 'Unknown';
-      // [CLEANSED] ยึด Admin_STD จากชีต Config_Admin_Map เป็นหลัก ไม่ว่า RawKey จะพิมพ์แบบไหนมา
-      // หมายเหตุ: ไฟล์ export มีหัวคอลัมน์ 'Admin Name' ซ้ำ 2 ตำแหน่ง (คอลัมน์ K ที่ว่าง กับคอลัมน์ขวาสุด
-      // ที่เป็น Admin_STD) PapaParse จะตั้งชื่อตัวหลังเป็น 'Admin Name_1' -> ต้องอ่านจากชื่อนี้
-      if (row['Admin_STD'] !== undefined || row['Admin Name_1'] !== undefined) {
-        const aStd = ((row['Admin_STD'] !== undefined ? row['Admin_STD'] : row['Admin Name_1']) || '').toString().trim();
-        return aStd || 'Unknown';
-      }
-      // [RETENTION PATTERN] คอลัมน์ "Note" คู่กับ "Order Type" (T ใหญ่) ของไฟล์ Retention คือชื่อแอดมินอยู่แล้ว
-      // (ไม่ต้องเดา/จับคำแบบไฟล์เดิมด้านล่าง) ใช้ตรงๆ - เพิ่มเติมจากของเดิม ไม่ได้แทนที่ รองรับชื่อแอดมินใหม่ที่ไม่อยู่
-      // ใน keyword list ด้านล่างได้ด้วย (เช่น "เอ", "พัด")
-      if (row['Note'] !== undefined && row['Order Type'] !== undefined) {
-        const nRet = (row['Note'] || '').toString().trim();
-        return nRet || 'Unknown';
-      }
-      // จับค่าจากคอลัมน์ Admin Name เท่านั้น (ชื่อแอดมิน/Admin/Admin Name) ถ้าคอลัมน์นี้ไม่มีข้อมูลจริง
-      // ให้ถือว่าไม่ทราบชื่อแอดมินไปเลย ไม่เอาคอลัมน์อื่น (เช่น หมายเหตุ/Remark) มาแสดงแทน
-      let val = getRowValue(row, ['ชื่อแอดมิน', 'Admin', 'Admin Name']);
-
-      let a = (val || '').toString().trim();
-      if (!a) return 'Unknown';
-      let lower = a.toLowerCase();
-      
-      if (lower.includes('may') || lower.includes('เมย์')) return 'May';
-      if (lower.includes('บี')) return 'บี';
-      if (lower.includes('มิ้ว')) return 'มิ้ว';
-      if (lower.includes('แอน')) return 'แอน';
-      if (lower.includes('แอล')) return 'แอล';
-      
-      if (a.includes(',')) {
-        let parts = a.split(',');
-        let adminPart = parts[parts.length - 1].trim();
-        let lowerPart = adminPart.toLowerCase();
-        if (lowerPart.includes('may') || lowerPart.includes('เมย์')) return 'May';
-        if (lowerPart.includes('บี')) return 'บี';
-        if (lowerPart.includes('มิ้ว')) return 'มิ้ว';
-        if (lowerPart.includes('แอน')) return 'แอน';
-        if (lowerPart.includes('แอล')) return 'แอล';
-        if (adminPart) return adminPart;
-      }
-      return a;
+      return QMAdminName.normalizeAdmin(row, getRowValue);
     }
 
     // --- Group filter (ใหญ่สุดของทั้งระบบ) ---
@@ -3285,9 +3162,9 @@
   <script src="ai-analytics.js?v=3"></script>
   <script src="insighthub-api.js?v=1"></script>
   <script src="insighthub.js?v=16"></script>
-  <script src="retention.js?v=1"></script>
+  <script src="retention.js?v=2"></script>
   <script src="kpisetting.js?v=3"></script>
   <script src="api-client.js?v=2"></script>
-  <script src="settings.js?v=4"></script>
+  <script src="settings.js?v=5"></script>
 </body>
 </html>
