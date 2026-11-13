@@ -692,11 +692,31 @@
       return { t: 'n', v: pct ? num / 100 : num, z: format };
     }
 
-    function tableToExactSheet(table) {
+    // headRows: แถวข้อความ (เช่น Filter ที่เลือก) ใส่ไว้เหนือตาราง ตารางเลื่อนลงไปต่อจากนั้นโดยเว้น 1 แถว
+    function tableToExactSheet(table, headRows) {
       const ws = XLSX.utils.table_to_sheet(table, { raw: true });
+      if (headRows && headRows.length) {
+        const shift = headRows.length + 1;
+        Object.keys(ws).filter(addr => addr[0] !== '!').forEach(addr => {
+          const c = XLSX.utils.decode_cell(addr);
+          ws['__' + XLSX.utils.encode_cell({ r: c.r + shift, c: c.c })] = ws[addr];
+          delete ws[addr];
+        });
+        Object.keys(ws).filter(k => k.startsWith('__')).forEach(k => { ws[k.slice(2)] = ws[k]; delete ws[k]; });
+        (ws['!merges'] || []).forEach(m => { m.s.r += shift; m.e.r += shift; });
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+        range.s.r = 0; range.e.r += shift;
+        headRows.forEach((row, r) => row.forEach((v, c) => {
+          ws[XLSX.utils.encode_cell({ r, c })] = { t: 's', v: String(v) };
+          range.e.c = Math.max(range.e.c, c);
+        }));
+        ws['!ref'] = XLSX.utils.encode_range(range);
+      }
       const colWidths = [];
       Object.keys(ws).forEach(addr => {
         if (addr[0] === '!') return;
+        // แถว Filter ด้านบนเป็นข้อความเสมอ ไม่แปลงเป็นตัวเลข และไม่ใช้กำหนดความกว้างคอลัมน์
+        if (headRows && XLSX.utils.decode_cell(addr).r < headRows.length) return;
         // ขึ้นบรรทัดใหม่ในช่อง (<br> ของป้ายชื่อ 2 ภาษา) เป็นเว้นวรรค - Excel ไม่ตัดบรรทัดให้ถ้าไม่ได้ตั้ง Wrap Text คำจะติดกัน
         const text = String(ws[addr].v === undefined || ws[addr].v === null ? '' : ws[addr].v).replace(/\s*\n\s*/g, ' ').trim();
         ws[addr] = exportCellFromText(text);
@@ -733,8 +753,10 @@
           addSheet(XLSX.utils.aoa_to_sheet(buildOverviewSummaryRows()), 'Summary');
           addSheet(XLSX.utils.json_to_sheet(buildMonthlyExportRows()), 'Monthly');
         } else {
+          // หน้า Executive: ใส่ Filter ที่เลือกไว้บนสุดของชีตตาราง CRM Report ให้ตรงกับที่แสดงบนหน้าจอ
+          const headRows = isExec ? [['Filter ที่เลือก'].concat(window.getExecFilterSummary().map(([label, value]) => label + ': ' + value))] : null;
           Array.from(document.querySelectorAll('#view-' + tab + ' table')).slice(0, 8).forEach((t, i) => {
-            addSheet(tableToExactSheet(t), (pageLabel + ' ' + (i + 1)).slice(0, 31));
+            addSheet(tableToExactSheet(t, i === 0 ? headRows : null), (pageLabel + ' ' + (i + 1)).slice(0, 31));
           });
         }
         addSheet(XLSX.utils.json_to_sheet(orders), 'Orders');
@@ -2220,6 +2242,18 @@
     let execFiltersTouched = { Year: false, Month: false, Channel: false, SubChannel: false, Product: false, SubProduct: false, Admin: false };
     window.execFiltersTouched = execFiltersTouched;
 
+    // Filter ทั้งหมดของหน้า Executive ณ ตอนนี้ เป็นคู่ [ชื่อ Filter, ค่าที่เลือก] เรียงตามปุ่มบนแถบ Filter
+    // ใช้แสดงใต้หัวข้อ CRM Report (executive.js) และใส่ไว้บนสุดของชีตตอน Export (exportCurrentView)
+    const EXEC_FILTER_LABELS = [['Group', 'Group'], ['Year', 'Year'], ['Month', 'Month'], ['Channel', 'Channel'], ['SubChannel', 'SubChannel'], ['Product', 'Product'], ['SubProduct', 'Sub Product'], ['Admin', 'Admin']];
+    window.getExecFilterSummary = function () {
+      // picked = ผู้ใช้กดเลือกเองแล้วและไม่ใช่ All (เกณฑ์เดียวกับสีปุ่มใน syncExecFilterButtons / ปุ่ม Group)
+      return EXEC_FILTER_LABELS.map(([key, label]) => {
+        const value = execFilters[key] || 'All';
+        const picked = value !== 'All' && (key === 'Group' || !!execFiltersTouched[key]);
+        return [label, value, picked];
+      });
+    };
+
     function populateExecYearMenu() {
       const yearsSet = new Set();
       getScopedRawData().forEach(row => {
@@ -3203,7 +3237,7 @@
     window.switchTab = switchTab; window.applyFilters = applyFilters; window.setFilter = setFilter; window.clearFilters = clearFilters; window.toggleFilter = toggleFilter; window.toggleChartPctChange = toggleChartPctChange; window.toggleRetNewProportion = toggleRetNewProportion; window.setChartViewMode = setChartViewMode; window.setChartViewYear = setChartViewYear;
   </script>
   <script src="cohort.js?v=14"></script>
-  <script src="executive.js?v=20"></script>
+  <script src="executive.js?v=21"></script>
   <script src="Migration.js?v=16"></script>
   <script src="ai-analytics.js?v=3"></script>
   <script src="insighthub-api.js?v=1"></script>

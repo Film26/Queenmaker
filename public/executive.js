@@ -267,6 +267,27 @@ function renderExecutive1(filteredData, rawData) {
         margin-top: 10px;
       }
       .exec-table-footnote i { color: #2563eb; }
+      .exec-filter-summary {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin: -4px 0 14px 2px;
+        font-family: 'Inter', sans-serif;
+        font-size: 12px;
+      }
+      .exec-filter-summary-title { font-weight: 700; color: #475569; }
+      .exec-filter-summary-title i { color: #1e3a8a; margin-right: 4px; }
+      .exec-filter-chip {
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        padding: 4px 10px;
+        color: #64748b;
+      }
+      .exec-filter-chip b { color: #334155; font-weight: 700; }
+      .exec-filter-chip.picked { background: #1e293b; border-color: #1e293b; color: #cbd5e1; }
+      .exec-filter-chip.picked b { color: #fff; }
     `;
     document.head.appendChild(style);
   }
@@ -574,14 +595,25 @@ function renderExecutive1(filteredData, rawData) {
   });
   kpiHtml += '</div>';
 
+  // ---- Filter ที่เลือกอยู่ (แสดงใต้หัวข้อ CRM Report และใส่ไว้บนสุดของชีตตอน Export ด้วย - ดู exportCurrentView) ----
+  // ค่ามาจากข้อมูลที่ import (ชื่อ Channel/Product ฯลฯ) จึงต้อง escape ก่อนใส่ใน HTML
+  const escHtml = (v) => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const filterPairs = window.getExecFilterSummary ? window.getExecFilterSummary() : [];
+  const filterSummaryHtml = filterPairs.length ? `
+    <div class="exec-filter-summary">
+      <span class="exec-filter-summary-title"><i class="fas fa-filter"></i> Filter ที่เลือก:</span>
+      ${filterPairs.map(([label, value, picked]) => `<span class="exec-filter-chip${picked ? ' picked' : ''}">${escHtml(label)}: <b>${escHtml(value)}</b></span>`).join('')}
+    </div>` : '';
+
   // ---- Build CRM Report Table ----
   let html = `
     <div class="exec-section-title">YTD Overview<span>ภาพรวมยอดขายสะสม</span></div>
     ${kpiHtml}
     <div class="exec-section-title-row">
       <span class="exec-section-icon"><i class="fas fa-chart-column"></i></span>
-      <div class="exec-section-title exec-section-title-lg">CRM Report<span>รายงาน CRM</span></div>
+      <div class="exec-section-title exec-section-title-lg">CRM Report</div>
     </div>
+    ${filterSummaryHtml}
     <div class="exec-table-wrapper">
       <table class="exec-table">
       <thead>
