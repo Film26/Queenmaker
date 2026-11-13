@@ -469,8 +469,8 @@ window.stgSwitchMainTab = function(tab) {
 // ข้อมูลบันทึกบนเซิร์ฟเวอร์ขององค์กร ทุกคนเห็นชุดเดียวกัน - นำเข้าไฟล์ = ยกเลิกการเชื่อมชีตของชุดนั้น
 // =====================================================
 const STG_IMPORT_TARGETS = [
-  { id: 'main', icon: 'fa-file-import', label: 'Import Data' },
-  { id: 'retention', icon: 'fa-rotate', label: 'Import Data for Retention' }
+  { id: 'main', icon: 'fa-file-import', label: 'Import data : CRM' },
+  { id: 'retention', icon: 'fa-rotate', label: 'Import data : For Retention' }
 ];
 
 function stgImportCountText(target) {
