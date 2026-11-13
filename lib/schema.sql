@@ -186,7 +186,7 @@ CREATE TABLE IF NOT EXISTS org_dataset_chunks (
 
 -- Google Sheet linked to an org's dataset (see lib/sheetSource.js): the server re-reads it so the
 -- dataset always follows the sheet. last_checked_at throttles re-reads to about once a minute;
--- source_modified is Drive's modifiedTime of the last read (unchanged sheet = no re-download).
+-- source_modified is a hash of the last contents read (unchanged sheet = nothing rewritten).
 CREATE TABLE IF NOT EXISTS org_sheet_sources (
   org_id TEXT NOT NULL,
   dataset TEXT NOT NULL,
@@ -199,3 +199,24 @@ CREATE TABLE IF NOT EXISTS org_sheet_sources (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (org_id, dataset)
 );
+
+-- Regular sheet links are read with the Google permission of the Super Admin/CEO who linked them
+-- (no service account): their email and read-only refresh token (encrypted, lib/secretBox.js).
+ALTER TABLE org_sheet_sources ADD COLUMN IF NOT EXISTS google_email TEXT;
+ALTER TABLE org_sheet_sources ADD COLUMN IF NOT EXISTS refresh_token TEXT;
+
+-- A regular sheet link waiting for the linking person's Google sign-in (lib/sheetSource.js), ~10 minutes.
+CREATE TABLE IF NOT EXISTS org_sheet_link_requests (
+  nonce TEXT PRIMARY KEY,
+  org_id TEXT NOT NULL,
+  dataset TEXT NOT NULL,
+  url TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- outcome of the Google sign-in, shown when the dashboard comes back (/api/data?action=link-status)
+ALTER TABLE org_sheet_link_requests ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE org_sheet_link_requests ADD COLUMN IF NOT EXISTS error TEXT;
+ALTER TABLE org_sheet_link_requests ADD COLUMN IF NOT EXISTS row_count INTEGER;
+ALTER TABLE org_sheet_link_requests ADD COLUMN IF NOT EXISTS google_email TEXT;
+ALTER TABLE org_sheet_link_requests ADD COLUMN IF NOT EXISTS return_to TEXT;

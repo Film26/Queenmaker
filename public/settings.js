@@ -517,17 +517,20 @@ function stgFormatTime(iso) {
   return isNaN(d) ? '' : d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-// ลิงก์ที่เชื่อมอยู่ของแต่ละชุด + อีเมล Service Account ที่ต้องแชร์ชีตให้ (โหลดหลังวาดแท็บ Import Data)
+// ลิงก์ที่เชื่อมอยู่ของแต่ละชุด และบัญชี Google ที่ใช้ดึงข้อมูล (โหลดหลังวาดแท็บ Import Data)
 function stgLoadSheetSources() {
   if (typeof window.qmGetSheetSources !== 'function') return;
   window.qmGetSheetSources().then(data => {
     const hint = document.getElementById('stg-sheet-share-hint');
-    if (hint) {
-      hint.innerHTML = data.serviceAccountEmail
-        ? '<i class="fas fa-circle-info"></i> ลิงก์ชีตปกติ: แชร์ชีตให้ <b>' + stgEscapeHtml(data.serviceAccountEmail) + '</b> (สิทธิ์ Viewer) ก่อนวางลิงก์'
-        : '<i class="fas fa-triangle-exclamation"></i> ยังไม่ได้ตั้งค่า Service Account ของ Google ในระบบ - ใช้ได้เฉพาะลิงก์ Publish to web / Apps Script';
-    }
+    if (hint) hint.innerHTML = '<i class="fas fa-circle-info"></i> ลิงก์ชีตปกติ: ระบบจะให้เข้าสู่ระบบ Google ด้วยบัญชีที่เปิดชีตนั้นได้ แล้วดึงข้อมูลด้วยสิทธิ์ของบัญชีนั้น (ชีตไม่ต้องเปิดสาธารณะ)';
     STG_IMPORT_TARGETS.forEach(t => stgShowSheetSource(t.id, data.sources && data.sources[t.id]));
+    // ผลการเชื่อมลิงก์ตอนกลับมาจากหน้า Google (ดู showSheetLinkResult ใน dashboard.html)
+    const notice = window.qmSheetLinkNotice;
+    if (notice) {
+      window.qmSheetLinkNotice = null;
+      const status = document.getElementById('stg-sheet-status-' + (notice.dataset || 'main'));
+      if (status) { status.textContent = notice.text; status.style.color = notice.ok ? '#15803d' : '#b91c1c'; }
+    }
   }).catch(err => console.error('[Settings] โหลดลิงก์ Google Sheet ไม่สำเร็จ', err));
 }
 
@@ -543,7 +546,7 @@ function stgShowSheetSource(target, src) {
     status.textContent = 'เชื่อมลิงก์อยู่ แต่ดึงข้อมูลครั้งล่าสุดไม่สำเร็จ: ' + src.lastError;
     status.style.color = '#b91c1c';
   } else {
-    status.textContent = 'เชื่อมลิงก์อยู่ · อัปเดตล่าสุด ' + (stgFormatTime(src.lastSyncedAt) || '-') + ' · ระบบดึงข้อมูลใหม่ให้อัตโนมัติทุก 1 นาที';
+    status.textContent = 'เชื่อมลิงก์อยู่' + (src.googleEmail ? ' (ดึงด้วยบัญชี ' + src.googleEmail + ')' : '') + ' · อัปเดตล่าสุด ' + (stgFormatTime(src.lastSyncedAt) || '-') + ' · ระบบดึงข้อมูลใหม่ให้อัตโนมัติทุก 1 นาที';
     status.style.color = '#15803d';
   }
 }
@@ -575,7 +578,7 @@ window.stgLinkSheet = function(target) {
   const input = document.getElementById('stg-sheet-link-' + target);
   const status = document.getElementById('stg-sheet-status-' + target);
   if (!input.value.trim()) { input.focus(); return; }
-  window.qmLinkSheet(target, input.value).then(result => {
+  window.qmLinkSheet(target, input.value, 'settings').then(result => {
     const count = document.getElementById('stg-import-status-' + target);
     if (count) { count.textContent = 'Google Sheet · นำเข้าแล้ว ' + result.total.toLocaleString() + ' แถว'; count.style.color = '#15803d'; }
     stgToast('เชื่อมลิงก์ Google Sheet สำเร็จ', 'success');

@@ -1130,6 +1130,7 @@
         showLoading(false);
       }
       startLiveSync();
+      showSheetLinkResult();
       const hasMain = !!(main && main.length);
       if (canImport) {
         if (!hasMain || loadError) window.openImportPopup();
@@ -1140,7 +1141,7 @@
       else if (!hasMain) showOverviewNotice('ยังไม่มีข้อมูลในระบบ — รอ Super Admin หรือ CEO นำเข้าข้อมูล');
     }
 
-    // --- Google Sheet ที่เชื่อมไว้: เซิร์ฟเวอร์จำลิงก์และดึงชีตเอง (lib/sheetSource.js ผ่าน Service Account) ---
+    // --- Google Sheet ที่เชื่อมไว้: เซิร์ฟเวอร์จำลิงก์และดึงชีตเอง (lib/sheetSource.js) ด้วยสิทธิ์ Google ของคนที่เชื่อมลิงก์ ---
     // หน้าเปิดค้างไว้: ขอให้เซิร์ฟเวอร์ดึงชีตทุก LIVE_SYNC_MS (เซิร์ฟเวอร์อ่านชีตจริงไม่เกินนาทีละครั้งต่อองค์กร และข้ามถ้าชีต
     // ไม่เปลี่ยน) ถ้าได้ข้อมูลชุดใหม่ก็โหลดมาแสดงทันที - ทุก Role ใช้ได้ Manager/Sales Admin จึงเห็นข้อมูลล่าสุดตามชีตด้วย
     const LIVE_SYNC_MS = 60 * 1000;
@@ -1171,21 +1172,66 @@
       document.addEventListener('visibilitychange', () => { if (!document.hidden) liveSyncTick(); });
     }
 
-    // เชื่อมลิงก์ (Super Admin/CEO): เซิร์ฟเวอร์จำลิงก์ อ่านชีตทันที แล้วโหลดข้อมูลชุดนั้นมาแสดง -> { total }
-    async function linkSheet(target, url) {
+    // ลิงก์ชีตปกติ: พาทั้งแท็บไปเข้าสู่ระบบ Google ด้วยบัญชีที่เปิดชีตนั้นได้ (ไม่ใช้หน้าต่าง pop-up เพราะหน้า Google ตัดการเชื่อมกับ
+    // หน้าต่างที่เปิดมันทำให้ส่งผลกลับไม่ได้) เซิร์ฟเวอร์ตรวจว่าบัญชีนี้เปิดชีตได้ แล้วดึงชีตด้วยสิทธิ์อ่านอย่างเดียวของบัญชีนี้ต่อไป
+    // จากนั้นพากลับมาที่ dashboard.html?sheetLink=<nonce> ซึ่ง showSheetLinkResult แจ้งผล (ดู sheets-start ใน api/auth/google/[action].js)
+    const REGULAR_SHEET_LINK = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/(?!e\/)[\w-]+/;
+
+    // เชื่อมลิงก์ (Super Admin/CEO) - returnTo: 'popup' | 'settings' (กลับมาเปิดที่ไหนหลังเข้าสู่ระบบ Google)
+    // ลิงก์ที่ไม่ต้องเข้าสู่ระบบ: เซิร์ฟเวอร์จำลิงก์ อ่านชีตทันที แล้วโหลดข้อมูลชุดนั้นมาแสดง -> { total }
+    async function linkSheet(target, url, returnTo) {
+      url = String(url || '').trim();
       showLoading(true);
       try {
-        await dataApi({ dataset: target, action: 'link' }, { url: String(url || '').trim() });
+        if (REGULAR_SHEET_LINK.test(url)) {
+          const { nonce } = await dataApi({ dataset: target, action: 'prepare-link' }, { url, returnTo });
+          window.location.href = '/api/auth/google/sheets-start?nonce=' + encodeURIComponent(nonce);
+          return new Promise(() => {}); // หน้ากำลังเปลี่ยนไปหน้า Google
+        }
+        await dataApi({ dataset: target, action: 'link' }, { url });
         const rows = (await loadSharedDataset(target)) || [];
         showDataset(target, rows);
         return { total: rows.length };
       } catch (err) {
         console.error(err);
+        showLoading(false);
         throw new Error(err.status === 403 ? 'บัญชีนี้ไม่มีสิทธิ์นำเข้าข้อมูล (เฉพาะ Super Admin และ CEO)' : err.message);
       } finally {
-        showLoading(false);
+        if (!REGULAR_SHEET_LINK.test(url)) showLoading(false);
       }
     }
+
+    // กลับมาจากหน้า Google (dashboard.html?sheetLink=<nonce>): แจ้งผลการเชื่อมลิงก์ แล้วลบพารามิเตอร์ออกจาก URL
+    // ผลสำเร็จ/ไม่สำเร็จแสดงทั้งเป็น toast และในหน้าที่กดเชื่อม (ป๊อปอัพ หรือ Settings > Import Data ผ่าน qmSheetLinkNotice)
+    async function showSheetLinkResult() {
+      const params = new URLSearchParams(window.location.search);
+      const nonce = params.get('sheetLink');
+      if (!nonce) return;
+      params.delete('sheetLink');
+      history.replaceState(null, '', window.location.pathname + (params.toString() ? '?' + params : '') + window.location.hash);
+      let result = { status: 'error', error: 'คำขอเชื่อมลิงก์หมดอายุหรือไม่ถูกต้อง กรุณากดเชื่อมลิงก์ใหม่', returnTo: 'popup' };
+      if (nonce !== 'invalid') {
+        try { result = await dataApi({ action: 'link-status', nonce }); } catch (err) { console.error(err); }
+      }
+      const ok = result.status === 'success';
+      const text = ok
+        ? 'เชื่อมลิงก์ Google Sheet สำเร็จ · นำเข้าแล้ว ' + (result.rowCount || 0).toLocaleString() + ' แถว · ระบบจะดึงข้อมูลล่าสุดให้เองทุก 1 นาที'
+        : 'เชื่อมลิงก์ Google Sheet ไม่สำเร็จ: ' + (result.error || 'กรุณาลองใหม่');
+      if (typeof stgToast === 'function') stgToast(ok ? 'เชื่อมลิงก์ Google Sheet สำเร็จ' : 'เชื่อมลิงก์ Google Sheet ไม่สำเร็จ', ok ? 'success' : 'error');
+      if (result.returnTo === 'settings') {
+        window.qmSheetLinkNotice = { dataset: result.dataset, text, ok };
+        switchTab('settings');
+        return;
+      }
+      const popup = document.getElementById('importPopup');
+      if (!ok && getComputedStyle(popup).display === 'none') window.openImportPopup();
+      if (getComputedStyle(popup).display !== 'none') {
+        const status = document.getElementById(result.dataset === 'retention' ? 'importStatusSheetRetention' : 'importStatusSheet');
+        status.textContent = text;
+        status.className = 'import-popup-status ' + (ok ? 'success' : 'error');
+      }
+    }
+
     window.qmLinkSheet = linkSheet;
     window.qmUnlinkSheet = target => dataApi({ dataset: target, action: 'unlink' }, {});
     window.qmGetSheetSources = () => dataApi({ action: 'sources' });
@@ -1284,7 +1330,7 @@
         const link = async () => {
           if (!input.value.trim()) { input.focus(); return; }
           try {
-            const result = await linkSheet(target, input.value);
+            const result = await linkSheet(target, input.value, 'popup');
             status.textContent = 'Google Sheet · นำเข้าแล้ว ' + result.total.toLocaleString() + ' แถว · ระบบจะดึงข้อมูลล่าสุดให้เองทุก 1 นาที';
             status.className = 'import-popup-status success';
             doneBtn.textContent = 'เข้าสู่ Dashboard';

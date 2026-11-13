@@ -11,7 +11,6 @@
 const orgConfigStore = require('../../lib/orgConfigStore');
 const datasetStore = require('../../lib/datasetStore');
 const sheetSource = require('../../lib/sheetSource');
-const googleServiceAccount = require('../../lib/googleServiceAccount');
 const auditLog = require('../../lib/auditLog');
 const { DEFAULT_ORG_ID } = require('../../lib/orgStore');
 const { getAuthorizedUser } = require('../../lib/session');
@@ -19,9 +18,12 @@ const { getClientIp } = require('../../lib/reqUtils');
 
 // GET  ?dataset=main|retention                    -> the committed version's manifest ({ version: null } when none) + linked
 // GET  ?dataset=..&version=..&chunk=N            -> that chunk's rows (a Sales Admin gets only rows of their adminName)
-// GET  ?action=sources                           -> linked Google Sheets + the service account email (Super Admin / CEO)
+// GET  ?action=sources                           -> linked Google Sheets (Super Admin / CEO)
 // POST ?dataset=..&action=sync                   -> re-read the linked sheet if due (any role - keeps the dashboard live)
-// POST ?dataset=..&action=link   { url }          -> remember a sheet link and read it now (Super Admin / CEO)
+// POST ?dataset=..&action=link   { url }          -> Publish-to-web / Apps Script link: remember it and read it now (Super Admin / CEO)
+// POST ?dataset=..&action=prepare-link { url, returnTo } -> regular sheet link: -> { nonce } for the Google sign-in
+//      redirect (/api/auth/google/sheets-start?nonce=..), whose callback checks that account can open the sheet and links it
+// GET  ?action=link-status&nonce=..               -> outcome of that sign-in, for the person who started it
 // POST ?dataset=..&action=unlink                 -> forget the link, keep the data (Super Admin / CEO)
 // POST ?dataset=..&action=chunk  { version, index, rows, admins }                     (Super Admin / CEO)
 // POST ?dataset=..&action=commit { version, chunkCount, rowCount, baseVersion, mode, sourceName } (Super Admin / CEO)
@@ -40,7 +42,12 @@ async function handleData(req, res, sessionUser) {
     if (!canImport) return forbidden(req, res, sessionUser);
     const sources = {};
     for (const d of datasetStore.DATASETS) sources[d] = await sheetSource.getSource(sessionUser.orgId, d);
-    return res.status(200).json({ serviceAccountEmail: googleServiceAccount.serviceAccountEmail(), sources });
+    return res.status(200).json({ sources });
+  }
+  if (q.action === 'link-status' && req.method === 'GET') {
+    const request = await sheetSource.getLinkRequest(q.nonce);
+    if (!request || request.userId !== sessionUser.id || request.orgId !== sessionUser.orgId) return res.status(404).json({ error: 'not_found' });
+    return res.status(200).json({ status: request.status, error: request.error, rowCount: request.rowCount, googleEmail: request.googleEmail, dataset: request.dataset, returnTo: request.returnTo });
   }
   if (datasetStore.DATASETS.indexOf(dataset) === -1) return res.status(400).json({ error: 'Unknown dataset' });
 
@@ -73,8 +80,13 @@ async function handleData(req, res, sessionUser) {
   if (!canImport) return forbidden(req, res, sessionUser);
   const body = req.body || {};
   try {
+    if (q.action === 'prepare-link') {
+      const nonce = await sheetSource.createLinkRequest(sessionUser.orgId, dataset, body.url, sessionUser.id, body.returnTo);
+      return res.status(200).json({ nonce });
+    }
     if (q.action === 'link') {
-      sheetSource.parseLink(body.url);
+      // a regular sheet is read with the linking person's Google permission - see prepare-link
+      if (sheetSource.parseLink(body.url).kind === 'sheet') return res.status(400).json({ error: 'needs_google' });
       await sheetSource.setSource(sessionUser.orgId, dataset, String(body.url).trim(), sessionUser.username);
       const result = await sheetSource.syncDataset(sessionUser.orgId, dataset, { force: true });
       if (result.status === 'error') {
