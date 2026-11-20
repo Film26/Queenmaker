@@ -5,11 +5,12 @@
 // เกณฑ์ระดับตรงกับ LTV tier ของ InsightHub (25k / 12k / 4.5k) แก้ได้ที่ MEMBERSHIP_TIERS ด้านล่างที่เดียว
 // สถานะความเคลื่อนไหวนับจาก "วันที่ล่าสุดในข้อมูล" ไม่ใช่วันนี้ ตัวเลขจึงไม่เปลี่ยนเองถ้าข้อมูลไม่ได้อัปเดต
 
+// โทนสีเป็นมิตร: แต่ละระดับมีสีของตัวเอง (พาสเทลอ่อนเป็นพื้น สีเข้มเป็นตัวอักษร) โดย Gold/Platinum ยังเป็นส้ม/กรมท่าของธีม
 const MEMBERSHIP_TIERS = [
-  { id: 'platinum', name: 'Platinum', th: 'ลูกค้าระดับสูงสุด', min: 25000, color: '#1e293b', fg: '#1e293b', onBar: '#ffffff', soft: '#e2e8f0', icon: 'fa-crown' },
-  { id: 'gold', name: 'Gold', th: 'ลูกค้าประจำยอดสูง', min: 12000, color: '#d95f1d', fg: '#c2410c', onBar: '#ffffff', soft: '#fdebdf', icon: 'fa-medal' },
-  { id: 'silver', name: 'Silver', th: 'ลูกค้าประจำ', min: 4500, color: '#64748b', fg: '#475569', onBar: '#ffffff', soft: '#eef2f6', icon: 'fa-award' },
-  { id: 'member', name: 'Member', th: 'สมาชิกทั่วไป', min: 0, color: '#cbd5e1', fg: '#64748b', onBar: '#334155', soft: '#f1f5f9', icon: 'fa-user' }
+  { id: 'platinum', name: 'Platinum', th: 'ลูกค้าคนสำคัญที่สุดของแบรนด์', min: 25000, color: '#1e293b', fg: '#1e293b', onBar: '#ffffff', soft: '#e8edf5', band: '#eef2f8', icon: 'fa-crown' },
+  { id: 'gold', name: 'Gold', th: 'ลูกค้าประจำที่ซื้อยอดสูง', min: 12000, color: '#d95f1d', fg: '#c2410c', onBar: '#ffffff', soft: '#fdebdf', band: '#fff4ec', icon: 'fa-medal' },
+  { id: 'silver', name: 'Silver', th: 'ลูกค้าที่กลับมาซื้อต่อเนื่อง', min: 4500, color: '#8b5cf6', fg: '#6d28d9', onBar: '#ffffff', soft: '#ede9fe', band: '#f5f3ff', icon: 'fa-award' },
+  { id: 'member', name: 'Member', th: 'สมาชิกใหม่และลูกค้าทั่วไป', min: 0, color: '#38bdf8', fg: '#0369a1', onBar: '#0c4a6e', soft: '#e0f2fe', band: '#f0f9ff', icon: 'fa-heart' }
 ];
 // วันนับจากซื้อครั้งล่าสุด (เทียบกับวันที่ล่าสุดในข้อมูล)
 const MEMBERSHIP_STATUS = [
@@ -114,37 +115,48 @@ function memInjectStyles() {
   style.id = 'membership-styles';
   style.textContent = `
     #view-membership { font-family: 'Inter', sans-serif; color: #1e293b; }
-    .mem-hero { background: #1e293b; color: #fff; border-radius: 18px; padding: 26px 30px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px; align-items: flex-end; margin-bottom: 22px; position: relative; overflow: hidden; }
-    .mem-hero::after { content: ''; position: absolute; right: -60px; top: -60px; width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(circle, rgba(217,95,29,0.35), rgba(217,95,29,0) 70%); pointer-events: none; }
-    .mem-hero-title { display: flex; align-items: center; gap: 14px; }
-    .mem-hero-icon { width: 48px; height: 48px; border-radius: 14px; background: #d95f1d; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
-    .mem-hero h2 { margin: 0; font-family: 'Outfit', 'Inter', sans-serif; font-size: 24px; font-weight: 800; letter-spacing: 0.5px; }
-    .mem-hero p { margin: 4px 0 0; font-size: 12.5px; color: #94a3b8; }
-    .mem-hero-stats { display: flex; flex-wrap: wrap; gap: 10px 30px; position: relative; z-index: 1; }
-    .mem-hero-stat span { display: block; font-size: 11px; color: #94a3b8; letter-spacing: 0.3px; margin-bottom: 3px; }
-    .mem-hero-stat b { font-family: 'Outfit', 'Inter', sans-serif; font-size: 22px; font-weight: 800; }
-    .mem-hero-stat b small { font-size: 12px; font-weight: 600; color: #cbd5e1; margin-left: 4px; }
+    .mem-hero { position: relative; overflow: hidden; border-radius: 24px; padding: 46px 24px 34px; margin-bottom: 34px; text-align: center;
+      background: radial-gradient(circle at 12% 20%, rgba(217,95,29,0.16), rgba(217,95,29,0) 38%), radial-gradient(circle at 88% 80%, rgba(56,189,248,0.16), rgba(56,189,248,0) 40%), linear-gradient(135deg, #fff7f0 0%, #fdf2f8 50%, #eef6ff 100%); }
+    .mem-hero-deco { position: absolute; color: #d95f1d; opacity: 0.18; pointer-events: none; }
+    .mem-hero-icon { width: 58px; height: 58px; border-radius: 18px; margin: 0 auto 14px; background: #fff; color: #d95f1d; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 8px 22px rgba(217,95,29,0.18); }
+    .mem-hero h2 { margin: 0; font-family: 'Outfit', 'Inter', sans-serif; font-size: 34px; font-weight: 800; color: #1e293b; letter-spacing: 0.2px; }
+    .mem-crumb { margin-top: 8px; font-size: 12.5px; color: #64748b; }
+    .mem-crumb a { color: #1e293b; font-weight: 600; text-decoration: none; cursor: pointer; }
+    .mem-crumb b { color: #d95f1d; font-weight: 600; }
+    .mem-hero-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 24px; position: relative; z-index: 1; }
+    .mem-hero-stat { background: rgba(255,255,255,0.85); border: 1px solid rgba(255,255,255,0.9); border-radius: 16px; padding: 12px 20px; min-width: 150px; box-shadow: 0 4px 14px rgba(15,23,42,0.05); }
+    .mem-hero-stat span { display: block; font-size: 11.5px; color: #64748b; margin-bottom: 4px; }
+    .mem-hero-stat b { font-family: 'Outfit', 'Inter', sans-serif; font-size: 22px; font-weight: 800; color: #1e293b; }
+    .mem-hero-stat b small { font-size: 12px; font-weight: 600; color: #64748b; margin-left: 4px; }
 
-    .mem-tier-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 22px; }
+    .mem-section-head { text-align: center; margin: 0 auto 26px; max-width: 560px; }
+    .mem-section-head h3 { margin: 0 0 8px; font-family: 'Outfit', 'Inter', sans-serif; font-size: 26px; font-weight: 800; color: #1e293b; }
+    .mem-section-head p { margin: 0; font-size: 13px; color: #64748b; line-height: 1.7; }
+
+    .mem-tier-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; margin-bottom: 36px; }
     @media (max-width: 1200px) { .mem-tier-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 600px) { .mem-tier-grid { grid-template-columns: 1fr; } }
-    .mem-tier-card { background: #fff; border: 1px solid #eef2f7; border-radius: 16px; padding: 18px 20px; cursor: pointer; transition: box-shadow .2s, border-color .2s, transform .2s; box-shadow: 0 1px 2px rgba(15,23,42,0.04); position: relative; text-align: left; font: inherit; color: inherit; }
-    .mem-tier-card:hover { box-shadow: 0 10px 24px rgba(15,23,42,0.08); transform: translateY(-1px); }
-    .mem-tier-card.selected { border-color: var(--tier); box-shadow: 0 0 0 2px var(--tier) inset; }
-    .mem-tier-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-    .mem-tier-badge { width: 36px; height: 36px; border-radius: 10px; background: var(--tier-soft); color: var(--tier-fg); display: flex; align-items: center; justify-content: center; font-size: 15px; }
-    .mem-tier-name { font-family: 'Outfit', 'Inter', sans-serif; font-size: 16px; font-weight: 800; color: #1e293b; }
-    .mem-tier-rule { font-size: 11.5px; color: #64748b; }
-    .mem-tier-count { font-family: 'Outfit', 'Inter', sans-serif; font-size: 28px; font-weight: 800; color: #0f172a; line-height: 1; }
-    .mem-tier-count small { font-size: 12.5px; font-weight: 600; color: #64748b; margin-left: 4px; font-family: 'Inter', sans-serif; }
-    .mem-tier-meta { display: flex; justify-content: space-between; font-size: 12px; color: #64748b; margin-top: 12px; }
-    .mem-tier-meta b { color: #1e293b; }
-    .mem-tier-bar { height: 6px; border-radius: 3px; background: #f1f5f9; margin-top: 8px; overflow: hidden; }
-    .mem-tier-bar i { display: block; height: 100%; border-radius: 3px; background: var(--tier); }
+    .mem-tier-card { background: #fff; border: 1px solid #eef2f7; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; text-align: center; position: relative; box-shadow: 0 6px 20px rgba(15,23,42,0.05); transition: transform .2s, box-shadow .2s; }
+    .mem-tier-card:hover { transform: translateY(-4px); box-shadow: 0 16px 34px rgba(15,23,42,0.10); }
+    .mem-tier-card.selected { box-shadow: 0 0 0 2px var(--tier), 0 16px 34px rgba(15,23,42,0.10); }
+    .mem-ribbon { position: absolute; top: 16px; right: -36px; transform: rotate(45deg); background: #d95f1d; color: #fff; font-size: 10.5px; font-weight: 700; padding: 4px 40px; letter-spacing: 0.3px; }
+    .mem-tier-top { padding: 22px 18px 16px; }
+    .mem-tier-badge { width: 46px; height: 46px; border-radius: 50%; margin: 0 auto 10px; background: var(--tier-soft); color: var(--tier-fg); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .mem-tier-name { font-family: 'Outfit', 'Inter', sans-serif; font-size: 20px; font-weight: 800; color: #1e293b; }
+    .mem-tier-band { background: var(--tier-band); padding: 14px 18px; font-size: 12.5px; color: #475569; line-height: 1.6; min-height: 64px; display: flex; flex-direction: column; justify-content: center; }
+    .mem-tier-band b { color: var(--tier-fg); }
+    .mem-tier-price { padding: 18px 18px 6px; font-family: 'Outfit', 'Inter', sans-serif; font-size: 30px; font-weight: 800; color: var(--tier-fg); line-height: 1; }
+    .mem-tier-price small { display: block; margin-top: 6px; font-family: 'Inter', sans-serif; font-size: 11.5px; font-weight: 500; color: #94a3b8; }
+    .mem-tier-list { list-style: none; margin: 10px 0 0; padding: 0 22px; text-align: left; flex: 1; }
+    .mem-tier-list li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px dashed #e2e8f0; font-size: 13px; color: #475569; }
+    .mem-tier-list li i { width: 22px; height: 22px; border-radius: 50%; background: var(--tier-soft); color: var(--tier-fg); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
+    .mem-tier-list li b { margin-left: auto; color: #1e293b; font-weight: 700; white-space: nowrap; }
+    .mem-tier-btn { margin: 16px auto 22px; border: none; background: var(--tier-soft); color: var(--tier-fg); font: inherit; font-size: 12.5px; font-weight: 700; padding: 9px 22px; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; }
+    .mem-tier-btn:hover, .mem-tier-card.selected .mem-tier-btn { background: var(--tier); color: var(--tier-on); }
 
-    .mem-panels { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; margin-bottom: 22px; }
+    .mem-panels { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; margin-bottom: 26px; }
     @media (max-width: 1000px) { .mem-panels { grid-template-columns: 1fr; } }
-    .mem-panel { background: #fff; border: 1px solid #eef2f7; border-radius: 16px; padding: 20px 22px; box-shadow: 0 1px 2px rgba(15,23,42,0.04); min-width: 0; }
+    .mem-panel { background: #fff; border: 1px solid #eef2f7; border-radius: 20px; padding: 22px 24px; box-shadow: 0 6px 20px rgba(15,23,42,0.05); min-width: 0; }
     .mem-panel-title { font-size: 14.5px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px; margin: 0 0 4px; }
     .mem-panel-title::before { content: ''; width: 4px; height: 16px; border-radius: 2px; background: #d95f1d; }
     .mem-panel-sub { font-size: 12px; color: #64748b; margin: 0 0 16px 12px; }
@@ -158,7 +170,7 @@ function memInjectStyles() {
     .mem-insight b { color: #1e293b; }
 
     .mem-up-list { display: flex; flex-direction: column; gap: 10px; max-height: 250px; overflow-y: auto; padding-right: 4px; }
-    .mem-up-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; }
+    .mem-up-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 12px 14px; border-radius: 14px; background: #fff7f0; }
     .mem-up-name { font-size: 13px; font-weight: 600; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mem-up-need { font-size: 12px; font-weight: 700; color: #d95f1d; white-space: nowrap; }
     .mem-up-progress { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-size: 11px; color: #64748b; }
@@ -166,7 +178,7 @@ function memInjectStyles() {
     .mem-up-progress .bar i { display: block; height: 100%; background: #d95f1d; border-radius: 3px; }
     .mem-empty { font-size: 12.5px; color: #94a3b8; text-align: center; padding: 30px 10px; }
 
-    .mem-table-card { background: #fff; border: 1px solid #eef2f7; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,23,42,0.04); overflow: hidden; }
+    .mem-table-card { background: #fff; border: 1px solid #eef2f7; border-radius: 20px; box-shadow: 0 6px 20px rgba(15,23,42,0.05); overflow: hidden; }
     .mem-toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; justify-content: space-between; padding: 18px 22px 14px; }
     .mem-toolbar-left { display: flex; flex-direction: column; gap: 2px; }
     .mem-toolbar-right { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -200,7 +212,7 @@ function memInjectStyles() {
 }
 
 // --tier = สีแท่ง/กรอบ, --tier-fg = สีตัวอักษร/ไอคอน (Member สีอ่อนมาก จึงใช้ตัวอักษรเข้มกว่าแยกต่างหาก)
-const memTierVars = (t) => `--tier:${t.color}; --tier-soft:${t.soft}; --tier-fg:${t.fg};`;
+const memTierVars = (t) => `--tier:${t.color}; --tier-soft:${t.soft}; --tier-fg:${t.fg}; --tier-band:${t.band}; --tier-on:${t.onBar};`;
 
 function renderMembership() {
   const container = document.getElementById('view-membership');
@@ -208,7 +220,7 @@ function renderMembership() {
   memInjectStyles();
   const rows = window.rawData || (typeof rawData !== 'undefined' ? rawData : []);
   if (!rows.length) {
-    container.innerHTML = `<div class="mem-hero"><div class="mem-hero-title"><div class="mem-hero-icon"><i class="fas fa-user-tag"></i></div><div><h2>MEMBERSHIP</h2><p>ระดับสมาชิกจากยอดซื้อสะสมของลูกค้า</p></div></div></div>
+    container.innerHTML = `${memHeroHtml('')}
       <div class="mem-panel"><div class="mem-empty"><i class="fas fa-inbox" style="font-size:28px; display:block; margin-bottom:10px; color:#cbd5e1;"></i>ยังไม่มีข้อมูล หน้านี้ใช้ข้อมูลหลัก (Import data : CRM) ที่นำเข้าไว้</div></div>`;
     return;
   }
@@ -218,19 +230,31 @@ function renderMembership() {
   const avgSpend = total ? data.totalSpend / total : 0;
   const pct = (n, d) => d ? Math.round((n / d) * 100) : 0;
 
-  const tierCards = data.tiers.map((t, i) => {
-    const prev = i > 0 ? MEMBERSHIP_TIERS[i - 1] : null;
-    const rule = prev ? `ยอดสะสม ${memMoney(t.tier.min)} - ${memMoney(prev.min - 1)}` : `ยอดสะสม ${memMoney(t.tier.min)} ขึ้นไป`;
+  // การ์ดระดับแบบตารางแพ็กเกจ เรียงจากระดับเริ่มต้นไประดับสูงสุด (ซ้ายไปขวา)
+  const tierCards = data.tiers.slice().reverse().map(t => {
+    const i = MEMBERSHIP_TIERS.indexOf(t.tier);
+    const above = i > 0 ? MEMBERSHIP_TIERS[i - 1] : null;
+    const rule = t.tier.min > 0
+      ? (above ? `ยอดซื้อสะสม <b>${memMoney(t.tier.min)} - ${memMoney(above.min - 1)}</b>` : `ยอดซื้อสะสมตั้งแต่ <b>${memMoney(t.tier.min)}</b> ขึ้นไป`)
+      : `ยอดซื้อสะสมต่ำกว่า <b>${memMoney(above.min)}</b>`;
+    const avg = t.count ? t.spend / t.count : 0;
     return `
-      <button type="button" class="mem-tier-card${memState.tier === t.tier.id ? ' selected' : ''}" style="${memTierVars(t.tier)}" onclick="memSetTier('${t.tier.id}')" title="ดูรายชื่อสมาชิกระดับ ${t.tier.name}">
-        <div class="mem-tier-head">
+      <div class="mem-tier-card${memState.tier === t.tier.id ? ' selected' : ''}" style="${memTierVars(t.tier)}">
+        ${i === 0 ? '<div class="mem-ribbon">ระดับสูงสุด</div>' : ''}
+        <div class="mem-tier-top">
           <div class="mem-tier-badge"><i class="fas ${t.tier.icon}"></i></div>
-          <div><div class="mem-tier-name">${t.tier.name}</div><div class="mem-tier-rule">${t.tier.min > 0 ? rule : 'ยอดสะสมต่ำกว่า ' + memMoney(MEMBERSHIP_TIERS[i - 1].min)}</div></div>
+          <div class="mem-tier-name">${t.tier.name}</div>
         </div>
-        <div class="mem-tier-count">${t.count.toLocaleString('th-TH')}<small>คน · ${pct(t.count, total)}%</small></div>
-        <div class="mem-tier-meta"><span>ยอดขาย <b>${memCompact(t.spend)}</b></span><span>Active <b>${pct(t.active, t.count)}%</b></span></div>
-        <div class="mem-tier-bar"><i style="width:${pct(t.spend, data.totalSpend)}%"></i></div>
-      </button>`;
+        <div class="mem-tier-band"><span>${t.tier.th}</span><span>${rule}</span></div>
+        <div class="mem-tier-price">${t.count.toLocaleString('th-TH')} คน<small>${pct(t.count, total)}% ของสมาชิกทั้งหมด</small></div>
+        <ul class="mem-tier-list">
+          <li><i class="fas fa-check"></i>ยอดขายรวม<b>${memCompact(t.spend)}</b></li>
+          <li><i class="fas fa-check"></i>สัดส่วนยอดขาย<b>${pct(t.spend, data.totalSpend)}%</b></li>
+          <li><i class="fas fa-check"></i>ยอดเฉลี่ยต่อคน<b>${memCompact(avg)}</b></li>
+          <li><i class="fas fa-check"></i>ซื้อใน 90 วัน (Active)<b>${pct(t.active, t.count)}%</b></li>
+        </ul>
+        <button type="button" class="mem-tier-btn" onclick="memShowTier('${t.tier.id}')">ดูรายชื่อสมาชิก</button>
+      </div>`;
   }).join('');
 
   // แถบสัดส่วน 100%: จำนวนสมาชิก เทียบกับ ยอดขาย ของแต่ละระดับ (เห็นทันทีว่ากลุ่มเล็กสร้างยอดเท่าไร)
@@ -252,17 +276,17 @@ function renderMembership() {
     `<button type="button" class="mem-chip${memState.tier === t.id ? ' active' : ''}" onclick="memSetTier('${t.id}')">${t.name}</button>`).join('');
 
   container.innerHTML = `
-    <div class="mem-hero">
-      <div class="mem-hero-title">
-        <div class="mem-hero-icon"><i class="fas fa-user-tag"></i></div>
-        <div><h2>MEMBERSHIP</h2><p>ระดับสมาชิกจากยอดซื้อสะสมทุกปีของลูกค้าแต่ละคน · ข้อมูลถึง ${memDateText(data.latest)}</p></div>
-      </div>
+    ${memHeroHtml(`
       <div class="mem-hero-stats">
         <div class="mem-hero-stat"><span>สมาชิกทั้งหมด</span><b>${total.toLocaleString('th-TH')}<small>คน</small></b></div>
         <div class="mem-hero-stat"><span>Active (90 วัน)</span><b>${activeCount.toLocaleString('th-TH')}<small>${pct(activeCount, total)}%</small></b></div>
         <div class="mem-hero-stat"><span>ยอดซื้อสะสม</span><b>${memCompact(data.totalSpend)}</b></div>
         <div class="mem-hero-stat"><span>ยอดเฉลี่ยต่อสมาชิก</span><b>${memCompact(avgSpend)}</b></div>
-      </div>
+      </div>`)}
+
+    <div class="mem-section-head">
+      <h3>ระดับสมาชิก</h3>
+      <p>ลูกค้าแต่ละคนได้ระดับตามยอดซื้อสะสมทุกปี ยิ่งซื้อมากระดับยิ่งสูง · ข้อมูลถึง ${memDateText(data.latest)}</p>
     </div>
 
     <div class="mem-tier-grid">${tierCards}</div>
@@ -306,6 +330,29 @@ function renderMembership() {
     <p class="mem-note"><i class="fas fa-circle-info"></i><span>ระดับคิดจากยอดซื้อสะสมทุกปีในข้อมูลหลักที่นำเข้า · สถานะ Active / เสี่ยงหาย / ไม่เคลื่อนไหว นับจากวันที่ซื้อล่าสุดเทียบกับวันที่ล่าสุดในข้อมูล (${memDateText(data.latest)}) · เบอร์โทรแสดงแบบปิดบางส่วน</span></p>
   `;
   memRenderTable();
+}
+
+// หัวหน้าเพจ (ใช้ทั้งตอนมีข้อมูลและยังไม่มีข้อมูล) - extra = ส่วนที่ต่อท้ายใต้ชื่อหน้า เช่นตัวเลขสรุป
+function memHeroHtml(extra) {
+  return `
+    <div class="mem-hero">
+      <i class="fas fa-heart mem-hero-deco" style="top:26px; left:9%; font-size:30px; transform:rotate(-14deg);"></i>
+      <i class="fas fa-star mem-hero-deco" style="top:62px; right:11%; font-size:22px; color:#38bdf8;"></i>
+      <i class="fas fa-crown mem-hero-deco" style="bottom:26px; left:16%; font-size:20px; color:#1e293b; opacity:0.10;"></i>
+      <i class="fas fa-heart mem-hero-deco" style="bottom:40px; right:20%; font-size:16px; color:#8b5cf6;"></i>
+      <div class="mem-hero-icon"><i class="fas fa-user-tag"></i></div>
+      <h2>Membership Levels</h2>
+      <div class="mem-crumb"><a onclick="switchTab('overview')">CRM Dashboard</a> / <b>Membership</b></div>
+      ${extra}
+    </div>`;
+}
+
+// ปุ่ม "ดูรายชื่อสมาชิก" บนการ์ด: กรองตารางเป็นระดับนั้น แล้วเลื่อนลงไปที่ตาราง
+function memShowTier(id) {
+  memState.tier = id; memState.page = 1;
+  renderMembership();
+  const table = document.querySelector('.mem-table-card');
+  if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function memFilteredMembers() {
@@ -387,4 +434,4 @@ function getMembershipExportRows() {
 
 window.renderMembership = renderMembership;
 window.getMembershipExportRows = getMembershipExportRows;
-window.memSetTier = memSetTier; window.memSetSearch = memSetSearch; window.memSetSort = memSetSort; window.memSetPage = memSetPage;
+window.memSetTier = memSetTier; window.memShowTier = memShowTier; window.memSetSearch = memSetSearch; window.memSetSort = memSetSort; window.memSetPage = memSetPage;
