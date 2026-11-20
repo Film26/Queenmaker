@@ -178,7 +178,7 @@
              api/insighthub/config.js were removed - Settings now has an Export Log tab instead.) -->
         <li class="nav-item"><a href="https://insinghub.vercel.app" target="_blank" rel="noopener noreferrer" class="nav-link" id="side-insight"><i class="fas fa-users"></i>INSIGHT HUB</a></li>
         <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-chart-pie"></i>MUSIGHT HUB</a></li>
-        <li class="nav-item"><a href="#" class="nav-link"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
+        <li class="nav-item"><a href="#" class="nav-link" id="side-membership" onclick="event.preventDefault(); switchTab('membership')"><i class="fas fa-user-tag"></i>MEMBERSHIP</a></li>
         <li class="nav-item"><a href="#" class="nav-link" id="side-ai-analytics" onclick="event.preventDefault(); switchTab('ai-analytics')"><i class="fas fa-brain"></i>AI ANALYTICS</a></li>
         <!-- id="exportBtn" ต้องคงไว้เดิม - checkSessionOrRedirect() อ้างถึง id นี้ตรงๆ เพื่อโชว์/ซ่อนตามสิทธิ์
              (เฉพาะ Super Admin/CEO ดู EXPORT_ROLES) ซ่อนไว้ก่อนด้วย display:none จนกว่าจะรู้ role ของผู้ใช้ -->
@@ -495,6 +495,8 @@
         <div id="view-ai-analytics" class="view-content" style="display:none; padding: 20px;"></div>
         <div id="view-insighthub" class="view-content" style="display:none; padding: 20px;"></div>
         <div id="view-kpisetting" class="view-content" style="display:none; padding: 20px;"></div>
+        <!-- หน้า MEMBERSHIP (public/membership.js) ระดับสมาชิกจากยอดซื้อสะสมในข้อมูลหลัก -->
+        <div id="view-membership" class="view-content" style="display:none; padding: 20px;"></div>
         <div id="view-settings" class="view-content" style="display:none; padding: 20px;"></div>
 
       </div>
@@ -616,7 +618,7 @@
     const EXPORT_ROLES = ['Super Admin', 'CEO'];
     const IMPORT_ROLES = EXPORT_ROLES;
     const EXPORT_SEEN_KEY = 'qm_exportlog_seen';
-    const EXPORT_PAGE_LABELS = { overview: 'Overview', executive1: 'Executive', executive2: 'Migration', retention: 'Retention', cohort: 'Cohort Heatmap', 'ai-analytics': 'AI Analytics' };
+    const EXPORT_PAGE_LABELS = { overview: 'Overview', executive1: 'Executive', executive2: 'Migration', retention: 'Retention', cohort: 'Cohort Heatmap', 'ai-analytics': 'AI Analytics', membership: 'Membership' };
     window.qmExportUnseen = 0;
     window.currentTabId = 'overview';
 
@@ -752,7 +754,10 @@
         const sheetNames = [];
         const addSheet = (ws, name) => { XLSX.utils.book_append_sheet(wb, ws, name); sheetNames.push(name); };
 
-        if (tab === 'overview') {
+        if (tab === 'membership') {
+          // รายชื่อสมาชิกทั้งหมดตามระดับ/คำค้นที่เลือกอยู่ (ตารางบนหน้าแสดงทีละ 20 คน จึงไม่ใช้ตารางบนหน้า)
+          addSheet(XLSX.utils.json_to_sheet(window.getMembershipExportRows()), 'Members');
+        } else if (tab === 'overview') {
           addSheet(XLSX.utils.aoa_to_sheet(buildOverviewSummaryRows()), 'Summary');
           addSheet(XLSX.utils.json_to_sheet(buildMonthlyExportRows()), 'Monthly');
         } else {
@@ -1416,6 +1421,8 @@
       if (sideSettings) sideSettings.classList.remove('active');
       const sideAiAnalytics = document.getElementById('side-ai-analytics');
       if (sideAiAnalytics) sideAiAnalytics.classList.remove('active');
+      const sideMembership = document.getElementById('side-membership');
+      if (sideMembership) sideMembership.classList.remove('active');
 
       const mainFiltersBar = document.getElementById('mainFiltersBar');
       const execFiltersBar = document.getElementById('execFiltersBar');
@@ -1464,6 +1471,17 @@
         } else if (typeof renderInsightHub === 'function') {
           renderInsightHub(insightHubFilteredData, insightHubRawData);
         }
+      } else if (tabId === 'membership') {
+        // หน้าเต็มของตัวเอง (ไม่มีแถบแท็บ/Filter บนสุด) - ระดับสมาชิกคิดจากยอดสะสมทุกปีของข้อมูลหลักทั้งหมด
+        if (sideMembership) sideMembership.classList.add('active');
+        document.getElementById('view-membership').style.display = 'block';
+
+        const tabsContainer = document.querySelector('.tabs-container');
+        if (tabsContainer) tabsContainer.style.display = 'none';
+        if (mainFiltersBar) mainFiltersBar.style.display = 'none';
+        if (execFiltersBar) execFiltersBar.style.display = 'none';
+
+        if (typeof renderMembership === 'function') { renderMembership(); }
       } else if (tabId === 'kpisetting') {
         if (sideKpiSetting) sideKpiSetting.classList.add('active');
         document.getElementById('view-kpisetting').style.display = 'block';
@@ -2567,6 +2585,8 @@
       // loadInsightHubDataFromAppsScript/window.refreshInsightHub above), unrelated to this
       // CSV-driven filters/rawData pipeline.
       try { if (document.getElementById('view-retention').style.display === 'block') { refreshRetentionView(); } } catch(e) { console.error(e); }
+      // ข้อมูลอัปเดต (นำเข้าใหม่/ชีตที่เชื่อมไว้เปลี่ยน) ตอนเปิดหน้า MEMBERSHIP อยู่ - คำนวณใหม่ทันที
+      try { if (document.getElementById('view-membership').style.display === 'block' && typeof renderMembership === 'function') { renderMembership(); } } catch(e) { console.error(e); }
       try { if (document.getElementById('view-ai-analytics').style.display === 'block' && typeof renderAiAnalytics === 'function') { renderAiAnalytics(getAiAnalyticsData(), getScopedRawData(), { year: filters.Year, month: filters.Month }); } } catch(e) { console.error(e); }
       // หน้า Executive ใช้ execFilters แยกต่างหาก ไม่ได้อยู่ในลูป filteredData ด้านบน - ถ้าไม่เรียกตรงนี้ด้วย
       // การ Import Data/Load Sample ใหม่ตอนที่ค้างอยู่หน้า Executive อยู่แล้ว จะไม่รีเฟรชข้อมูลเลย (ค้าง
@@ -3354,6 +3374,7 @@
   <script src="insighthub.js?v=16"></script>
   <script src="retention.js?v=2"></script>
   <script src="kpisetting.js?v=3"></script>
+  <script src="membership.js?v=1"></script>
   <script src="api-client.js?v=2"></script>
   <script src="settings.js?v=6"></script>
 </body>
